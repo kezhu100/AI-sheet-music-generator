@@ -33,6 +33,7 @@ Current milestone:
 - Phase 11A completed: source separation now supports explicit provider selection, an optional stronger Demucs backend, and a documented fallback path while preserving normalized persisted stems and downstream contracts
 - Phase 11B completed: piano transcription now supports explicit provider selection, an optional stronger Basic Pitch backend, and a documented fallback path while preserving the normalized result pipeline
 - Phase 11C completed: drum transcription now supports explicit provider selection, an optional stronger madmom-backed backend, and a documented fallback path while preserving the normalized result pipeline
+- Phase 11D completed: backend post-processing is now more robust, with stronger tempo estimation, confidence-aware cleanup, adaptive quantization, duplicate removal, overlap cleanup, and steadier merged track output while preserving the normalized `JobResult` contract
 
 Current behavior:
 
@@ -40,7 +41,7 @@ Current behavior:
 - Source separation now runs through a configured provider: the default development copy backend remains available, and an optional Demucs-based backend can be selected with graceful fallback
 - Piano transcription now runs through a configured provider: the default heuristic backend remains available, and an optional Basic Pitch-based backend can be selected with graceful fallback
 - Drum transcription now runs through a configured provider: the default heuristic backend remains available, and an optional madmom-based backend can be selected with graceful fallback
-- Post-processing now estimates tempo, quantizes note timing, aligns beat/bar positions, and filters low-confidence events before result delivery
+- Post-processing now cleans provider output before delivery: it merges compatible tracks, filters low-confidence or suspiciously short noisy events, estimates a single project tempo from weighted onset evidence, picks an eighth-note or sixteenth-note grid adaptively, removes near-duplicate events, trims overlapping piano durations when needed, and aligns final beat/bar positions
 - Timing conversions and timing display helpers are now organized into reusable utility modules to prepare for later export work
 - Completed jobs can now be exported as minimal MIDI and MusicXML drafts generated from the post-processed result
 - Completed jobs can now be visually inspected in a piano-roll plus simplified piano/drum score preview UI driven by the normalized result
@@ -174,7 +175,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running the Current Phase 11C Build Locally
+## Running the Current Phase 11D Build Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
@@ -232,8 +233,11 @@ Current limitations:
 - the current Basic Pitch integration normalizes note start/end/pitch/confidence output into the existing `NoteEvent` shape, but it does not yet add provider-specific controls such as sustain-pedal reasoning or piano-only post-filters
 - the heuristic drum provider is intentionally lightweight and may simplify or misclassify dense drum-kit material
 - the current madmom integration uses a stronger ML-backed onset path but still maps final drum lanes back into the stable `kick` / `snare` / `hi-hat` labels expected by the current editor workflow
-- post-processing currently assumes a simple 4/4 grid and a single project-wide tempo estimate
-- MIDI export currently assumes the same single tempo and quantized timing already produced by Phase 5
+- post-processing now does more cleanup than Phase 5, but it still assumes a simple 4/4 grid and a single project-wide tempo estimate rather than a tempo map
+- tempo estimation is still heuristic; sparse, rubato, or heavily syncopated material may return only an approximate BPM or fall back to 120 BPM with a warning
+- quantization now chooses between simple eighth-note and sixteenth-note grids based on the detected timing evidence, but it does not model tuplets, swing, or notation-specific phrasing
+- duplicate removal and overlap trimming are intentionally conservative cleanup passes, not a DAW-grade performance-edit model
+- MIDI export currently assumes the same single tempo and quantized timing already produced by the backend post-processing stage
 - MusicXML export currently assumes the same single tempo and 4/4 grid, and focuses on structural compatibility rather than engraving quality
 - the piano score preview is intentionally simplified, currently shows only the first visible piano track, and focuses on inspection rather than engraving fidelity
 - the drum preview is notation-oriented but lane/grid based rather than full percussion staff engraving, and currently shows only the first visible drum track
@@ -271,5 +275,5 @@ Current validation reality:
 
 ## Future Roadmap
 
-- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, and Phase 11C drum-provider upgrades are now in place; later Phase 11 work still includes smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
+- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, Phase 11C drum-provider upgrades, and Phase 11D post-processing upgrades are now in place; later Phase 11 work still includes region re-transcription and AI-assisted correction while keeping the normalized pipeline stable
 - Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment

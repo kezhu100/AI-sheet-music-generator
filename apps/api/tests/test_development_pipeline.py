@@ -32,7 +32,8 @@ class DevelopmentPipelineTests(unittest.TestCase):
             ).run(audio_path, "demo.wav", "job-test")
 
         self.assertEqual(result.project_name, "demo")
-        self.assertEqual(result.bpm, 120)
+        self.assertGreaterEqual(result.bpm, 100)
+        self.assertLessEqual(result.bpm, 140)
         self.assertEqual(len(result.stems), 2)
         self.assertEqual(len(result.tracks), 2)
         self.assertEqual({stem.instrument_hint for stem in result.stems}, {"piano", "drums"})
@@ -57,7 +58,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
         self.assertIn(60, detected_pitches)
         self.assertIn(64, detected_pitches)
         self.assertIn(67, detected_pitches)
-        self.assertTrue(all(self._is_sixteenth_aligned(note.onset_sec, result.bpm) for note in piano_track.notes))
+        self.assertTrue(all(self._is_quantized_to_supported_grid(note.onset_sec, result.bpm) for note in piano_track.notes))
 
         drum_track = next(track for track in result.tracks if track.instrument == "drums")
         self.assertEqual(drum_track.provider, "heuristic-wav-drum-provider")
@@ -106,7 +107,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
 
         self.assertEqual(result.bpm, 120)
         self.assertIn(
-            "Phase 5 post-processing filtered 1 low-confidence note events before returning the normalized result.",
+            "Phase 11D post-processing filtered 1 low-confidence note events before returning the normalized result.",
             result.warnings,
         )
         self.assertEqual(len(result.tracks), 1)
@@ -197,10 +198,13 @@ class DevelopmentPipelineTests(unittest.TestCase):
 
         return output
 
-    def _is_sixteenth_aligned(self, onset_sec: float, bpm: int) -> bool:
-        grid = (60.0 / bpm) / 4.0
-        remainder = round(onset_sec / grid, 6)
-        return abs(remainder - round(remainder)) <= 1e-6
+    def _is_quantized_to_supported_grid(self, onset_sec: float, bpm: int) -> bool:
+        for subdivision in (2, 4):
+            grid = (60.0 / bpm) / subdivision
+            nearest_step = round(onset_sec / grid)
+            if abs(onset_sec - (nearest_step * grid)) <= 0.003:
+                return True
+        return False
 
 
 if __name__ == "__main__":

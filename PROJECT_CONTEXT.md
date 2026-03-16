@@ -106,6 +106,23 @@ Current Phase 11C runtime behavior:
 - the current stronger path uses ML-backed onset detection but still normalizes output into the stable `kick`, `snare`, and `hi-hat` lane mapping expected by the existing editor workflow
 - this repository environment validates provider selection and fallback behavior, but it has not yet validated end-to-end madmom quality on a real installed ML runtime
 
+### Phase 11D - Post-Processing Upgrade
+Completed.
+
+Implemented features:
+- backend post-processing now merges compatible `(instrument, sourceStem)` tracks with stable provider naming before final cleanup
+- confidence-aware cleanup now removes low-confidence events and filters short weak piano notes before final tempo estimation
+- tempo estimation now uses weighted onset evidence from cleaned note events instead of only a minimal adjacent-interval heuristic
+- quantization now stays backend-owned, still returns a single project BPM, and adaptively chooses between eighth-note and sixteenth-note grids
+- near-duplicate events are removed before final result delivery, and overlapping piano notes with the same pitch are trimmed when quantization would otherwise leave them stacked
+- dedicated backend tests now cover richer post-processing behavior, sparse/noisy fallback, duplicate cleanup, overlap cleanup, and stable merged-track output
+
+Current Phase 11D runtime behavior:
+- the result schema remains stable and still returns `projectName`, `bpm`, `stems`, `tracks`, and `warnings`
+- post-processing remains intentionally heuristic and still assumes a simple 4/4 grid plus a single project-wide tempo estimate
+- tempo estimation is more robust than the old Phase 5 path, but it can still fall back to 120 BPM or produce only an approximate BPM for sparse, expressive, or noisy material
+- warnings now surface meaningful cleanup and fallback behavior instead of silently pretending the normalized result is more precise than it really is
+
 ### Phase 5 - Post Processing
 Completed.
 
@@ -292,7 +309,7 @@ run the configured piano transcription provider on the persisted piano stem
 ->
 run the configured drum transcription provider on the persisted drum stem
 ->
-run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
+run backend-owned post-processing for confidence-aware cleanup, tempo estimation, adaptive quantization, duplicate cleanup, track merge, and beat/bar alignment
 ->
 clone the completed normalized result into a frontend editing draft when the user opens a completed job
 ->
@@ -308,7 +325,7 @@ return normalized stems + tracks + warnings
 ->
 frontend displays stems + track summaries + warnings, score previews, event details, and can request MIDI or MusicXML export
 
-The architecture now supports swapping source separation, piano transcription, and drum transcription providers explicitly through config, while later Phase 11 post-processing work remains follow-up work.
+The architecture now supports swapping source separation, piano transcription, and drum transcription providers explicitly through config, while keeping richer post-processing in a dedicated backend stage before result delivery.
 
 ---
 
@@ -327,6 +344,7 @@ pipeline/
 - piano_transcription.py
 - drum_transcription.py
 - post_processing.py
+- post_processing_helpers.py
 - timing.py
 
 services/
@@ -426,14 +444,16 @@ Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
 - Phase 11B is complete for stronger piano transcription provider selection and fallback
 - Phase 11C is complete for stronger drum transcription provider selection and fallback
-- later Phase 11 work should still improve post-processing and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
+- later Phase 11 work should still focus on region re-transcription and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
 - Phase 10 editing UX improvements are complete
 - Phase 11A source separation work is complete
 - Phase 11B piano transcription work is complete
 - Phase 11C drum transcription work is complete
-- the next Phase 11 steps should focus on smarter post-processing and correction assistance rather than redesigning the draft/export model
+- Phase 11D post-processing work is complete
+- the next Phase 11 steps should focus on region re-transcription and correction assistance rather than redesigning the draft/export model
 
 ---
 
@@ -460,7 +480,7 @@ Current runtime limitations:
 - the optional madmom backend depends on a separately prepared Python runtime with the required ML package installed
 - the heuristic drum fallback currently runs only on uncompressed PCM `.wav` stems
 - the drum provider keeps normalized output aligned to stable kick/snare/hi-hat lane mapping, so richer drum-kit label coverage is still future work
-- post-processing currently assumes a simple 4/4 grid and does not support tempo changes
+- post-processing now includes confidence-aware cleanup, duplicate removal, adaptive eighth/sixteenth quantization, and overlap trimming for same-pitch piano notes, but it still assumes a simple 4/4 grid and does not support tempo changes
 - MIDI export currently assumes a single project-wide tempo and does not preserve tempo maps or notation-only semantics
 - MusicXML export currently assumes a single project-wide tempo, 4/4 meter, and simple structural notation without advanced engraving semantics
 - piano score preview currently uses a simplified grand-staff approximation rather than full engraving or MusicXML-quality notation layout

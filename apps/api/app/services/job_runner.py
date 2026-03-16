@@ -53,7 +53,7 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             status="processing",
             stage="post_processing",
             percent=90,
-            message="Estimating tempo, quantizing events, aligning beats and bars, and filtering low-confidence notes.",
+            message="Cleaning events, estimating a stable project tempo, quantizing timing, aligning beats and bars, and merging normalized tracks.",
         )
         sleep(0.4)
 

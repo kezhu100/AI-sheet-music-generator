@@ -4,6 +4,35 @@
 
 ### 2026-03-16
 Decision:
+- Implement Phase 11D as a richer backend post-processing layer that keeps provider responsibilities unchanged, preserves the normalized `JobResult` contract, and moves the new cleanup logic into dedicated post-processing helpers instead of scattering timing rules across the pipeline.
+
+Context:
+- Phase 11A through 11C had already made separation, piano transcription, and drum transcription configurable, but final result cleanup was still the older lightweight Phase 5 pass.
+- Preview, editing, draft persistence, and export already depended on the normalized `JobResult`, so Phase 11D needed to improve timing stability and event cleanliness without redesigning downstream consumers.
+- The main quality gaps were fragile tempo estimation, over-simple confidence filtering, lack of duplicate cleanup, and overlapping piano-note output that could survive provider normalization.
+
+Chosen option:
+- Keep `apps/api/app/pipeline/post_processing.py` as the orchestration entry point.
+- Add `apps/api/app/pipeline/post_processing_helpers.py` for weighted tempo estimation, adaptive eighth/sixteenth quantization choice, confidence-aware cleanup, near-duplicate removal, overlap trimming, stable merged-track ordering, and cleanup-warning summaries.
+- Continue returning a single project-wide BPM and the existing normalized note fields (`instrument`, `pitch`, `onset_sec`, `offset_sec`, `velocity`, `confidence`, `bar`, `beat`, `source_stem`).
+- Surface cleanup and fallback behavior through warnings rather than pretending the output is DAW-grade or schema-richer than it is.
+
+Alternatives considered:
+- Leaving the richer logic embedded directly inside `post_processing.py`.
+- Pushing provider-specific cleanup rules back into piano or drum providers.
+- Expanding the result schema with tempo maps, variable meter, or extra post-processing metadata during this phase.
+
+Tradeoffs:
+- Extracted helpers make the richer cleanup easier to test and extend, but they add another backend module to maintain.
+- The upgraded heuristics are more stable than the old Phase 5 path, but they still remain approximate on sparse, noisy, or expressive material.
+- Preserving the existing result contract keeps preview, editing, persistence, and export stable, but more advanced timing semantics remain intentionally deferred.
+
+Follow-up:
+- Keep Phase 11E region re-transcription separate from post-processing so providers and correction workflows do not collapse into one layer.
+- Revisit tempo-map or meter-aware modeling only if a later phase truly needs it without breaking the normalized output boundary.
+
+### 2026-03-16
+Decision:
 - Implement Phase 11C drum transcription as an explicitly configured provider selection layer that keeps the existing heuristic WAV backend, adds an optional madmom-backed provider, and supports graceful fallback without changing the normalized `JobResult`.
 
 Context:

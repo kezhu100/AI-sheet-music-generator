@@ -54,3 +54,10 @@ Phase 11C drum transcription update:
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized drum note events still flow into the same post-processing stage and the same `JobResult` structure
 - the stronger drum path keeps output mapped to the stable `kick`, `snare`, and `hi-hat` lanes expected by the current editor workflow
+
+Phase 11D post-processing update:
+- the post-processing stage remains backend-owned and still returns the same normalized `JobResult` shape
+- post-processing now performs richer cleanup before final delivery: confidence-aware filtering, short weak-note removal, near-duplicate cleanup, and overlapping same-pitch piano-note trimming where quantization would otherwise leave stacked durations
+- tempo estimation now uses weighted onset evidence from cleaned note events instead of only a minimal adjacent-interval heuristic
+- quantization still assumes a simple single-tempo 4/4 result, but it now adaptively chooses between eighth-note and sixteenth-note grids for more predictable normalization
+- warnings now surface fallback or cleanup behavior more explicitly when timing evidence is sparse/noisy or when events are removed during normalization

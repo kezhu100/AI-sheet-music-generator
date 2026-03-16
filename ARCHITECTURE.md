@@ -58,7 +58,7 @@ Responsibilities:
 4. persist stems
 5. run the configured piano transcription provider on the persisted piano stem when supported
 6. run the configured drum transcription provider on the persisted drum stem when supported
-7. run lightweight post-processing for confidence filtering, tempo estimation, quantization, track merge, and beat/bar alignment
+7. run backend-owned post-processing for confidence-aware cleanup, weighted tempo estimation, adaptive quantization, duplicate cleanup, track merge, and beat/bar alignment
 8. normalize timing through reusable helper boundaries
 9. normalize to the common event schema
 10. merge into a job result
@@ -79,7 +79,7 @@ Current runtime note:
 - the default drum transcription provider is still the heuristic WAV backend for predictable local setup
 - an optional madmom-backed provider can generate stronger normalized drum hit events when its runtime is configured
 - the stronger drum provider path can fall back to the heuristic provider without changing downstream contracts
-- step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
+- step 7 is implemented with a richer backend post-processing stage that still reuses the existing `bpm`, `bar`, and `beat` fields instead of introducing a new timing schema
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
 - step 11 is currently implemented with a local file-backed draft store under `apps/api/data/drafts`
 - step 12 is currently implemented with stdlib-only backend MIDI and MusicXML exporters that use either the completed `JobResult` or a validated override payload
@@ -151,6 +151,12 @@ Phase 5.5 timing helper boundaries:
 - backend timing math lives in `apps/api/app/pipeline/timing.py`
 - frontend-facing reusable timing helpers live in `packages/music-engine/src/timing.ts`
 
+Phase 11D post-processing boundaries:
+- `apps/api/app/pipeline/post_processing.py` remains the orchestration entry point for final backend cleanup and normalization
+- `apps/api/app/pipeline/post_processing_helpers.py` now owns richer cleanup and timing decisions such as weighted tempo estimation, adaptive grid selection, duplicate removal, overlap trimming, and cleanup-warning summaries
+- provider modules still only emit normalized raw note events; they do not absorb post-processing responsibilities
+- the frontend, draft persistence, preview, and export layers continue to consume the same normalized `JobResult`
+
 Phase 6 export boundary:
 - MIDI export generation lives in `apps/api/app/services/midi_export.py`
 - MusicXML export generation lives in `apps/api/app/services/musicxml_export.py`
@@ -205,7 +211,7 @@ Validation boundary after Phase 10:
 - minimal cohesive changes per phase
 - export logic should remain independent from ML providers
 - frontend should consume normalized results only
-- post-processing should stay lightweight until later export or notation phases demand richer timing models
+- post-processing should stay backend-owned and practical rather than DAW-grade, even as later phases make the cleanup heuristics richer
 - preview rendering should stay decoupled from editing behavior and avoid forcing backend contract changes before Phase 8
 - Phase 8 editing should stay draft-oriented and avoid introducing persistence until the product explicitly needs saved edits
 - Phase 9 draft persistence should extend the existing draft model rather than collapsing edited state into the original job result
