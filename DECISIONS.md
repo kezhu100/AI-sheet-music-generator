@@ -2,6 +2,35 @@
 
 ## Decision Log
 
+### 2026-03-16
+Decision:
+- Implement Phase 10 editing UX on top of the existing normalized draft `JobResult` by keeping reusable bulk-editing rules in `packages/music-engine` and keeping undo/redo history as session-local frontend state.
+
+Context:
+- Phase 9 already persisted the latest saved edited draft separately from the original completed backend result.
+- Phase 10 needed undo/redo, multi-selection, box selection, keyboard editing, quantization tools, and drum lane reassignment without collapsing the distinction between original result, saved draft, and in-session editable draft.
+- The current architecture already had a strong split between reusable editing helpers in `packages/music-engine` and UI orchestration in `apps/web`.
+
+Chosen option:
+- Extend `packages/music-engine/src/editing.ts` with reusable richer editing helpers for multi-note lookup, bulk delete, group timing moves, quantization, piano transposition, and drum lane reassignment.
+- Keep undo/redo stacks, selection-state orchestration, and keyboard shortcut handling in `apps/web/app/hooks/useEditableJobResult.ts`.
+- Keep piano-roll box selection and drag gestures in `apps/web/app/components/PianoRollPreview.tsx`, with page-level composition still centered in `apps/web/app/page.tsx`.
+- Continue exporting only validated normalized `JobResult` payloads for either the original backend result or the current draft override.
+
+Alternatives considered:
+- Persisting undo/redo history or editor deltas in backend draft storage during Phase 10.
+- Keeping the new multi-selection and bulk-editing logic mostly inside page-level React handlers.
+- Introducing a larger DAW-style editor framework for box selection and keyboard control.
+
+Tradeoffs:
+- Session-local history keeps the implementation small and coherent with the current draft snapshot model, but undo/redo does not survive refresh or draft reload.
+- Centralizing reusable edit rules in `packages/music-engine` improves maintainability and testability, but some UI-specific interaction state still lives in the web app by design.
+- The piano-roll editor remains intentionally MVP-scale and practical rather than a full notation workstation.
+
+Follow-up:
+- Revisit persistent revision history only if later product phases truly need saved undo stacks or multi-revision project workflows.
+- Expand richer notation editing only when it can still preserve the current normalized draft/export boundaries.
+
 ### 2026-03-15
 Initial project framing:
 - Focus on piano and drums first.

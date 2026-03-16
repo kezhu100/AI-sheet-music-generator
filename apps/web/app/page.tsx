@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   areJobResultsEqual,
+  beatsToSeconds,
   buildPreviewTracks,
   formatEventTiming,
   getNoteDurationSec,
@@ -49,6 +50,8 @@ export default function HomePage() {
   const [addPitch, setAddPitch] = useState(60);
   const [addDrumLabel, setAddDrumLabel] = useState("snare");
   const [addDrumMidiNote, setAddDrumMidiNote] = useState(38);
+  const [reassignDrumLabel, setReassignDrumLabel] = useState("snare");
+  const [reassignDrumMidiNote, setReassignDrumMidiNote] = useState(38);
   const lastDraftJobIdRef = useRef<string | null>(null);
   const {
     draftResult,
@@ -57,18 +60,31 @@ export default function HomePage() {
     hasSavedDraft,
     savedDraftVersion,
     savedDraftSavedAt,
+    canUndo,
+    canRedo,
     selectedDraftNoteId,
+    selectedDraftNoteIds,
+    selectedDraftNotes,
     selectedTrack,
     selectedNote,
     selectedTrackKey,
-    setSelectedDraftNoteId,
+    selectDraftNote,
+    replaceSelection,
+    clearSelection,
     clearEditableState,
     updateSelectedNote,
     addDraftNote,
-    deleteSelectedNote,
+    deleteSelectedNotes,
     moveNote,
     changeSelectedDuration,
     changeSelectedPitch,
+    transposeSelectedPianoNotes,
+    quantizeSelection,
+    quantizeAllNotes,
+    reassignSelectedDrumLane,
+    undo,
+    redo,
+    selectAllNotes,
     resetDraftFromOriginalResult,
     restoreSavedDraft,
     getCurrentDraftResult
@@ -202,7 +218,21 @@ export default function HomePage() {
     if (selectedNote.midiNote != null) {
       setAddDrumMidiNote(selectedNote.midiNote);
     }
+    if (selectedNote.instrument === "drums") {
+      setReassignDrumLabel(selectedNote.drumLabel ?? "snare");
+      setReassignDrumMidiNote(selectedNote.midiNote ?? 38);
+    }
   }, [activeResult?.bpm, selectedNote, selectedTrackKey]);
+
+  useEffect(() => {
+    const selectedDrumNotes = selectedDraftNotes.filter((note) => note.note.instrument === "drums");
+    if (selectedDrumNotes.length === 0) {
+      return;
+    }
+
+    setReassignDrumLabel(selectedDrumNotes[0].note.drumLabel ?? "snare");
+    setReassignDrumMidiNote(selectedDrumNotes[0].note.midiNote ?? 38);
+  }, [selectedDraftNotes]);
 
   useEffect(() => {
     if (!activeResult || activeResult.tracks.length === 0) {
@@ -357,16 +387,20 @@ export default function HomePage() {
     );
   }
 
-  function handleSelectNote(_trackKey: string, draftNoteId: string): void {
-    setSelectedDraftNoteId(draftNoteId);
+  function handleSelectNote(_trackKey: string, draftNoteId: string, options?: { additive?: boolean }): void {
+    selectDraftNote(draftNoteId, options);
+  }
+
+  function handleBoxSelect(noteIds: string[], options?: { additive?: boolean }): void {
+    replaceSelection(noteIds, { additive: options?.additive, primaryDraftNoteId: noteIds[0] ?? null });
   }
 
   function handleMoveNote(_trackKey: string, draftNoteId: string, onsetSec: number): void {
     moveNote(draftNoteId, onsetSec);
   }
 
-  function handleDeleteSelectedNote(): void {
-    deleteSelectedNote();
+  function handleDeleteSelectedNotes(): void {
+    deleteSelectedNotes();
   }
 
   function handleAddNote(): void {
@@ -392,6 +426,122 @@ export default function HomePage() {
     });
   }
 
+  function handleReassignSelectedDrumLane(): void {
+    reassignSelectedDrumLane(reassignDrumLabel, reassignDrumMidiNote);
+  }
+
+  useEffect(() => {
+    if (!activeResult) {
+      return;
+    }
+
+    const activeBpm = activeResult.bpm;
+
+    function targetIsEditable(eventTarget: EventTarget | null): boolean {
+      if (!(eventTarget instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tagName = eventTarget.tagName.toLowerCase();
+      return tagName === "input" || tagName === "textarea" || tagName === "select" || eventTarget.isContentEditable;
+    }
+
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (targetIsEditable(event.target)) {
+        return;
+      }
+
+      const hasSelection = selectedDraftNoteIds.length > 0;
+      const isMetaShortcut = event.metaKey || event.ctrlKey;
+      const nudgeSec = beatsToSeconds(0.25, activeBpm);
+
+      if (isMetaShortcut && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+
+      if (isMetaShortcut && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+        return;
+      }
+
+      if (isMetaShortcut && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        selectAllNotes();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "q" && hasSelection) {
+        event.preventDefault();
+        quantizeSelection(4);
+        return;
+      }
+
+      if ((event.key === "Delete" || event.key === "Backspace") && hasSelection) {
+        event.preventDefault();
+        deleteSelectedNotes();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        clearSelection();
+        return;
+      }
+
+      if (event.key === "ArrowLeft" && selectedDraftNoteId) {
+        event.preventDefault();
+        const anchor = selectedDraftNotes.find((selected) => selected.selection.draftNoteId === selectedDraftNoteId);
+        if (anchor) {
+          moveNote(selectedDraftNoteId, Math.max(0, anchor.note.onsetSec - nudgeSec));
+        }
+        return;
+      }
+
+      if (event.key === "ArrowRight" && selectedDraftNoteId) {
+        event.preventDefault();
+        const anchor = selectedDraftNotes.find((selected) => selected.selection.draftNoteId === selectedDraftNoteId);
+        if (anchor) {
+          moveNote(selectedDraftNoteId, anchor.note.onsetSec + nudgeSec);
+        }
+        return;
+      }
+
+      if (event.key === "ArrowUp" && hasSelection && selectedDraftNotes.every((selected) => selected.note.instrument === "piano")) {
+        event.preventDefault();
+        transposeSelectedPianoNotes(1);
+        return;
+      }
+
+      if (event.key === "ArrowDown" && hasSelection && selectedDraftNotes.every((selected) => selected.note.instrument === "piano")) {
+        event.preventDefault();
+        transposeSelectedPianoNotes(-1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activeResult?.bpm,
+    clearSelection,
+    deleteSelectedNotes,
+    moveNote,
+    quantizeSelection,
+    redo,
+    selectAllNotes,
+    selectedDraftNoteId,
+    selectedDraftNoteIds.length,
+    selectedDraftNotes,
+    transposeSelectedPianoNotes,
+    undo
+  ]);
+
   return (
     <main className="page">
       <section className="hero">
@@ -400,12 +550,13 @@ export default function HomePage() {
             <h1>AI Sheet Music Generator</h1>
             <p>
               Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
-              and drum notation views, then save and continue Phase 9 draft edits before exporting original or edited MIDI and MusicXML.
+              and drum notation views, then save, multi-select, quantize, and continue Phase 10 draft edits before exporting original or edited MIDI and MusicXML.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 9 draft persistence</span>
-              <span className="pill">Drag timing edits</span>
-              <span className="pill">Saved draft reload</span>
+              <span className="pill">Phase 10 editing UX</span>
+              <span className="pill">Undo / redo</span>
+              <span className="pill">Box selection</span>
+              <span className="pill">Quantize + drum lanes</span>
               <span className="pill">Track visibility toggles</span>
               <span className="pill">Original vs draft export</span>
             </div>
@@ -617,12 +768,15 @@ export default function HomePage() {
           <h2>Piano-Roll Preview</h2>
           {activeResult ? (
             <>
-              <p className="muted">Select notes here and drag horizontally to move timing.</p>
+              <p className="muted">Select, Ctrl/Cmd-add, or box-select notes here, then drag horizontally to move timing.</p>
               <PianoRollPreview
                 bpm={activeResult.bpm}
+                onBoxSelect={handleBoxSelect}
+                onClearSelection={clearSelection}
                 onMoveNote={handleMoveNote}
                 onSelectNote={handleSelectNote}
                 selectedNoteId={selectedDraftNoteId}
+                selectedNoteIds={selectedDraftNoteIds}
                 selectedTrackKey={selectedTrackKey}
                 tracks={visibleTracks}
               />
@@ -649,23 +803,35 @@ export default function HomePage() {
             savedDraftVersion={savedDraftVersion}
             savedDraftSavedAt={savedDraftSavedAt}
             isSavingDraft={isSavingDraft}
+            canUndo={canUndo}
+            canRedo={canRedo}
             onAddNote={handleAddNote}
             onChangeAddDrumLabel={setAddDrumLabel}
             onChangeAddDrumMidiNote={setAddDrumMidiNote}
             onChangeAddDurationSec={setAddDurationSec}
             onChangeAddOnsetSec={setAddOnsetSec}
             onChangeAddPitch={setAddPitch}
+            onChangeReassignDrumLabel={setReassignDrumLabel}
+            onChangeReassignDrumMidiNote={setReassignDrumMidiNote}
             onChangeSelectedDurationSec={changeSelectedDuration}
             onChangeSelectedOnsetSec={(value) =>
               updateSelectedNote((draft, draftNoteId) => updateNoteTiming(draft, draftNoteId, value))
             }
             onChangeSelectedPitch={changeSelectedPitch}
-            onDeleteSelectedNote={handleDeleteSelectedNote}
+            onDeleteSelectedNotes={handleDeleteSelectedNotes}
+            onQuantizeSelection={quantizeSelection}
+            onQuantizeAll={quantizeAllNotes}
+            onReassignSelectedDrumLane={handleReassignSelectedDrumLane}
+            onUndo={undo}
+            onRedo={redo}
             onSaveDraft={() => void handleSaveDraft()}
             onRevertDraft={resetDraftFromOriginalResult}
             onRestoreSavedDraft={restoreSavedDraft}
             onSelectAddTrack={setAddTrackKey}
+            reassignDrumLabel={reassignDrumLabel}
+            reassignDrumMidiNote={reassignDrumMidiNote}
             selectedNote={selectedNote}
+            selectedNotes={selectedDraftNotes.map((selected) => selected.note)}
             selectedTrack={selectedTrack}
           />
         </div>
@@ -690,7 +856,7 @@ export default function HomePage() {
             <article className="note-card">
               <strong>Current limitation</strong>
               <div className="muted">
-                Draft save stores only the latest full edited result per job. There is no delete, branching, or revision history beyond the incrementing version number.
+                Draft save still stores only the latest full edited result per job. Undo/redo history is session-local and is not persisted as revision history.
               </div>
             </article>
             {job?.result ? (
@@ -743,9 +909,14 @@ export default function HomePage() {
               {pianoTrack.notes.length > 0 ? (
                 pianoTrack.notes.slice(0, 8).map((note) => (
                   <article
-                    className={`note-card ${selectedDraftNoteId === note.draftNoteId ? "is-selected-card" : ""}`}
+                    className={`note-card ${note.draftNoteId && selectedDraftNoteIds.includes(note.draftNoteId) ? "is-selected-card" : ""}`}
                     key={note.draftNoteId ?? note.id}
-                    onClick={() => note.draftNoteId && handleSelectNote(getTrackKey(pianoTrack), note.draftNoteId)}
+                    onClick={(event) =>
+                      note.draftNoteId &&
+                      handleSelectNote(getTrackKey(pianoTrack), note.draftNoteId, {
+                        additive: event.metaKey || event.ctrlKey || event.shiftKey
+                      })
+                    }
                   >
                     <strong>{formatNote(note)}</strong>
                     <div>{formatEventTiming(note)}</div>
@@ -775,9 +946,14 @@ export default function HomePage() {
               {drumTrack.notes.length > 0 ? (
                 drumTrack.notes.slice(0, 12).map((note) => (
                   <article
-                    className={`note-card ${selectedDraftNoteId === note.draftNoteId ? "is-selected-card" : ""}`}
+                    className={`note-card ${note.draftNoteId && selectedDraftNoteIds.includes(note.draftNoteId) ? "is-selected-card" : ""}`}
                     key={note.draftNoteId ?? note.id}
-                    onClick={() => note.draftNoteId && handleSelectNote(getTrackKey(drumTrack), note.draftNoteId)}
+                    onClick={(event) =>
+                      note.draftNoteId &&
+                      handleSelectNote(getTrackKey(drumTrack), note.draftNoteId, {
+                        additive: event.metaKey || event.ctrlKey || event.shiftKey
+                      })
+                    }
                   >
                     <strong>{formatNote(note)}</strong>
                     <div>{formatEventTiming(note)}</div>

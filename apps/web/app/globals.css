@@ -296,6 +296,13 @@ code.inline {
   stroke-width: 2;
 }
 
+.selection-box {
+  fill: rgba(13, 110, 110, 0.12);
+  stroke: rgba(13, 110, 110, 0.8);
+  stroke-dasharray: 8 6;
+  stroke-width: 1.5;
+}
+
 .editor-panel,
 .editor-grid,
 .editor-fields {
@@ -327,6 +334,14 @@ code.inline {
   border-radius: 12px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.86);
+}
+
+.bulk-actions,
+.editor-fields.section {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .measure-grid {

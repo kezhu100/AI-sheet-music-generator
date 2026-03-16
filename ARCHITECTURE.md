@@ -125,7 +125,7 @@ Phase 7 preview boundary:
 
 Phase 8 editing boundary:
 - the web app keeps a frontend-only draft `JobResult` cloned from the completed backend result
-- editing state and normalization helpers live in `packages/music-engine/src/editing.ts`
+- editing helpers and normalization helpers live in `packages/music-engine/src/editing.ts`
 - note selection now uses stable per-draft `draftNoteId` values attached during draft cloning
 - note updates, add/delete behavior, drum-note defaults, and edited-result normalization are centralized in `packages/music-engine/src/editing.ts`
 - `apps/web/app/hooks/useEditableJobResult.ts` now owns most draft-state orchestration (`isDraftDirty`, reset-to-original, note selection, and export override wiring)
@@ -143,9 +143,19 @@ Phase 9 persistence boundary:
 - the frontend auto-loads a saved draft when one exists and keeps export choices explicit between original result and current draft
 - export still operates on validated normalized `JobResult` payloads rather than a separate export-only schema
 
-Validation boundary after the Phase 8 wrap-up:
+Phase 10 editing UX boundary:
+- reusable richer editing rules remain in `packages/music-engine/src/editing.ts`, including bulk selection lookup, multi-note delete/move, quantization helpers, piano transposition, and drum lane reassignment
+- session-local undo/redo stacks and selection-state orchestration live in `apps/web/app/hooks/useEditableJobResult.ts`
+- the hook stores history entries as draft `JobResult` snapshots plus selected draft-note ids; this keeps undo/redo separate from backend draft persistence
+- `apps/web/app/components/PianoRollPreview.tsx` owns surface-specific interaction such as additive note clicks, box selection geometry, and drag gesture wiring
+- `apps/web/app/components/NoteEditorPanel.tsx` owns editing affordances only: undo/redo buttons, quantize actions, and drum reassignment controls
+- `apps/web/app/page.tsx` remains composition-oriented and wires flow, persistence, export, and high-level keyboard shortcuts without embedding note-editing rules directly
+- original completed backend results, saved latest draft snapshots, and current in-session editable draft state remain distinct artifacts
+- export still consumes validated normalized `JobResult` payloads and does not introduce a separate Phase 10 export schema
+
+Validation boundary after Phase 10:
 - backend unittest discovery runs through `scripts/test-api.mjs` and the project venv
-- focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests`
+- focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests` and now includes richer bulk-editing helpers
 - `npm run validate` is the reliable current repo-wide validation command
 - frontend lint remains outside the reliable path until the repo adopts a real ESLint configuration and dependency set
 
@@ -160,3 +170,4 @@ Validation boundary after the Phase 8 wrap-up:
 - preview rendering should stay decoupled from editing behavior and avoid forcing backend contract changes before Phase 8
 - Phase 8 editing should stay draft-oriented and avoid introducing persistence until the product explicitly needs saved edits
 - Phase 9 draft persistence should extend the existing draft model rather than collapsing edited state into the original job result
+- Phase 10 editing UX should extend the same normalized draft model and keep UI gesture logic separate from reusable editing rules

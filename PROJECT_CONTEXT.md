@@ -163,7 +163,26 @@ Current Phase 8 runtime behavior:
 - drum notes support timing move, add, and delete
 - editing rules are centralized in `packages/music-engine/src/editing.ts`, and the frontend now treats components as action emitters plus state wiring
 - edited results are normalized before export and backend override payloads are validated before export generation
-- drum-lane reassignment is intentionally not included in this MVP and remains a documented limitation
+
+### Phase 10 - Editing UX Improvements
+Completed.
+
+Implemented features:
+- undo / redo for draft edits inside the frontend editing session
+- additive multi-note selection from the piano roll and event detail lists
+- box selection in the piano-roll editing surface
+- keyboard shortcuts for undo/redo, delete, selection clear, timing nudging, piano transposition, quantize, and select-all
+- quantization helpers for selected notes or the whole current draft
+- drum lane reassignment for selected drum notes while preserving normalized draft/export compatibility
+- expanded shared editing-helper coverage for richer state transitions and bulk edit operations
+
+Current Phase 10 runtime behavior:
+- the original completed backend `JobResult` remains distinct from the editable draft and from the saved latest draft snapshot
+- undo/redo history is session-local in the frontend editor and is not stored as persistent revision history
+- selection state, history-aware draft orchestration, and keyboard handling live in `apps/web/app/hooks/useEditableJobResult.ts`
+- reusable bulk editing rules live in `packages/music-engine/src/editing.ts`
+- piano-roll box selection and drag interaction stay inside `apps/web/app/components/PianoRollPreview.tsx`
+- export continues to run from validated normalized `JobResult` payloads for either the original result or the current draft override
 
 ### Phase 8 - Engineering Wrap-Up
 Completed.
@@ -290,6 +309,10 @@ Current UI supports:
 - simplified drum notation preview display
 - track visibility toggles
 - note selection and editing draft controls
+- additive multi-note selection and piano-roll box selection
+- undo / redo and keyboard editing shortcuts
+- quantization controls for selected notes or the whole draft
+- drum lane reassignment for selected drum hits
 - saved-draft auto-load and explicit save/reload controls
 - add/delete note controls
 - original-result versus draft-result export actions
@@ -333,14 +356,14 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 10 - Next Candidate
+## Phase 11 - Next Candidate
 
 Goal:
-Build on the now-persisted editing MVP with stronger editing ergonomics and richer instrument-specific editing behavior.
+Improve transcription quality and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10.
 
 Scope reminder:
-- Phase 9 editing persistence is now complete
-- deeper editing ergonomics and richer notation editing are still future work
+- Phase 10 editing UX improvements are now complete
+- the next phase should focus on provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
 
 ---
 
@@ -369,7 +392,7 @@ Current runtime limitations:
 - drum preview currently uses a notation-oriented lane/grid renderer rather than full percussion staff engraving
 - preview panes currently focus on the first visible piano track and first visible drum track for notation-style rendering
 - the saved draft system currently stores only the latest full edited result per job, not a revision history
-- drum-lane reassignment is not yet implemented
+- undo/redo history is session-local and not stored as persistent revision history
 - job state is still in-memory and is lost when the API restarts
 
 Phase 7
@@ -389,10 +412,7 @@ Completed:
 
 ## Phase 10 - Editing UX Improvements
 
-Goal:
-Make correction work faster and more ergonomic once edit persistence exists.
-
-Planned capabilities:
+Completed:
 - undo / redo
 - multi-note selection
 - box selection
@@ -400,7 +420,7 @@ Planned capabilities:
 - quantization tools
 - drum lane reassignment
 
-Motivation:
+Notes:
 - Phase 8 established single-note editing and Phase 9 makes edits durable
 - Phase 10 should improve editor throughput rather than changing the pipeline contract
 - richer editing should continue to operate on the same normalized draft result shape whenever possible

@@ -7,22 +7,35 @@ export {
   DEFAULT_DRUM_MIDI_NOTE,
   DEFAULT_DRUM_DURATION_BEATS,
   deleteNote,
+  deleteNotes,
   generateDraftNoteId,
   getNoteDurationSec,
   MIN_NOTE_DURATION_SEC,
+  moveNotesByDelta,
   normalizeDrumLabel,
   normalizeEditedResult,
   normalizeJobResult,
   normalizeNoteEvent,
   normalizeTrackResult,
+  quantizeDraftNotes,
+  reassignDrumLane,
   resetDraftFromOriginal,
   resolveDrumMidiNote,
   selectNote,
+  selectNotes,
+  sanitizeDraftNoteIds,
+  transposeNotes,
   updateNoteDuration,
   updateNotePitch,
   updateNoteTiming
 } from "./editing.js";
-export type { AddDraftNoteInput, AddDraftNoteResult, DraftSelection, SelectedDraftNote } from "./editing.js";
+export type {
+  AddDraftNoteInput,
+  AddDraftNoteResult,
+  DraftSelection,
+  QuantizeDraftNotesInput,
+  SelectedDraftNote
+} from "./editing.js";
 export {
   DEFAULT_BEATS_PER_BAR,
   DEFAULT_QUANTIZATION_SUBDIVISION,

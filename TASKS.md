@@ -81,13 +81,13 @@
 - [x] document saved-draft limitations and lifecycle clearly
 
 ## Phase 10 - Editing UX Improvements
-- [ ] add undo / redo for draft edits
-- [ ] add multi-note selection
-- [ ] add box selection in the piano-roll editing surface
-- [ ] add keyboard editing shortcuts and affordances
-- [ ] add quantization tools for edited notes
-- [ ] add drum lane reassignment
-- [ ] expand tests around richer editing actions and state transitions
+- [x] add undo / redo for draft edits
+- [x] add multi-note selection
+- [x] add box selection in the piano-roll editing surface
+- [x] add keyboard editing shortcuts and affordances
+- [x] add quantization tools for edited notes
+- [x] add drum lane reassignment
+- [x] expand tests around richer editing actions and state transitions
 
 ## Phase 11 - Result Quality & AI Improvements
 - [ ] evaluate stronger source separation backends behind the existing provider contract

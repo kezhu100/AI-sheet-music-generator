@@ -27,6 +27,11 @@ export interface SelectedDraftNote {
   note: NoteEvent;
 }
 
+export interface QuantizeDraftNotesInput {
+  draftNoteIds?: string[];
+  subdivision: number;
+}
+
 export interface AddDraftNoteInput {
   trackKey: string;
   instrument: InstrumentType;
@@ -143,6 +148,42 @@ export function selectNote(result: JobResult, draftNoteId: string): SelectedDraf
   return null;
 }
 
+export function selectNotes(result: JobResult, draftNoteIds: string[]): SelectedDraftNote[] {
+  const requestedIds = new Set(draftNoteIds);
+  const selectedNotes: SelectedDraftNote[] = [];
+
+  for (const track of result.tracks) {
+    const trackKey = getTrackKey(track);
+    for (const note of track.notes) {
+      if (note.draftNoteId && requestedIds.has(note.draftNoteId)) {
+        selectedNotes.push({
+          selection: {
+            draftNoteId: note.draftNoteId,
+            trackKey
+          },
+          track,
+          note
+        });
+      }
+    }
+  }
+
+  return selectedNotes.sort(
+    (left, right) =>
+      left.note.onsetSec - right.note.onsetSec ||
+      compareOptionalNumber(left.note.pitch, right.note.pitch) ||
+      left.selection.draftNoteId.localeCompare(right.selection.draftNoteId)
+  );
+}
+
+export function sanitizeDraftNoteIds(result: JobResult, draftNoteIds: string[]): string[] {
+  const availableIds = new Set(
+    result.tracks.flatMap((track) => track.notes.map((note) => note.draftNoteId).filter((draftNoteId): draftNoteId is string => Boolean(draftNoteId)))
+  );
+
+  return draftNoteIds.filter((draftNoteId, index) => availableIds.has(draftNoteId) && draftNoteIds.indexOf(draftNoteId) === index);
+}
+
 export function updateNoteTiming(result: JobResult, draftNoteId: string, onsetSec: number): JobResult {
   const selected = selectNote(result, draftNoteId);
   if (!selected) {
@@ -155,6 +196,35 @@ export function updateNoteTiming(result: JobResult, draftNoteId: string, onsetSe
     onsetSec,
     offsetSec: onsetSec + durationSec
   }));
+}
+
+export function moveNotesByDelta(result: JobResult, draftNoteIds: string[], deltaSec: number): JobResult {
+  const selectedNotes = selectNotes(result, draftNoteIds);
+  if (selectedNotes.length === 0) {
+    return result;
+  }
+
+  const earliestOnsetSec = Math.min(...selectedNotes.map((selected) => selected.note.onsetSec));
+  const safeDeltaSec = Math.max(deltaSec, -earliestOnsetSec);
+  const selectedIds = new Set(selectedNotes.map((selected) => selected.selection.draftNoteId));
+
+  return normalizeEditedResult({
+    ...result,
+    tracks: result.tracks.map((track) => ({
+      ...track,
+      notes: track.notes.map((note) => {
+        if (!note.draftNoteId || !selectedIds.has(note.draftNoteId)) {
+          return note;
+        }
+
+        return {
+          ...note,
+          onsetSec: note.onsetSec + safeDeltaSec,
+          offsetSec: (note.offsetSec ?? note.onsetSec) + safeDeltaSec
+        };
+      })
+    }))
+  });
 }
 
 export function updateNoteDuration(result: JobResult, draftNoteId: string, durationSec: number): JobResult {
@@ -172,11 +242,16 @@ export function updateNotePitch(result: JobResult, draftNoteId: string, pitch: n
 }
 
 export function deleteNote(result: JobResult, draftNoteId: string): JobResult {
+  return deleteNotes(result, [draftNoteId]);
+}
+
+export function deleteNotes(result: JobResult, draftNoteIds: string[]): JobResult {
+  const selectedIds = new Set(draftNoteIds);
   return normalizeEditedResult({
     ...result,
     tracks: result.tracks.map((track) => ({
       ...track,
-      notes: track.notes.filter((note) => note.draftNoteId !== draftNoteId)
+      notes: track.notes.filter((note) => !note.draftNoteId || !selectedIds.has(note.draftNoteId))
     }))
   });
 }
@@ -242,6 +317,86 @@ export function normalizeDrumLabel(drumLabel?: string): string {
   return normalized && normalized.length > 0 ? normalized : "snare";
 }
 
+export function quantizeDraftNotes(result: JobResult, input: QuantizeDraftNotesInput): JobResult {
+  const selectedIds = input.draftNoteIds ? new Set(input.draftNoteIds) : null;
+
+  return normalizeEditedResult({
+    ...result,
+    tracks: result.tracks.map((track) => ({
+      ...track,
+      notes: track.notes.map((note) => {
+        if (selectedIds && (!note.draftNoteId || !selectedIds.has(note.draftNoteId))) {
+          return note;
+        }
+
+        const onsetBeat = secondsToBeats(note.onsetSec, result.bpm);
+        const durationBeat = secondsToBeats(getNoteDurationSec(note, result.bpm), result.bpm);
+        const quantizedOnsetSec = beatsToSeconds(roundToSubdivision(onsetBeat, input.subdivision), result.bpm);
+        const quantizedOffsetSec = beatsToSeconds(
+          roundToSubdivision(onsetBeat + durationBeat, input.subdivision),
+          result.bpm
+        );
+
+        return {
+          ...note,
+          onsetSec: Number(Math.max(0, quantizedOnsetSec).toFixed(3)),
+          offsetSec: Number(Math.max(quantizedOnsetSec + MIN_NOTE_DURATION_SEC, quantizedOffsetSec).toFixed(3))
+        };
+      })
+    }))
+  });
+}
+
+export function reassignDrumLane(
+  result: JobResult,
+  draftNoteIds: string[],
+  drumLabel: string,
+  midiNote?: number
+): JobResult {
+  const selectedIds = new Set(draftNoteIds);
+  const normalizedDrumLabel = normalizeDrumLabel(drumLabel);
+  const resolvedMidiNote = resolveDrumMidiNote(normalizedDrumLabel, midiNote);
+
+  return normalizeEditedResult({
+    ...result,
+    tracks: result.tracks.map((track) => ({
+      ...track,
+      notes: track.notes.map((note) => {
+        if (note.instrument !== "drums" || !note.draftNoteId || !selectedIds.has(note.draftNoteId)) {
+          return note;
+        }
+
+        return {
+          ...note,
+          drumLabel: normalizedDrumLabel,
+          midiNote: resolvedMidiNote
+        };
+      })
+    }))
+  });
+}
+
+export function transposeNotes(result: JobResult, draftNoteIds: string[], semitones: number): JobResult {
+  const selectedIds = new Set(draftNoteIds);
+
+  return normalizeEditedResult({
+    ...result,
+    tracks: result.tracks.map((track) => ({
+      ...track,
+      notes: track.notes.map((note) => {
+        if (note.instrument !== "piano" || note.pitch == null || !note.draftNoteId || !selectedIds.has(note.draftNoteId)) {
+          return note;
+        }
+
+        return {
+          ...note,
+          pitch: note.pitch + semitones
+        };
+      })
+    }))
+  });
+}
+
 export function buildDraftNoteId(trackKey: string, noteId: string): string {
   return `draft:${trackKey}:${noteId}`;
 }
@@ -262,6 +417,11 @@ function updateDraftNote(result: JobResult, draftNoteId: string, updater: (note:
       notes: track.notes.map((note) => (note.draftNoteId === draftNoteId ? updater(note) : note))
     }))
   });
+}
+
+function roundToSubdivision(beatPosition: number, subdivision: number): number {
+  const safeSubdivision = Math.max(1, subdivision);
+  return Math.round(beatPosition * safeSubdivision) / safeSubdivision;
 }
 
 function clamp(value: number, min: number, max: number): number {

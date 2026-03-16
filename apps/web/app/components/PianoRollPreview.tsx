@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getDrumLanes,
   getNoteDurationSec,
@@ -16,15 +16,28 @@ interface PianoRollPreviewProps {
   bpm: number;
   selectedTrackKey?: string | null;
   selectedNoteId?: string | null;
-  onSelectNote?: (trackKey: string, noteId: string) => void;
+  selectedNoteIds?: string[];
+  onSelectNote?: (trackKey: string, noteId: string, options?: { additive?: boolean }) => void;
+  onBoxSelect?: (noteIds: string[], options?: { additive?: boolean }) => void;
+  onClearSelection?: () => void;
   onMoveNote?: (trackKey: string, noteId: string, onsetSec: number) => void;
 }
 
-interface DragState {
+interface NoteDragState {
+  mode: "note";
   trackKey: string;
   draftNoteId: string;
   startClientX: number;
   originalOnsetSec: number;
+}
+
+interface BoxSelectionState {
+  mode: "box";
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  additive: boolean;
 }
 
 interface PreviewNote extends NoteEvent {
@@ -32,15 +45,26 @@ interface PreviewNote extends NoteEvent {
   offsetSec: number;
 }
 
+interface NoteLayout extends PreviewNote {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export function PianoRollPreview({
   tracks,
   bpm,
   selectedTrackKey,
   selectedNoteId,
+  selectedNoteIds = [],
   onSelectNote,
+  onBoxSelect,
+  onClearSelection,
   onMoveNote
 }: PianoRollPreviewProps) {
-  const [dragState, setDragState] = useState<DragState | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [interactionState, setInteractionState] = useState<NoteDragState | BoxSelectionState | null>(null);
 
   const pianoNotes = useMemo(
     () =>
@@ -79,23 +103,100 @@ export function PianoRollPreview({
   const drumHeight = drumRowCount > 0 ? drumRowCount * rowHeight + 24 : 0;
   const height = pianoHeight + drumHeight;
   const durationSec = Math.max(0.25, timeBounds.durationSec);
+  const selectedIds = useMemo(() => new Set(selectedNoteIds), [selectedNoteIds]);
+  const pianoLayouts = useMemo(
+    () =>
+      pianoNotes.map((note) => {
+        const pitch = note.pitch ?? pitchRange.minPitch;
+        const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
+        const width = Math.max(8, ((note.offsetSec - note.onsetSec) / durationSec) * gridWidth);
+        const rowIndex = pitchRange.maxPitch - pitch;
+        const y = rowIndex * rowHeight + 2;
+
+        return {
+          ...note,
+          x,
+          y,
+          width,
+          height: rowHeight - 4
+        };
+      }),
+    [durationSec, gridWidth, labelWidth, pianoNotes, pitchRange.maxPitch, pitchRange.minPitch, rowHeight, timeBounds.startSec]
+  );
+  const drumLayouts = useMemo(
+    () =>
+      drumLanes.flatMap((lane, laneIndex) => {
+        const laneTop = pianoHeight + laneIndex * rowHeight;
+        return lane.notes.map((laneNote) => {
+          const note = laneNote as PreviewNote;
+          const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
+
+          return {
+            ...note,
+            x: x - 4,
+            y: laneTop + 3,
+            width: 8,
+            height: rowHeight - 6
+          };
+        });
+      }),
+    [drumLanes, durationSec, gridWidth, labelWidth, pianoHeight, rowHeight, timeBounds.startSec]
+  );
+  const noteLayouts = [...pianoLayouts, ...drumLayouts];
 
   useEffect(() => {
-    if (!dragState || !onMoveNote) {
+    if (!interactionState) {
       return;
     }
 
-    const activeDrag = dragState;
-    const moveNote = onMoveNote;
+    const activeInteraction = interactionState;
 
     function handlePointerMove(event: PointerEvent): void {
-      const deltaX = event.clientX - activeDrag.startClientX;
-      const deltaSec = (deltaX / gridWidth) * durationSec;
-      moveNote(activeDrag.trackKey, activeDrag.draftNoteId, Math.max(0, activeDrag.originalOnsetSec + deltaSec));
+      if (activeInteraction.mode === "note" && onMoveNote) {
+        const deltaX = event.clientX - activeInteraction.startClientX;
+        const deltaSec = (deltaX / gridWidth) * durationSec;
+        onMoveNote(
+          activeInteraction.trackKey,
+          activeInteraction.draftNoteId,
+          Math.max(0, activeInteraction.originalOnsetSec + deltaSec)
+        );
+        return;
+      }
+
+      if (activeInteraction.mode === "box") {
+        const nextPoint = clientPointToSvgPoint(svgRef.current, event.clientX, event.clientY);
+        if (!nextPoint) {
+          return;
+        }
+
+        setInteractionState((current) =>
+          current?.mode === "box"
+            ? {
+                ...current,
+                currentX: nextPoint.x,
+                currentY: nextPoint.y
+              }
+            : current
+        );
+      }
     }
 
     function handlePointerUp(): void {
-      setDragState(null);
+      if (activeInteraction.mode === "box") {
+        const selectionBounds = toSelectionBounds(activeInteraction);
+        const intersectingNoteIds = noteLayouts
+          .filter((layout) => intersects(selectionBounds, layout))
+          .map((layout) => layout.draftNoteId)
+          .filter((draftNoteId): draftNoteId is string => Boolean(draftNoteId));
+
+        if (intersectingNoteIds.length > 0) {
+          onBoxSelect?.(intersectingNoteIds, { additive: activeInteraction.additive });
+        } else if (!activeInteraction.additive) {
+          onClearSelection?.();
+        }
+      }
+
+      setInteractionState(null);
     }
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -105,12 +206,47 @@ export function PianoRollPreview({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [dragState, durationSec, gridWidth, onMoveNote]);
+  }, [durationSec, gridWidth, interactionState, noteLayouts, onBoxSelect, onClearSelection, onMoveNote]);
 
   return (
     <div className="preview-scroll">
-      <svg aria-label="Piano roll preview" className="preview-svg" role="img" viewBox={`0 0 ${width} ${height}`}>
+      <svg
+        aria-label="Piano roll preview"
+        className="preview-svg"
+        ref={svgRef}
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
         <rect fill="rgba(255,255,255,0.82)" height={height} rx="18" width={width} x="0" y="0" />
+        <rect
+          fill="transparent"
+          height={height}
+          width={width}
+          x="0"
+          y="0"
+          onPointerDown={(event) => {
+            if (!onBoxSelect) {
+              if (!(event.metaKey || event.ctrlKey)) {
+                onClearSelection?.();
+              }
+              return;
+            }
+
+            const startPoint = clientPointToSvgPoint(svgRef.current, event.clientX, event.clientY);
+            if (!startPoint) {
+              return;
+            }
+
+            setInteractionState({
+              mode: "box",
+              startX: startPoint.x,
+              startY: startPoint.y,
+              currentX: startPoint.x,
+              currentY: startPoint.y,
+              additive: event.metaKey || event.ctrlKey || event.shiftKey
+            });
+          }}
+        />
 
         {pianoNotes.length > 0
           ? Array.from({ length: pianoRowCount }, (_, index) => {
@@ -133,27 +269,26 @@ export function PianoRollPreview({
           return <line className="preview-grid-line strong" key={`time-grid-${index}`} x1={x} x2={x} y1="0" y2={height} />;
         })}
 
-        {pianoNotes.map((note) => {
-          const pitch = note.pitch ?? pitchRange.minPitch;
-          const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
-          const noteWidth = Math.max(8, ((note.offsetSec - note.onsetSec) / durationSec) * gridWidth);
-          const rowIndex = pitchRange.maxPitch - pitch;
-          const y = rowIndex * rowHeight + 2;
-          const isSelected = selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId;
-
+        {pianoLayouts.map((note) => {
+          const isSelected =
+            (selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId) ||
+            (note.draftNoteId ? selectedIds.has(note.draftNoteId) : false);
           return (
             <rect
               className={`piano-roll-note piano ${isSelected ? "is-selected" : ""}`}
-              height={rowHeight - 4}
+              height={note.height}
               key={note.draftNoteId ?? `${note.trackKey}-${note.id}`}
               onPointerDown={(event) => {
                 if (!note.draftNoteId) {
                   return;
                 }
 
-                onSelectNote?.(note.trackKey, note.draftNoteId);
+                event.stopPropagation();
+                const additive = event.metaKey || event.ctrlKey || event.shiftKey;
+                onSelectNote?.(note.trackKey, note.draftNoteId, { additive });
                 if (onMoveNote) {
-                  setDragState({
+                  setInteractionState({
+                    mode: "note",
                     trackKey: note.trackKey,
                     draftNoteId: note.draftNoteId,
                     startClientX: event.clientX,
@@ -163,9 +298,9 @@ export function PianoRollPreview({
               }}
               rx="5"
               style={{ cursor: onMoveNote ? "grab" : "pointer" }}
-              width={noteWidth}
-              x={x}
-              y={y}
+              width={note.width}
+              x={note.x}
+              y={note.y}
             />
           );
         })}
@@ -180,10 +315,10 @@ export function PianoRollPreview({
               </text>
               <line className="preview-grid-line" x1={labelWidth} x2={width} y1={laneTop + rowHeight} y2={laneTop + rowHeight} />
 
-              {lane.notes.map((laneNote) => {
-                const note = laneNote as PreviewNote;
-                const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
-                const isSelected = selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId;
+              {drumLayouts.filter((note) => note.y >= laneTop && note.y < laneTop + rowHeight).map((note) => {
+                const isSelected =
+                  (selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId) ||
+                  (note.draftNoteId ? selectedIds.has(note.draftNoteId) : false);
 
                 return (
                   <rect
@@ -195,9 +330,12 @@ export function PianoRollPreview({
                         return;
                       }
 
-                      onSelectNote?.(note.trackKey, note.draftNoteId);
+                      event.stopPropagation();
+                      const additive = event.metaKey || event.ctrlKey || event.shiftKey;
+                      onSelectNote?.(note.trackKey, note.draftNoteId, { additive });
                       if (onMoveNote) {
-                        setDragState({
+                        setInteractionState({
+                          mode: "note",
                           trackKey: note.trackKey,
                           draftNoteId: note.draftNoteId,
                           startClientX: event.clientX,
@@ -207,15 +345,25 @@ export function PianoRollPreview({
                     }}
                     rx="4"
                     style={{ cursor: onMoveNote ? "grab" : "pointer" }}
-                    width="8"
-                    x={x - 4}
-                    y={laneTop + 3}
+                    width={note.width}
+                    x={note.x}
+                    y={note.y}
                   />
                 );
               })}
             </g>
           );
         })}
+
+        {interactionState?.mode === "box" ? (
+          <rect
+            className="selection-box"
+            height={Math.abs(interactionState.currentY - interactionState.startY)}
+            width={Math.abs(interactionState.currentX - interactionState.startX)}
+            x={Math.min(interactionState.startX, interactionState.currentX)}
+            y={Math.min(interactionState.startY, interactionState.currentY)}
+          />
+        ) : null}
       </svg>
     </div>
   );
@@ -227,4 +375,49 @@ function toPreviewNote(note: NoteEvent, trackKey: string, bpm: number): PreviewN
     trackKey,
     offsetSec: note.offsetSec ?? note.onsetSec + getNoteDurationSec(note, bpm)
   };
+}
+
+function clientPointToSvgPoint(
+  svgElement: SVGSVGElement | null,
+  clientX: number,
+  clientY: number
+): { x: number; y: number } | null {
+  if (!svgElement) {
+    return null;
+  }
+
+  const bounds = svgElement.getBoundingClientRect();
+  if (bounds.width === 0 || bounds.height === 0) {
+    return null;
+  }
+
+  const viewBox = svgElement.viewBox.baseVal;
+  const x = ((clientX - bounds.left) / bounds.width) * viewBox.width;
+  const y = ((clientY - bounds.top) / bounds.height) * viewBox.height;
+
+  return {
+    x: Math.max(0, Math.min(viewBox.width, x)),
+    y: Math.max(0, Math.min(viewBox.height, y))
+  };
+}
+
+function toSelectionBounds(selection: BoxSelectionState): { x: number; y: number; width: number; height: number } {
+  return {
+    x: Math.min(selection.startX, selection.currentX),
+    y: Math.min(selection.startY, selection.currentY),
+    width: Math.abs(selection.currentX - selection.startX),
+    height: Math.abs(selection.currentY - selection.startY)
+  };
+}
+
+function intersects(
+  bounds: { x: number; y: number; width: number; height: number },
+  noteLayout: { x: number; y: number; width: number; height: number }
+): boolean {
+  return (
+    noteLayout.x < bounds.x + bounds.width &&
+    noteLayout.x + noteLayout.width > bounds.x &&
+    noteLayout.y < bounds.y + bounds.height &&
+    noteLayout.y + noteLayout.height > bounds.y
+  );
 }

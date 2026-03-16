@@ -25,3 +25,9 @@ Phase 9 persistence update:
 - each save replaces the previous saved draft for that job and increments a minimal version number
 - the frontend auto-loads the saved draft when present and still keeps original-result export separate from draft export
 - export continues to support both the original result and the latest saved or in-memory edited draft
+
+Phase 10 editing UX update:
+- the editable draft now supports session-local undo/redo without changing backend storage or the original completed result
+- selection can now span multiple notes through additive click selection, event-list selection, or piano-roll box selection
+- richer editing actions such as keyboard nudging, quantization, bulk delete, and drum lane reassignment still operate on the same normalized draft result shape
+- export flow remains unchanged: original export uses the completed backend result, while draft export uses the current validated normalized draft payload

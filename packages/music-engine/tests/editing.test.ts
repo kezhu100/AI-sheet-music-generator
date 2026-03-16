@@ -4,10 +4,17 @@ import {
   addNote,
   buildDraftNoteId,
   deleteNote,
+  deleteNotes,
+  moveNotesByDelta,
   normalizeEditedResult,
+  quantizeDraftNotes,
+  reassignDrumLane,
   resetDraftFromOriginal,
   resolveDrumMidiNote,
   selectNote,
+  selectNotes,
+  sanitizeDraftNoteIds,
+  transposeNotes,
   updateNotePitch,
   updateNoteTiming
 } from "../src/index.js";
@@ -119,6 +126,15 @@ runTest("deleteNote removes the targeted draft note only", () => {
   assert.equal(nextDraft.tracks[0].notes[0].id, "piano-b");
 });
 
+runTest("deleteNotes removes multiple selected notes across tracks", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const selectedIds = [draft.tracks[0].notes[0].draftNoteId!, draft.tracks[1].notes[0].draftNoteId!];
+  const nextDraft = deleteNotes(draft, selectedIds);
+
+  assert.equal(nextDraft.tracks[0].eventCount, 1);
+  assert.equal(nextDraft.tracks[1].eventCount, 0);
+});
+
 runTest("updateNoteTiming preserves duration and re-sorts by onset", () => {
   const draft = resetDraftFromOriginal(createOriginalResult());
   const draftNoteId = draft.tracks[0].notes[1].draftNoteId!;
@@ -136,6 +152,54 @@ runTest("updateNotePitch changes only the selected piano note", () => {
 
   assert.equal(updated.tracks[0].notes[0].pitch, 72);
   assert.equal(updated.tracks[0].notes[1].pitch, 64);
+});
+
+runTest("selectNotes returns multiple notes in stable time order", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const selected = selectNotes(draft, [draft.tracks[0].notes[1].draftNoteId!, draft.tracks[0].notes[0].draftNoteId!]);
+
+  assert.equal(selected.length, 2);
+  assert.equal(selected[0].note.id, "piano-a");
+  assert.equal(selected[1].note.id, "piano-b");
+});
+
+runTest("sanitizeDraftNoteIds drops duplicates and unknown ids", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const validId = draft.tracks[0].notes[0].draftNoteId!;
+
+  assert.deepEqual(sanitizeDraftNoteIds(draft, [validId, "missing", validId]), [validId]);
+});
+
+runTest("moveNotesByDelta preserves relative spacing for multi-note selection", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const moved = moveNotesByDelta(draft, [draft.tracks[0].notes[0].draftNoteId!, draft.tracks[0].notes[1].draftNoteId!], 0.5);
+
+  assert.equal(moved.tracks[0].notes[0].onsetSec, 1);
+  assert.equal(moved.tracks[0].notes[1].onsetSec, 2);
+});
+
+runTest("quantizeDraftNotes can snap selected notes to beats", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const edited = updateNoteTiming(draft, draft.tracks[0].notes[0].draftNoteId!, 0.38);
+  const quantized = quantizeDraftNotes(edited, { draftNoteIds: [edited.tracks[0].notes[0].draftNoteId!], subdivision: 1 });
+
+  assert.equal(quantized.tracks[0].notes[0].onsetSec, 0.5);
+});
+
+runTest("reassignDrumLane updates drum label and midi note together", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const reassigned = reassignDrumLane(draft, [draft.tracks[1].notes[0].draftNoteId!], "kick", 36);
+
+  assert.equal(reassigned.tracks[1].notes[0].drumLabel, "kick");
+  assert.equal(reassigned.tracks[1].notes[0].midiNote, 36);
+});
+
+runTest("transposeNotes applies pitch shifts only to selected piano notes", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const transposed = transposeNotes(draft, [draft.tracks[0].notes[0].draftNoteId!], 2);
+
+  assert.equal(transposed.tracks[0].notes[0].pitch, 62);
+  assert.equal(transposed.tracks[0].notes[1].pitch, 64);
 });
 
 runTest("normalizeEditedResult corrects invalid note values", () => {
