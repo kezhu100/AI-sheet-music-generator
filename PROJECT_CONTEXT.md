@@ -73,9 +73,9 @@ Implemented features:
 - basic validation added with a generated PCM WAV sample clip
 
 Current Phase 3 runtime behavior:
-- the real piano provider currently supports only uncompressed PCM `.wav` stems
-- the provider is heuristic and best suited to simple monophonic or lightly overlapping piano phrases
-- the source separation step is still a placeholder file-copy backend, so piano stems are not truly isolated yet
+- the original real piano provider currently supports only uncompressed PCM `.wav` stems
+- the original fallback provider is heuristic and best suited to simple monophonic or lightly overlapping piano phrases
+- Phase 11A now means upstream source separation may come from either the development copy backend or the optional Demucs path
 
 ### Phase 4 - Drum Transcription
 Completed.
@@ -207,6 +207,23 @@ Current Phase 11A runtime behavior:
 - the normalized `drum_stem` maps from Demucs `drums.wav`
 - the normalized `piano_stem` currently maps from a configurable Demucs non-drum output, defaulting to `other.wav`, so it is stronger than the copy backend but is not equivalent to validated piano-isolated separation
 
+### Phase 11B - Stronger Piano Transcription Backend
+Completed.
+
+Implemented features:
+- backend piano transcription provider selection now comes from configuration rather than being hard-wired in the processing pipeline
+- optional Basic Pitch-backed piano transcription support added behind the existing provider contract
+- configurable fallback to the heuristic WAV provider added for environments where the stronger backend is unavailable
+- raw ML note events are normalized into the existing `NoteEvent` shape before post-processing
+- provider-selection, normalization, and fallback behavior now have direct backend test coverage
+
+Current Phase 11B runtime behavior:
+- default local behavior still uses the heuristic piano provider unless `PIANO_TRANSCRIPTION_PROVIDER` is changed
+- `PIANO_TRANSCRIPTION_PROVIDER=ml` and `PIANO_TRANSCRIPTION_PROVIDER=basic-pitch` both select the stronger Basic Pitch-backed provider
+- when `PIANO_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic` is configured, the pipeline falls back gracefully and records a warning instead of failing the whole job
+- the stronger provider can run through a separate configured Python executable so optional ML dependencies do not need to be installed into the FastAPI runtime itself
+- this repository environment validates provider selection and fallback behavior, but it has not yet validated end-to-end Basic Pitch quality on a real installed ML runtime
+
 ### Phase 8 - Engineering Wrap-Up
 Completed.
 
@@ -253,7 +270,7 @@ create job
 ->
 run the configured source separation provider and persist normalized stems
 ->
-run heuristic WAV piano transcription on the persisted piano stem when the stem is an uncompressed PCM `.wav`
+run the configured piano transcription provider on the persisted piano stem
 ->
 run heuristic WAV drum transcription on the persisted drum stem when the stem is an uncompressed PCM `.wav`
 ->
@@ -273,7 +290,7 @@ return normalized stems + tracks + warnings
 ->
 frontend displays stems + track summaries + warnings, score previews, event details, and can request MIDI or MusicXML export
 
-The architecture now supports swapping source separation providers explicitly through config, while stronger piano and drum providers remain later Phase 11 follow-up work.
+The architecture now supports swapping source separation and piano transcription providers explicitly through config, while stronger drum providers and later Phase 11 post-processing work remain follow-up tasks.
 
 ---
 
@@ -302,7 +319,9 @@ Current providers:
 - source separation providers:
   - local development stem persistence backend
   - optional Demucs-backed separation backend with configurable fallback
-- piano transcription provider: heuristic stdlib-only WAV provider
+- piano transcription providers:
+  - heuristic stdlib-only WAV provider
+  - optional Basic Pitch-backed provider with configurable fallback
 - drum transcription provider: heuristic stdlib-only WAV onset detector with simple kick/snare/hi-hat mapping
 
 All providers must output normalized schemas shared between frontend and backend.
@@ -385,12 +404,14 @@ Local dev startup
 
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
-- later Phase 11 work should still improve transcription quality and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 11B is complete for stronger piano transcription provider selection and fallback
+- later Phase 11 work should still improve drum quality, post-processing, and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
 - Phase 10 editing UX improvements are complete
 - Phase 11A source separation work is complete
-- the next Phase 11 steps should focus on piano/drum provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
+- Phase 11B piano transcription work is complete
+- the next Phase 11 steps should focus on drum provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
 
 ---
 
@@ -410,7 +431,9 @@ This keeps the current `upload -> pipeline -> normalized JobResult -> editable d
 Current runtime limitations:
 - source separation defaults to the development copy backend unless a stronger provider is configured
 - the optional Demucs backend still normalizes `piano_stem` from a configurable non-drum output rather than a validated piano-only source
-- the real piano provider currently runs only on uncompressed PCM `.wav` stems
+- piano transcription defaults to the heuristic WAV backend unless a stronger provider is configured
+- the optional Basic Pitch backend depends on a separately prepared Python runtime with the required ML package installed
+- the heuristic piano fallback currently runs only on uncompressed PCM `.wav` stems
 - the real drum provider currently runs only on uncompressed PCM `.wav` stems
 - the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
 - post-processing currently assumes a simple 4/4 grid and does not support tempo changes

@@ -26,6 +26,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
             result = build_development_pipeline(
                 Settings(
                     source_separation_provider="development-copy",
+                    piano_transcription_provider="heuristic",
                 )
             ).run(audio_path, "demo.wav", "job-test")
 

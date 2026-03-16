@@ -14,7 +14,7 @@ from app.pipeline.interfaces import (
 )
 from app.pipeline.drum_transcription import HeuristicWavDrumTranscriptionProvider
 from app.pipeline.post_processing import LightweightPostProcessor
-from app.pipeline.piano_transcription import HeuristicWavPianoTranscriptionProvider
+from app.pipeline.piano_transcription import build_piano_transcription_provider
 from app.pipeline.source_separation import build_source_separation_provider
 
 
@@ -73,7 +73,7 @@ def build_processing_pipeline(settings: Settings | None = None) -> ProcessingPip
     resolved_settings = settings or get_settings()
     return DevelopmentProcessingPipeline(
         separation_provider=build_source_separation_provider(resolved_settings),
-        piano_provider=HeuristicWavPianoTranscriptionProvider(),
+        piano_provider=build_piano_transcription_provider(resolved_settings),
         drum_provider=HeuristicWavDrumTranscriptionProvider(),
         post_processor=LightweightPostProcessor(),
     )

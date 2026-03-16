@@ -1,17 +1,30 @@
 from __future__ import annotations
 
 import audioop
+import json
 import math
 import struct
+import subprocess
+import sys
 import wave
 from pathlib import Path
-from typing import Optional
+from tempfile import NamedTemporaryFile
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from app.core.config import Settings
 from app.models.schemas import NoteEvent
 from app.pipeline.interfaces import PianoTranscriptionProvider, SourceStem, TranscriptionResult
 
+PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC = "heuristic"
+PIANO_TRANSCRIPTION_PROVIDER_ML = "ml"
+PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH = "basic-pitch"
+
 
 class UnsupportedPianoStemError(Exception):
+    pass
+
+
+class PianoTranscriptionProviderError(RuntimeError):
     pass
 
 
@@ -26,7 +39,7 @@ class HeuristicWavPianoTranscriptionProvider(PianoTranscriptionProvider):
 
         if stem.file_path.suffix.lower() != ".wav":
             warnings.append(
-                f"Skipping real piano transcription for stem '{stem.stem_name}' because only PCM .wav stems are supported in Phase 3."
+                f"Skipping real piano transcription for stem '{stem.stem_name}' because only PCM .wav stems are supported in the heuristic piano provider."
             )
             return TranscriptionResult(
                 provider_name=self.provider_name,
@@ -80,7 +93,7 @@ class HeuristicWavPianoTranscriptionProvider(PianoTranscriptionProvider):
 
         if not notes:
             warnings.append(
-                "The heuristic piano provider did not detect reliable note regions in this stem. Simple isolated piano notes work best in Phase 3."
+                "The heuristic piano provider did not detect reliable note regions in this stem. Simple isolated piano notes work best in the current fallback path."
             )
 
         return TranscriptionResult(
@@ -249,3 +262,232 @@ class HeuristicWavPianoTranscriptionProvider(PianoTranscriptionProvider):
     def _estimate_velocity(self, peak_level: float) -> int:
         scaled = int(peak_level * 220)
         return max(32, min(127, scaled))
+
+
+class BasicPitchPianoTranscriptionProvider(PianoTranscriptionProvider):
+    provider_name = "basic-pitch-piano-provider"
+
+    def __init__(
+        self,
+        python_executable: Optional[str] = None,
+        minimum_confidence: float = 0.35,
+    ) -> None:
+        self._python_executable = python_executable or sys.executable
+        self._minimum_confidence = minimum_confidence
+        self._runner_path = Path(__file__).with_name("basic_pitch_runner.py")
+
+    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
+        warnings = [
+            "Piano transcription attempted the stronger Basic Pitch backend behind the existing provider contract.",
+            "Basic Pitch runtime availability depends on the configured Python environment and optional ML dependencies.",
+        ]
+
+        raw_note_events = self._run_basic_pitch(stem.file_path)
+        notes = self._normalize_note_events(stem, raw_note_events)
+
+        if not notes:
+            warnings.append(
+                "The Basic Pitch piano provider did not return any note events above the configured confidence threshold for this stem."
+            )
+
+        return TranscriptionResult(
+            provider_name=self.provider_name,
+            instrument="piano",
+            source_stem=stem.stem_name,
+            notes=notes,
+            warnings=warnings,
+        )
+
+    def _run_basic_pitch(self, audio_path: Path) -> List[Any]:
+        with NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
+            output_path = Path(temp_file.name)
+
+        command = [
+            self._python_executable,
+            str(self._runner_path),
+            "--input",
+            str(audio_path),
+            "--output",
+            str(output_path),
+        ]
+
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError as exc:
+            raise PianoTranscriptionProviderError(
+                f"Basic Pitch Python executable was not found at '{self._python_executable}'."
+            ) from exc
+
+        try:
+            if completed.returncode != 0:
+                detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+                raise PianoTranscriptionProviderError(
+                    f"Basic Pitch transcription failed with exit code {completed.returncode}: {detail}"
+                )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or not isinstance(payload.get("noteEvents"), list):
+                raise PianoTranscriptionProviderError("Basic Pitch runner returned an invalid note event payload.")
+            return list(payload["noteEvents"])
+        finally:
+            output_path.unlink(missing_ok=True)
+
+    def _normalize_note_events(self, stem: SourceStem, raw_note_events: Iterable[Any]) -> List[NoteEvent]:
+        notes: List[NoteEvent] = []
+
+        for index, raw_event in enumerate(raw_note_events, start=1):
+            normalized = self._coerce_basic_pitch_event(raw_event)
+            if normalized is None:
+                continue
+
+            onset_sec = normalized["onset_sec"]
+            offset_sec = normalized["offset_sec"]
+            pitch = normalized["pitch"]
+            confidence = normalized["confidence"]
+            velocity = normalized["velocity"]
+
+            if confidence < self._minimum_confidence:
+                continue
+            if offset_sec - onset_sec < 0.05:
+                continue
+
+            notes.append(
+                NoteEvent(
+                    id=f"{stem.stem_name}-piano-{index}",
+                    instrument="piano",
+                    pitch=pitch,
+                    onsetSec=round(onset_sec, 3),
+                    offsetSec=round(offset_sec, 3),
+                    velocity=velocity,
+                    confidence=round(confidence, 2),
+                    channel=0,
+                    sourceStem=stem.stem_name,
+                )
+            )
+
+        notes.sort(key=lambda note: (note.onset_sec, note.pitch or 0, note.id))
+        return notes
+
+    def _coerce_basic_pitch_event(self, raw_event: Any) -> Optional[Dict[str, Any]]:
+        start_sec: Optional[float] = None
+        end_sec: Optional[float] = None
+        pitch: Optional[int] = None
+        confidence: Optional[float] = None
+
+        if isinstance(raw_event, dict):
+            start_sec = _coerce_float(
+                raw_event.get("startSec", raw_event.get("start_time", raw_event.get("start")))
+            )
+            end_sec = _coerce_float(
+                raw_event.get("endSec", raw_event.get("end_time", raw_event.get("end")))
+            )
+            pitch = _coerce_int(raw_event.get("pitch"))
+            confidence = _coerce_float(
+                raw_event.get("confidence", raw_event.get("amplitude", raw_event.get("velocity")))
+            )
+        elif isinstance(raw_event, Sequence) and not isinstance(raw_event, (str, bytes, bytearray)):
+            if len(raw_event) >= 3:
+                start_sec = _coerce_float(raw_event[0])
+                end_sec = _coerce_float(raw_event[1])
+                pitch = _coerce_int(raw_event[2])
+            if len(raw_event) >= 4:
+                confidence = _coerce_float(raw_event[3])
+
+        if start_sec is None or end_sec is None or pitch is None:
+            return None
+        if end_sec <= start_sec:
+            return None
+        if pitch < 21 or pitch > 108:
+            return None
+
+        safe_confidence = 0.8 if confidence is None else max(0.0, min(1.0, confidence))
+        return {
+            "onset_sec": max(0.0, start_sec),
+            "offset_sec": end_sec,
+            "pitch": pitch,
+            "confidence": safe_confidence,
+            "velocity": _confidence_to_velocity(safe_confidence),
+        }
+
+
+class FallbackPianoTranscriptionProvider(PianoTranscriptionProvider):
+    def __init__(self, primary: PianoTranscriptionProvider, fallback: PianoTranscriptionProvider) -> None:
+        self._primary = primary
+        self._fallback = fallback
+        self.provider_name = primary.provider_name
+
+    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
+        try:
+            return self._primary.transcribe(stem)
+        except PianoTranscriptionProviderError as exc:
+            fallback_result = self._fallback.transcribe(stem)
+            warnings = [
+                f"Configured piano transcription provider '{self._primary.provider_name}' was unavailable, so the pipeline fell back to '{fallback_result.provider_name}': {exc}"
+            ]
+            warnings.extend(fallback_result.warnings)
+            return TranscriptionResult(
+                provider_name=fallback_result.provider_name,
+                instrument=fallback_result.instrument,
+                source_stem=fallback_result.source_stem,
+                notes=fallback_result.notes,
+                warnings=_dedupe_warnings(warnings),
+            )
+
+
+def build_piano_transcription_provider(settings: Settings) -> PianoTranscriptionProvider:
+    provider_id = settings.piano_transcription_provider
+    fallback_id = settings.piano_transcription_fallback_provider
+
+    primary = _create_provider(provider_id, settings)
+    if fallback_id and fallback_id != provider_id:
+        fallback = _create_provider(fallback_id, settings)
+        return FallbackPianoTranscriptionProvider(primary=primary, fallback=fallback)
+
+    return primary
+
+
+def _create_provider(provider_id: str, settings: Settings) -> PianoTranscriptionProvider:
+    if provider_id == PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC:
+        return HeuristicWavPianoTranscriptionProvider()
+    if provider_id in {PIANO_TRANSCRIPTION_PROVIDER_ML, PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH}:
+        return BasicPitchPianoTranscriptionProvider(
+            python_executable=settings.piano_transcription_ml_python,
+            minimum_confidence=settings.piano_transcription_ml_min_confidence,
+        )
+
+    raise ValueError(f"Unsupported piano transcription provider '{provider_id}'.")
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value: Any) -> Optional[int]:
+    try:
+        if value is None:
+            return None
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _confidence_to_velocity(confidence: float) -> int:
+    return max(32, min(127, int(round(confidence * 127))))
+
+
+def _dedupe_warnings(warnings: List[str]) -> List[str]:
+    deduped: List[str] = []
+    for warning in warnings:
+        if warning not in deduped:
+            deduped.append(warning)
+    return deduped

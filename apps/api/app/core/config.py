@@ -24,6 +24,10 @@ class Settings(BaseModel):
     source_separation_demucs_device: Optional[str] = None
     source_separation_demucs_piano_source: str = "other"
     source_separation_demucs_drums_source: str = "drums"
+    piano_transcription_provider: str = "heuristic"
+    piano_transcription_fallback_provider: Optional[str] = None
+    piano_transcription_ml_python: Optional[str] = None
+    piano_transcription_ml_min_confidence: float = 0.35
 
 
 @lru_cache
@@ -36,6 +40,10 @@ def get_settings() -> Settings:
         source_separation_demucs_device=os.getenv("SOURCE_SEPARATION_DEMUCS_DEVICE"),
         source_separation_demucs_piano_source=os.getenv("SOURCE_SEPARATION_DEMUCS_PIANO_SOURCE", "other"),
         source_separation_demucs_drums_source=os.getenv("SOURCE_SEPARATION_DEMUCS_DRUMS_SOURCE", "drums"),
+        piano_transcription_provider=os.getenv("PIANO_TRANSCRIPTION_PROVIDER", "heuristic"),
+        piano_transcription_fallback_provider=os.getenv("PIANO_TRANSCRIPTION_FALLBACK_PROVIDER"),
+        piano_transcription_ml_python=os.getenv("PIANO_TRANSCRIPTION_ML_PYTHON"),
+        piano_transcription_ml_min_confidence=float(os.getenv("PIANO_TRANSCRIPTION_ML_MIN_CONFIDENCE", "0.35")),
     )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)

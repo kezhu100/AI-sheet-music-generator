@@ -4,6 +4,36 @@
 
 ### 2026-03-16
 Decision:
+- Implement Phase 11B piano transcription as an explicitly configured provider selection layer that keeps the existing heuristic WAV backend, adds an optional Basic Pitch-backed provider, and supports graceful fallback without changing the normalized `JobResult`.
+
+Context:
+- Phase 11A had already made source separation configurable, but piano transcription was still hard-wired to the original heuristic provider.
+- The architecture already expected future stronger piano backends behind the `PianoTranscriptionProvider` contract, while post-processing, preview, editing, persistence, and export continued to depend on normalized `NoteEvent` output.
+- The repository still validates on Python 3.9 locally, while stronger ML tooling is more likely to live in separate Python 3.10+ or 3.11+ environments.
+
+Chosen option:
+- Keep the heuristic WAV provider as the default safe path and optional fallback target.
+- Add a Basic Pitch-backed provider that can run through a configurable Python executable so optional ML dependencies do not need to be installed into the FastAPI runtime itself.
+- Normalize the stronger provider's raw note-event output into the existing `NoteEvent` fields before post-processing.
+- Surface provider selection and fallback through config, warnings, and the existing `TrackResult.provider` field rather than changing the result schema.
+
+Alternatives considered:
+- Replacing the heuristic provider outright with a single hard-coded ML stack.
+- Adding heavy ML dependencies directly to the current API requirements and requiring an immediate runtime migration.
+- Expanding `JobResult` or `NoteEvent` with provider-specific piano metadata during the provider swap.
+
+Tradeoffs:
+- The new path is materially stronger than the heuristic fallback and keeps the architecture modular, but the Basic Pitch integration is still optional and depends on a separately prepared local runtime.
+- Running ML inference in a separate Python executable reduces coupling with the current API environment, but it adds subprocess orchestration and a small runner shim.
+- Preserving the normalized result contract keeps downstream flows stable, but richer provider-specific metadata is intentionally deferred.
+
+Follow-up:
+- Evaluate stronger drum transcription in Phase 11C without changing the normalized result boundary.
+- Revisit piano-specific post-filters only if later Phase 11 work shows they are needed without collapsing post-processing and provider responsibilities.
+- Validate the Basic Pitch path on a real prepared ML runtime before making stronger quality claims.
+
+### 2026-03-16
+Decision:
 - Implement Phase 11A source separation as an explicitly configured provider selection layer that keeps the existing development copy backend, adds an optional Demucs-backed provider, and supports graceful fallback without changing API routes or the normalized `JobResult`.
 
 Context:

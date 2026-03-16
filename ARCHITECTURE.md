@@ -56,7 +56,7 @@ Responsibilities:
 2. create processing job
 3. route audio through the configured source separation provider
 4. persist stems
-5. run heuristic piano transcription on the persisted piano stem when supported
+5. run the configured piano transcription provider on the persisted piano stem when supported
 6. run heuristic drum transcription on the persisted drum stem when supported
 7. run lightweight post-processing for confidence filtering, tempo estimation, quantization, track merge, and beat/bar alignment
 8. normalize timing through reusable helper boundaries
@@ -71,7 +71,10 @@ Current runtime note:
 - the default provider is still the development copy backend for predictable local setup
 - an optional Demucs-backed provider can generate stronger persisted stems when its runtime is configured
 - the stronger provider path can fall back to the development copy provider without changing API routes or downstream result contracts
-- step 5 is implemented with a stdlib-only heuristic piano provider for uncompressed PCM `.wav` stems
+- step 5 now supports multiple piano transcription providers behind the same provider boundary
+- the default piano transcription provider is still the heuristic WAV backend for predictable local setup
+- an optional Basic Pitch-backed provider can generate stronger normalized piano note events when its runtime is configured
+- the stronger piano provider path can fall back to the heuristic provider without changing downstream contracts
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
@@ -93,8 +96,12 @@ Current runtime note:
 ### Piano Transcription Providers
 - backend contract lives under `apps/api/app/pipeline/interfaces.py`
 - current implementation lives in `apps/api/app/pipeline/piano_transcription.py`
-- current provider uses only the Python standard library and returns normalized piano `NoteEvent` values
-- current provider is intentionally heuristic and optimized for simple note output rather than dense polyphonic accuracy
+- provider selection is configured through backend settings and environment variables rather than being hard-wired inside the pipeline factory
+- `heuristic` uses only the Python standard library and returns normalized piano `NoteEvent` values from PCM `.wav` stems
+- `ml` and `basic-pitch` currently resolve to a stronger Basic Pitch-backed provider that can run through a separate Python executable
+- fallback selection can automatically return to `heuristic` when the stronger backend is unavailable
+- the stronger provider normalizes raw note start/end/pitch/confidence outputs into the existing `NoteEvent` shape before post-processing
+- the current heuristic provider remains intentionally lightweight and optimized for simple note output rather than dense polyphonic accuracy
 
 ### Drum Transcription Providers
 - backend contract lives under `apps/api/app/pipeline/interfaces.py`
@@ -119,6 +126,12 @@ Phase 11A separation boundary:
 - `StemAsset.provider` records which source separation backend actually produced the persisted stem files
 - separation fallback behavior is surfaced through warnings instead of contract-breaking schema changes
 - downstream piano/drum transcription, preview, editing, persistence, and export still consume normalized persisted stems and normalized `JobResult`
+
+Phase 11B piano transcription boundary:
+- `JobResult` remains unchanged
+- `TrackResult.provider` records which piano transcription backend actually produced the normalized note events
+- piano-provider fallback behavior is surfaced through warnings instead of schema changes
+- post-processing, preview, editing, persistence, and export still consume the same normalized `tracks[].notes` structure
 
 Phase 5.5 timing helper boundaries:
 - backend orchestration stays in `apps/api/app/pipeline/post_processing.py`

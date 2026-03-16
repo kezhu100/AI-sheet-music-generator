@@ -39,3 +39,10 @@ Phase 11A source separation update:
 - fallback can automatically return to `development-copy` when the stronger provider is unavailable
 - persisted stems remain normalized as `piano_stem` and `drum_stem` so downstream transcription and frontend result handling stay unchanged
 - the current Demucs path maps `drum_stem` from `drums.wav` and maps `piano_stem` from a configurable non-drum output, defaulting to `other.wav`
+
+Phase 11B piano transcription update:
+- the transcription stage now selects the piano backend explicitly through configuration instead of always using the heuristic WAV provider
+- `heuristic` remains available for local development and deterministic fallback
+- `ml` and `basic-pitch` can be enabled as stronger piano backends when Basic Pitch is installed in the configured Python environment
+- fallback can automatically return to `heuristic` when the stronger provider is unavailable
+- normalized piano note events still flow into the same post-processing stage and the same `JobResult` structure
