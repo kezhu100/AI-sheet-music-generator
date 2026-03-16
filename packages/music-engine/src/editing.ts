@@ -49,6 +49,18 @@ export interface AddDraftNoteResult {
   draftNoteId: string;
 }
 
+export interface ReplaceInstrumentRegionNotesInput {
+  instrument: InstrumentType;
+  startSec: number;
+  endSec: number;
+  notes: NoteEvent[];
+}
+
+export interface ReplaceInstrumentRegionNotesResult {
+  draftResult: JobResult;
+  insertedDraftNoteIds: string[];
+}
+
 export function cloneJobResult(result: JobResult): JobResult {
   return {
     ...result,
@@ -287,6 +299,46 @@ export function addNote(result: JobResult, input: AddDraftNoteInput): AddDraftNo
   return { draftResult, draftNoteId };
 }
 
+export function replaceInstrumentRegionNotes(
+  result: JobResult,
+  input: ReplaceInstrumentRegionNotesInput
+): ReplaceInstrumentRegionNotesResult {
+  const insertedDraftNoteIds: string[] = [];
+
+  const nextTracks = result.tracks.map((track) => {
+    if (track.instrument !== input.instrument) {
+      return track;
+    }
+
+    const retainedNotes = track.notes.filter((note) => !noteOverlapsRegion(note, input.startSec, input.endSec, result.bpm));
+    const replacementNotes = input.notes
+      .filter((note) => note.instrument === track.instrument && note.sourceStem === track.sourceStem)
+      .map((note) => {
+        const draftNoteId = generateDraftNoteId();
+        insertedDraftNoteIds.push(draftNoteId);
+        return {
+          ...note,
+          draftNoteId
+        };
+      });
+
+    return {
+      ...track,
+      notes: [...retainedNotes, ...replacementNotes]
+    };
+  });
+
+  const draftResult = normalizeEditedResult({
+    ...result,
+    tracks: nextTracks
+  });
+
+  return {
+    draftResult,
+    insertedDraftNoteIds: sanitizeDraftNoteIds(draftResult, insertedDraftNoteIds)
+  };
+}
+
 export function resetDraftFromOriginal(originalResult: JobResult): JobResult {
   return normalizeEditedResult(cloneJobResult(originalResult));
 }
@@ -417,6 +469,11 @@ function updateDraftNote(result: JobResult, draftNoteId: string, updater: (note:
       notes: track.notes.map((note) => (note.draftNoteId === draftNoteId ? updater(note) : note))
     }))
   });
+}
+
+function noteOverlapsRegion(note: NoteEvent, startSec: number, endSec: number, _bpm: number): boolean {
+  const noteEndSec = note.offsetSec ?? note.onsetSec;
+  return note.onsetSec < endSec && noteEndSec > startSec;
 }
 
 function roundToSubdivision(beatPosition: number, subdivision: number): number {

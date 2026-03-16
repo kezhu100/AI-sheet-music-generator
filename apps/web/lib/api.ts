@@ -4,6 +4,8 @@ import type {
   JobExportRequest,
   JobResponse,
   JobResult,
+  RegionRetranscriptionRequest,
+  RegionRetranscriptionResponse,
   SaveJobDraftRequest,
   UploadResponse
 } from "@ai-sheet-music-generator/shared-types";
@@ -81,6 +83,21 @@ export async function saveJobDraft(jobId: string, draftResult: JobResult): Promi
   });
 
   return parseJson<JobDraftResponse>(response);
+}
+
+export async function retranscribeRegion(
+  jobId: string,
+  payload: RegionRetranscriptionRequest
+): Promise<RegionRetranscriptionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/retranscribe-region`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return parseJson<RegionRetranscriptionResponse>(response);
 }
 
 export async function downloadMidiExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {

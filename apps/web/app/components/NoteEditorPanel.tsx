@@ -2,6 +2,7 @@
 
 import { getNoteDurationSec, getTrackKey, midiToNoteName } from "@ai-sheet-music-generator/music-engine";
 import type { JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
+import type { RetranscriptionRegionSelection } from "../hooks/useEditableJobResult";
 
 interface NoteEditorPanelProps {
   draftResult: JobResult | null;
@@ -12,6 +13,8 @@ interface NoteEditorPanelProps {
   isSavingDraft: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  retranscriptionRegion: RetranscriptionRegionSelection | null;
+  isRetranscribingRegion: boolean;
   selectedTrack: TrackResult | null;
   selectedNote: NoteEvent | null;
   selectedNotes: NoteEvent[];
@@ -38,6 +41,7 @@ interface NoteEditorPanelProps {
   onQuantizeSelection: (subdivision: number) => void;
   onQuantizeAll: (subdivision: number) => void;
   onReassignSelectedDrumLane: () => void;
+  onRetranscribeRegion: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onAddNote: () => void;
@@ -55,6 +59,8 @@ export function NoteEditorPanel({
   isSavingDraft,
   canUndo,
   canRedo,
+  retranscriptionRegion,
+  isRetranscribingRegion,
   selectedTrack,
   selectedNote,
   selectedNotes,
@@ -81,6 +87,7 @@ export function NoteEditorPanel({
   onQuantizeSelection,
   onQuantizeAll,
   onReassignSelectedDrumLane,
+  onRetranscribeRegion,
   onUndo,
   onRedo,
   onAddNote,
@@ -96,6 +103,10 @@ export function NoteEditorPanel({
   const addTrack = draftResult.tracks.find((track) => getTrackKey(track) === addTrackKey) ?? null;
   const selectionCount = selectedNotes.length;
   const allSelectedAreDrums = selectionCount > 0 && selectedNotes.every((note) => note.instrument === "drums");
+  const canRetranscribeRegion =
+    retranscriptionRegion != null &&
+    retranscriptionRegion.instrument != null &&
+    retranscriptionRegion.endSec > retranscriptionRegion.startSec;
 
   return (
     <div className="editor-panel">
@@ -198,6 +209,27 @@ export function NoteEditorPanel({
                   </button>
                   <button className="button secondary small" onClick={() => onQuantizeAll(4)} type="button">
                     Whole draft to 1/16
+                  </button>
+                </div>
+              </div>
+
+              <div className="bulk-actions">
+                <strong>Region Re-transcription</strong>
+                <div className="muted">
+                  {retranscriptionRegion
+                    ? `Region ${retranscriptionRegion.startSec.toFixed(3)}s-${retranscriptionRegion.endSec.toFixed(3)}s | ${
+                        retranscriptionRegion.instrument ?? "mixed selection"
+                      }`
+                    : "Draw a box in the piano roll to choose a time region for piano or drums."}
+                </div>
+                <div className="actions">
+                  <button
+                    className="button secondary small"
+                    disabled={!canRetranscribeRegion || isRetranscribingRegion}
+                    onClick={onRetranscribeRegion}
+                    type="button"
+                  >
+                    {isRetranscribingRegion ? "Re-transcribing..." : "Re-transcribe region"}
                   </button>
                 </div>
               </div>

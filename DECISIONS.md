@@ -2,6 +2,36 @@
 
 ## Decision Log
 
+### 2026-03-17
+Decision:
+- Implement Phase 11E region re-transcription as a separate backend pipeline hook plus draft-only frontend replacement flow, rather than modifying provider contracts or mutating the stored completed job result.
+
+Context:
+- By the end of Phase 11D, the repository already had configured source separation, configured piano and drum providers, backend post-processing, a stable normalized `JobResult`, and a frontend draft editing workflow with persistence and export.
+- The next quality step needed to correct only part of a song when AI output was wrong locally, without rerunning the whole job and without changing downstream consumers.
+- Providers already had a clean responsibility boundary: consume audio and emit normalized note events. Draft replacement, persistence, and undo/redo lived elsewhere.
+
+Chosen option:
+- Add `POST /api/v1/jobs/{jobId}/retranscribe-region` as a narrow endpoint that reuses the persisted `piano_stem` or `drum_stem`, extracts a temporary WAV segment, calls the existing configured provider for that instrument, then runs the same backend post-processing path before returning normalized region notes only.
+- Keep region cleanup and quantization in region-relative time first, then offset normalized notes back to absolute timeline positions before the final response filter.
+- Keep the original completed `JobResult` immutable in backend job storage.
+- Apply returned notes only to the current frontend editable draft, replacing overlapping notes for the same instrument and preserving undo/redo history as a single editing action.
+- Keep the normalized `JobResult` contract unchanged and avoid adding a separate export or preview schema, while allowing the narrow region response to expose `providerUsed` as a small diagnostic field.
+
+Alternatives considered:
+- Extending provider contracts so providers themselves handled region slicing and draft replacement semantics.
+- Mutating the stored completed job result whenever a region was re-transcribed.
+- Introducing a partial-job or partial-result schema just for region replacement.
+
+Tradeoffs:
+- A separate hook keeps provider responsibilities clear and preserves the existing draft/export architecture, but it adds another backend service path to maintain.
+- Reusing persisted stems and current providers keeps the implementation cohesive, but region quality remains bounded by the same stem and provider limitations as the main pipeline.
+- Returning only region notes keeps the schema stable, but the frontend must explicitly apply replacement logic to the draft.
+
+Follow-up:
+- Keep later AI-assisted correction layered on top of the same normalized draft model instead of bypassing it.
+- Revisit richer region metadata only if a later phase truly needs it without breaking the current result boundary.
+
 ### 2026-03-16
 Decision:
 - Implement Phase 11D as a richer backend post-processing layer that keeps provider responsibilities unchanged, preserves the normalized `JobResult` contract, and moves the new cleanup logic into dedicated post-processing helpers instead of scattering timing rules across the pipeline.

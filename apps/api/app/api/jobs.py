@@ -4,10 +4,20 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from app.models.schemas import CreateJobRequest, JobDraftResponse, JobExportRequest, JobResponse, JobResult, SaveJobDraftRequest
+from app.models.schemas import (
+    CreateJobRequest,
+    JobDraftResponse,
+    JobExportRequest,
+    JobResponse,
+    JobResult,
+    RegionRetranscriptionRequest,
+    RegionRetranscriptionResponse,
+    SaveJobDraftRequest,
+)
 from app.services.draft_store import draft_store
 from app.services.midi_export import MidiExportError, build_midi_file, build_midi_filename
 from app.services.musicxml_export import MusicXmlExportError, build_musicxml_file, build_musicxml_filename
+from app.services.region_retranscription import RegionRetranscriptionService
 from app.services.job_runner import start_job
 from app.services.job_store import job_store
 from app.services.upload_registry import upload_registry
@@ -58,6 +68,26 @@ async def save_job_draft(job_id: str, payload: SaveJobDraftRequest) -> JobDraftR
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
     return JobDraftResponse(draft=draft)
+
+
+@router.post("/{job_id}/retranscribe-region", response_model=RegionRetranscriptionResponse)
+async def retranscribe_job_region(job_id: str, payload: RegionRetranscriptionRequest) -> RegionRetranscriptionResponse:
+    job = _get_completed_job(job_id)
+    if job.result is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available yet.")
+
+    retranscription_result = RegionRetranscriptionService().retranscribe_region(
+        job_id=job_id,
+        result_stems=job.result.stems,
+        request=payload,
+    )
+    return RegionRetranscriptionResponse(
+        instrument=payload.instrument,
+        startSec=payload.start_sec,
+        endSec=payload.end_sec,
+        providerUsed=retranscription_result.provider_used,
+        notes=retranscription_result.notes,
+    )
 
 
 @router.get("/{job_id}/exports/midi")

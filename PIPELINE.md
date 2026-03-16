@@ -1,6 +1,8 @@
-audio
+audio upload
  ↓
-separation
+audio normalization
+ ↓
+source separation
  ↓
 transcription
  ↓
@@ -10,7 +12,7 @@ tracks
  ↓
 (export phase6)
  ↓
-notation phase7
+preview rendering (phase7)
 
 Phase 8 editing update:
 - after `tracks`, the frontend now clones a draft result for manual note correction before export
@@ -61,3 +63,9 @@ Phase 11D post-processing update:
 - tempo estimation now uses weighted onset evidence from cleaned note events instead of only a minimal adjacent-interval heuristic
 - quantization still assumes a simple single-tempo 4/4 result, but it now adaptively chooses between eighth-note and sixteenth-note grids for more predictable normalization
 - warnings now surface fallback or cleanup behavior more explicitly when timing evidence is sparse/noisy or when events are removed during normalization
+
+Phase 11E region re-transcription update:
+- after the main completed result exists, the editor can now request a piano-only or drum-only time region to be re-transcribed without rerunning source separation or recomputing the whole job
+- the backend reuses the persisted target stem, routes only the selected segment through the configured instrument provider, then reuses the existing post-processing stage before returning normalized region notes
+- the returned payload is region-note-only, not a partial `JobResult`, and now includes `providerUsed` so fallback-backed retranscription can be surfaced explicitly
+- the frontend applies the returned notes only to the current draft for the same instrument and time span, keeping undo/redo, draft persistence, and export behavior on the existing normalized draft workflow

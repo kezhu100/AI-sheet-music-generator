@@ -18,6 +18,7 @@ export {
   normalizeNoteEvent,
   normalizeTrackResult,
   quantizeDraftNotes,
+  replaceInstrumentRegionNotes,
   reassignDrumLane,
   resetDraftFromOriginal,
   resolveDrumMidiNote,
@@ -34,6 +35,8 @@ export type {
   AddDraftNoteResult,
   DraftSelection,
   QuantizeDraftNotesInput,
+  ReplaceInstrumentRegionNotesInput,
+  ReplaceInstrumentRegionNotesResult,
   SelectedDraftNote
 } from "./editing.js";
 export {

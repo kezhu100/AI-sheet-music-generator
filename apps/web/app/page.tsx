@@ -68,9 +68,12 @@ export default function HomePage() {
     selectedTrack,
     selectedNote,
     selectedTrackKey,
+    retranscriptionRegion,
+    isRetranscribingRegion,
     selectDraftNote,
     replaceSelection,
     clearSelection,
+    setRetranscriptionRegion,
     clearEditableState,
     updateSelectedNote,
     addDraftNote,
@@ -87,8 +90,9 @@ export default function HomePage() {
     selectAllNotes,
     resetDraftFromOriginalResult,
     restoreSavedDraft,
-    getCurrentDraftResult
-  } = useEditableJobResult(job?.result ?? null, savedDraft);
+    getCurrentDraftResult,
+    retranscribeSelectedRegion
+  } = useEditableJobResult(job?.result ?? null, savedDraft, job?.id ?? null);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -430,6 +434,19 @@ export default function HomePage() {
     reassignSelectedDrumLane(reassignDrumLabel, reassignDrumMidiNote);
   }
 
+  async function handleRetranscribeRegion(): Promise<void> {
+    try {
+      setError(null);
+      await retranscribeSelectedRegion();
+    } catch (retranscriptionError) {
+      setError(
+        retranscriptionError instanceof Error
+          ? retranscriptionError.message
+          : "Failed to re-transcribe the selected region."
+      );
+    }
+  }
+
   useEffect(() => {
     if (!activeResult) {
       return;
@@ -550,13 +567,13 @@ export default function HomePage() {
             <h1>AI Sheet Music Generator</h1>
             <p>
               Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
-              and drum notation views, then save, multi-select, quantize, and continue Phase 10 draft edits before exporting original or edited MIDI and MusicXML.
+              and drum notation views, then save, multi-select, quantize, re-transcribe selected regions, and continue Phase 11E draft edits before exporting original or edited MIDI and MusicXML.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 10 editing UX</span>
+              <span className="pill">Phase 11E region re-transcription</span>
               <span className="pill">Undo / redo</span>
               <span className="pill">Box selection</span>
-              <span className="pill">Quantize + drum lanes</span>
+              <span className="pill">Quantize + region retry</span>
               <span className="pill">Track visibility toggles</span>
               <span className="pill">Original vs draft export</span>
             </div>
@@ -567,7 +584,8 @@ export default function HomePage() {
               Frontend calls <code className="inline">/api/v1/uploads</code>, then
               <code className="inline"> /api/v1/jobs</code>, polls
               <code className="inline"> /api/v1/jobs/:id</code>, auto-loads
-              <code className="inline"> /api/v1/jobs/:id/draft</code>, and can save or export a validated edited result payload separately from the original job result.
+              <code className="inline"> /api/v1/jobs/:id/draft</code>, can call
+              <code className="inline"> /api/v1/jobs/:id/retranscribe-region</code>, and can save or export a validated edited result payload separately from the original job result.
             </p>
           </div>
         </div>
@@ -774,7 +792,9 @@ export default function HomePage() {
                 onBoxSelect={handleBoxSelect}
                 onClearSelection={clearSelection}
                 onMoveNote={handleMoveNote}
+                onSelectRegion={setRetranscriptionRegion}
                 onSelectNote={handleSelectNote}
+                selectedRegion={retranscriptionRegion}
                 selectedNoteId={selectedDraftNoteId}
                 selectedNoteIds={selectedDraftNoteIds}
                 selectedTrackKey={selectedTrackKey}
@@ -805,6 +825,8 @@ export default function HomePage() {
             isSavingDraft={isSavingDraft}
             canUndo={canUndo}
             canRedo={canRedo}
+            retranscriptionRegion={retranscriptionRegion}
+            isRetranscribingRegion={isRetranscribingRegion}
             onAddNote={handleAddNote}
             onChangeAddDrumLabel={setAddDrumLabel}
             onChangeAddDrumMidiNote={setAddDrumMidiNote}
@@ -822,6 +844,7 @@ export default function HomePage() {
             onQuantizeSelection={quantizeSelection}
             onQuantizeAll={quantizeAllNotes}
             onReassignSelectedDrumLane={handleReassignSelectedDrumLane}
+            onRetranscribeRegion={() => void handleRetranscribeRegion()}
             onUndo={undo}
             onRedo={redo}
             onSaveDraft={() => void handleSaveDraft()}

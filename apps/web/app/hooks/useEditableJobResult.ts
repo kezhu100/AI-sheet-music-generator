@@ -9,6 +9,7 @@ import {
   moveNotesByDelta,
   normalizeEditedResult,
   quantizeDraftNotes,
+  replaceInstrumentRegionNotes,
   reassignDrumLane,
   resetDraftFromOriginal,
   sanitizeDraftNoteIds,
@@ -20,7 +21,8 @@ import {
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
 import type { AddDraftNoteInput, SelectedDraftNote } from "@ai-sheet-music-generator/music-engine";
-import type { JobDraftRecord, JobResult } from "@ai-sheet-music-generator/shared-types";
+import type { JobDraftRecord, JobResult, RegionRetranscriptionResponse } from "@ai-sheet-music-generator/shared-types";
+import { retranscribeRegion as requestRegionRetranscription } from "../../lib/api";
 
 const MAX_HISTORY_ENTRIES = 50;
 
@@ -39,6 +41,12 @@ interface ReplaceSelectionOptions {
   primaryDraftNoteId?: string | null;
 }
 
+export interface RetranscriptionRegionSelection {
+  instrument: "piano" | "drums" | null;
+  startSec: number;
+  endSec: number;
+}
+
 export interface EditableJobResultState {
   draftResult: JobResult | null;
   activeResult: JobResult | null;
@@ -55,9 +63,13 @@ export interface EditableJobResultState {
   selectedTrack: SelectedDraftNote["track"] | null;
   selectedNote: SelectedDraftNote["note"] | null;
   selectedTrackKey: string | null;
+  retranscriptionRegion: RetranscriptionRegionSelection | null;
+  isRetranscribingRegion: boolean;
   selectDraftNote: (draftNoteId: string, options?: SelectDraftNoteOptions) => void;
   replaceSelection: (draftNoteIds: string[], options?: ReplaceSelectionOptions) => void;
   clearSelection: () => void;
+  setRetranscriptionRegion: (region: RetranscriptionRegionSelection | null) => void;
+  clearRetranscriptionRegion: () => void;
   clearEditableState: () => void;
   applyDraftUpdate: (
     mutator: (draft: JobResult) => JobResult,
@@ -79,6 +91,7 @@ export interface EditableJobResultState {
   resetDraftFromOriginalResult: () => void;
   restoreSavedDraft: () => void;
   getCurrentDraftResult: () => JobResult | undefined;
+  retranscribeSelectedRegion: () => Promise<void>;
 }
 
 function hydrateDraftResult(result: JobResult): JobResult {
@@ -102,7 +115,11 @@ function sanitizeSelectionState(
   };
 }
 
-export function useEditableJobResult(result: JobResult | null, savedDraft: JobDraftRecord | null): EditableJobResultState {
+export function useEditableJobResult(
+  result: JobResult | null,
+  savedDraft: JobDraftRecord | null,
+  jobId: string | null
+): EditableJobResultState {
   const [originalResult, setOriginalResult] = useState<JobResult | null>(null);
   const [savedDraftRecord, setSavedDraftRecord] = useState<JobDraftRecord | null>(null);
   const [savedDraftResult, setSavedDraftResult] = useState<JobResult | null>(null);
@@ -111,6 +128,8 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
   const [primarySelectedDraftNoteId, setPrimarySelectedDraftNoteId] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<DraftHistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<DraftHistoryEntry[]>([]);
+  const [retranscriptionRegion, setRetranscriptionRegion] = useState<RetranscriptionRegionSelection | null>(null);
+  const [isRetranscribingRegion, setIsRetranscribingRegion] = useState(false);
 
   useEffect(() => {
     if (!result) {
@@ -122,6 +141,8 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
       setPrimarySelectedDraftNoteId(null);
       setUndoStack([]);
       setRedoStack([]);
+      setRetranscriptionRegion(null);
+      setIsRetranscribingRegion(false);
       return;
     }
 
@@ -134,6 +155,8 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
     setPrimarySelectedDraftNoteId(null);
     setUndoStack([]);
     setRedoStack([]);
+    setRetranscriptionRegion(null);
+    setIsRetranscribingRegion(false);
   }, [result, savedDraft]);
 
   const activeResult = draftResult ?? result ?? null;
@@ -199,6 +222,8 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
     setPrimarySelectedDraftNoteId(null);
     setUndoStack([]);
     setRedoStack([]);
+    setRetranscriptionRegion(null);
+    setIsRetranscribingRegion(false);
   }
 
   function createHistoryEntry(
@@ -244,6 +269,10 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
   function clearSelection(): void {
     setSelectedDraftNoteIds([]);
     setPrimarySelectedDraftNoteId(null);
+  }
+
+  function clearRetranscriptionRegion(): void {
+    setRetranscriptionRegion(null);
   }
 
   function selectDraftNote(draftNoteId: string, options?: SelectDraftNoteOptions): void {
@@ -438,6 +467,43 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
     return draftResult ? normalizeEditedResult(draftResult) : undefined;
   }
 
+  async function retranscribeSelectedRegion(): Promise<void> {
+    if (!jobId) {
+      throw new Error("Complete a job before re-transcribing a region.");
+    }
+    if (!draftResult) {
+      throw new Error("Draft result is not available yet.");
+    }
+    if (!retranscriptionRegion) {
+      throw new Error("Select a region in the piano roll first.");
+    }
+    if (!retranscriptionRegion.instrument) {
+      throw new Error("Select a region that belongs to either piano or drums before re-transcribing.");
+    }
+
+    setIsRetranscribingRegion(true);
+    try {
+      const response: RegionRetranscriptionResponse = await requestRegionRetranscription(jobId, {
+        instrument: retranscriptionRegion.instrument,
+        startSec: retranscriptionRegion.startSec,
+        endSec: retranscriptionRegion.endSec
+      });
+      const replacement = replaceInstrumentRegionNotes(draftResult, {
+        instrument: response.instrument,
+        startSec: response.startSec,
+        endSec: response.endSec,
+        notes: response.notes
+      });
+      commitDraftResult(
+        replacement.draftResult,
+        replacement.insertedDraftNoteIds,
+        replacement.insertedDraftNoteIds[0] ?? null
+      );
+    } finally {
+      setIsRetranscribingRegion(false);
+    }
+  }
+
   return {
     draftResult,
     activeResult,
@@ -454,9 +520,13 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
     selectedTrack,
     selectedNote,
     selectedTrackKey,
+    retranscriptionRegion,
+    isRetranscribingRegion,
     selectDraftNote,
     replaceSelection,
     clearSelection,
+    setRetranscriptionRegion,
+    clearRetranscriptionRegion,
     clearEditableState,
     applyDraftUpdate,
     updateSelectedNote,
@@ -475,5 +545,7 @@ export function useEditableJobResult(result: JobResult | null, savedDraft: JobDr
     resetDraftFromOriginalResult,
     restoreSavedDraft,
     getCurrentDraftResult
+    ,
+    retranscribeSelectedRegion
   };
 }

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 InstrumentType = Literal["piano", "drums", "bass", "other"]
+RetranscriptionInstrumentType = Literal["piano", "drums"]
 JobStatus = Literal["queued", "processing", "failed", "completed"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
@@ -222,6 +223,38 @@ class JobDraftRecord(BaseModel):
 
 class SaveJobDraftRequest(BaseModel):
     draft_result: JobResult = Field(..., alias="draftResult")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class RegionRetranscriptionRequest(BaseModel):
+    instrument: RetranscriptionInstrumentType
+    start_sec: Annotated[float, Field(alias="startSec")]
+    end_sec: Annotated[float, Field(alias="endSec")]
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("start_sec", "end_sec")
+    @classmethod
+    def validate_non_negative_time(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Region times must be greater than or equal to 0.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "RegionRetranscriptionRequest":
+        if self.end_sec <= self.start_sec:
+            raise ValueError("endSec must be greater than startSec.")
+        return self
+
+
+class RegionRetranscriptionResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    instrument: RetranscriptionInstrumentType
+    start_sec: Annotated[float, Field(alias="startSec")]
+    end_sec: Annotated[float, Field(alias="endSec")]
+    provider_used: str = Field(alias="providerUsed")
+    notes: List[NoteEvent]
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

@@ -123,6 +123,23 @@ Current Phase 11D runtime behavior:
 - tempo estimation is more robust than the old Phase 5 path, but it can still fall back to 120 BPM or produce only an approximate BPM for sparse, expressive, or noisy material
 - warnings now surface meaningful cleanup and fallback behavior instead of silently pretending the normalized result is more precise than it really is
 
+### Phase 11E - Region Re-Transcription
+Completed.
+
+Implemented features:
+- backend region re-transcription endpoint added at `POST /api/v1/jobs/{jobId}/retranscribe-region`
+- region requests reuse persisted `piano_stem` or `drum_stem` assets instead of rerunning source separation
+- the backend extracts a temporary PCM WAV segment, routes it through the configured piano or drum provider, then reuses the existing post-processing stage before returning normalized note events
+- the frontend editor can now box-select a piano-only or drum-only time region and replace that region in the current draft with re-transcribed normalized notes
+- region replacement remains draft-only, preserves undo/redo history, and keeps the original completed backend result unchanged
+
+Current Phase 11E runtime behavior:
+- region re-transcription returns normalized note events for the requested region only; it does not return or persist a partial `JobResult`
+- the response now also reports `providerUsed` so fallback-backed region runs can be surfaced without changing the normalized note-event contract
+- the feature reuses the same provider fallback behavior as the main pipeline, so optional ML backends can still fall back to heuristic providers when configured
+- current extraction and re-transcription support is intentionally limited to the same practical persisted PCM `.wav` stem constraints already documented for the main providers
+- valid silent or note-free regions return `notes: []` successfully rather than raising an error
+
 ### Phase 5 - Post Processing
 Completed.
 
@@ -312,6 +329,8 @@ run the configured drum transcription provider on the persisted drum stem
 run backend-owned post-processing for confidence-aware cleanup, tempo estimation, adaptive quantization, duplicate cleanup, track merge, and beat/bar alignment
 ->
 clone the completed normalized result into a frontend editing draft when the user opens a completed job
+-> 
+optionally re-transcribe a selected piano or drum region from the persisted stem and replace only that draft segment
 ->
 load the latest saved draft for that job when one exists while keeping the original completed result unchanged
 ->
@@ -346,6 +365,9 @@ pipeline/
 - post_processing.py
 - post_processing_helpers.py
 - timing.py
+
+services/
+- region_retranscription.py
 
 services/
 - midi_export.py
@@ -401,6 +423,7 @@ Current UI supports:
 - piano note detail display
 - drum hit detail display
 - warning display
+- region selection and draft-only region re-transcription
 
 Future UI features:
 - waveform view
@@ -445,7 +468,8 @@ Current status:
 - Phase 11B is complete for stronger piano transcription provider selection and fallback
 - Phase 11C is complete for stronger drum transcription provider selection and fallback
 - Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
-- later Phase 11 work should still focus on region re-transcription and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
+- later Phase 11 work should still focus on AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
 - Phase 10 editing UX improvements are complete
@@ -453,7 +477,8 @@ Scope reminder:
 - Phase 11B piano transcription work is complete
 - Phase 11C drum transcription work is complete
 - Phase 11D post-processing work is complete
-- the next Phase 11 steps should focus on region re-transcription and correction assistance rather than redesigning the draft/export model
+- Phase 11E region re-transcription work is complete
+- the next Phase 11 steps should focus on correction assistance rather than redesigning the draft/export model
 
 ---
 

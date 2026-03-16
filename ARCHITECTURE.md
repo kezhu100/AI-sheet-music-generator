@@ -63,8 +63,9 @@ Responsibilities:
 9. normalize to the common event schema
 10. merge into a job result
 11. optionally load or save the latest edited draft snapshot for the completed job
-12. generate MIDI or MusicXML on demand from either the original normalized result or a validated draft override when requested
-13. return normalized result assets to the frontend
+12. optionally re-transcribe a selected piano or drum region from the persisted stem and return normalized replacement notes for the current draft only
+13. generate MIDI or MusicXML on demand from either the original normalized result or a validated draft override when requested
+14. return normalized result assets to the frontend
 
 Current runtime note:
 - step 3 now supports multiple source separation providers behind the same provider boundary
@@ -156,6 +157,13 @@ Phase 11D post-processing boundaries:
 - `apps/api/app/pipeline/post_processing_helpers.py` now owns richer cleanup and timing decisions such as weighted tempo estimation, adaptive grid selection, duplicate removal, overlap trimming, and cleanup-warning summaries
 - provider modules still only emit normalized raw note events; they do not absorb post-processing responsibilities
 - the frontend, draft persistence, preview, and export layers continue to consume the same normalized `JobResult`
+
+Phase 11E region re-transcription boundary:
+- backend region re-transcription orchestration lives in `apps/api/app/services/region_retranscription.py`
+- the jobs API exposes `POST /api/v1/jobs/{jobId}/retranscribe-region` as a narrow hook that returns normalized region notes plus a small `providerUsed` diagnostic field
+- region requests reuse persisted `piano_stem` / `drum_stem` files, existing transcription providers, and the same backend post-processing stage used by the main pipeline
+- the original completed `JobResult` remains unchanged; the frontend applies returned notes only to the current editable draft
+- providers still stay responsible only for transcribing their input segment, not for draft replacement or persistence rules
 
 Phase 6 export boundary:
 - MIDI export generation lives in `apps/api/app/services/midi_export.py`

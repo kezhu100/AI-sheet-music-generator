@@ -78,6 +78,21 @@ export interface SaveJobDraftRequest {
   draftResult: JobResult;
 }
 
+export interface RegionRetranscriptionRequest {
+  instrument: "piano" | "drums";
+  startSec: number;
+  endSec: number;
+}
+
+export interface RegionRetranscriptionResponse {
+  status: "ok";
+  instrument: "piano" | "drums";
+  startSec: number;
+  endSec: number;
+  providerUsed: string;
+  notes: NoteEvent[];
+}
+
 export interface JobDraftResponse {
   status: "ok";
   draft: JobDraftRecord;

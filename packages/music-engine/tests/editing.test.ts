@@ -8,6 +8,7 @@ import {
   moveNotesByDelta,
   normalizeEditedResult,
   quantizeDraftNotes,
+  replaceInstrumentRegionNotes,
   reassignDrumLane,
   resetDraftFromOriginal,
   resolveDrumMidiNote,
@@ -184,6 +185,73 @@ runTest("quantizeDraftNotes can snap selected notes to beats", () => {
   const quantized = quantizeDraftNotes(edited, { draftNoteIds: [edited.tracks[0].notes[0].draftNoteId!], subdivision: 1 });
 
   assert.equal(quantized.tracks[0].notes[0].onsetSec, 0.5);
+});
+
+runTest("replaceInstrumentRegionNotes swaps only overlapping notes for one instrument and assigns fresh draft ids", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const replaced = replaceInstrumentRegionNotes(draft, {
+    instrument: "piano",
+    startSec: 0.4,
+    endSec: 1.2,
+    notes: [
+      {
+        id: "region-piano-a",
+        instrument: "piano",
+        pitch: 67,
+        onsetSec: 0.5,
+        offsetSec: 1.0,
+        sourceStem: "piano_stem"
+      }
+    ]
+  });
+
+  assert.equal(replaced.draftResult.tracks[0].notes.length, 2);
+  assert.equal(replaced.draftResult.tracks[0].notes[0].pitch, 67);
+  assert.equal(replaced.draftResult.tracks[0].notes[1].pitch, 64);
+  assert.equal(replaced.draftResult.tracks[1].notes[0].drumLabel, "snare");
+  assert.equal(replaced.insertedDraftNoteIds.length, 1);
+  assert.match(replaced.insertedDraftNoteIds[0], /^draft:user:/);
+});
+
+runTest("replaceInstrumentRegionNotes uses strict overlap boundaries", () => {
+  const draft = resetDraftFromOriginal({
+    ...createOriginalResult(),
+    tracks: [
+      {
+        ...createOriginalResult().tracks[0],
+        notes: [
+          {
+            id: "ends-at-start",
+            instrument: "piano",
+            pitch: 60,
+            onsetSec: 0.0,
+            offsetSec: 0.5,
+            sourceStem: "piano_stem"
+          },
+          {
+            id: "starts-at-end",
+            instrument: "piano",
+            pitch: 64,
+            onsetSec: 1.0,
+            offsetSec: 1.5,
+            sourceStem: "piano_stem"
+          }
+        ]
+      },
+      createOriginalResult().tracks[1]
+    ]
+  });
+
+  const replaced = replaceInstrumentRegionNotes(draft, {
+    instrument: "piano",
+    startSec: 0.5,
+    endSec: 1.0,
+    notes: []
+  });
+
+  assert.equal(replaced.draftResult.tracks[0].notes.length, 2);
+  assert.equal(replaced.draftResult.tracks[0].notes[0].id, "ends-at-start");
+  assert.equal(replaced.draftResult.tracks[0].notes[1].id, "starts-at-end");
 });
 
 runTest("reassignDrumLane updates drum label and midi note together", () => {

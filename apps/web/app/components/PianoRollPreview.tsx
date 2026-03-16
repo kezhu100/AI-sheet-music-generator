@@ -10,6 +10,7 @@ import {
   midiToNoteName
 } from "@ai-sheet-music-generator/music-engine";
 import type { NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
+import type { RetranscriptionRegionSelection } from "../hooks/useEditableJobResult";
 
 interface PianoRollPreviewProps {
   tracks: TrackResult[];
@@ -19,8 +20,10 @@ interface PianoRollPreviewProps {
   selectedNoteIds?: string[];
   onSelectNote?: (trackKey: string, noteId: string, options?: { additive?: boolean }) => void;
   onBoxSelect?: (noteIds: string[], options?: { additive?: boolean }) => void;
+  onSelectRegion?: (region: RetranscriptionRegionSelection | null) => void;
   onClearSelection?: () => void;
   onMoveNote?: (trackKey: string, noteId: string, onsetSec: number) => void;
+  selectedRegion?: RetranscriptionRegionSelection | null;
 }
 
 interface NoteDragState {
@@ -60,8 +63,10 @@ export function PianoRollPreview({
   selectedNoteIds = [],
   onSelectNote,
   onBoxSelect,
+  onSelectRegion,
   onClearSelection,
-  onMoveNote
+  onMoveNote,
+  selectedRegion
 }: PianoRollPreviewProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [interactionState, setInteractionState] = useState<NoteDragState | BoxSelectionState | null>(null);
@@ -184,6 +189,14 @@ export function PianoRollPreview({
     function handlePointerUp(): void {
       if (activeInteraction.mode === "box") {
         const selectionBounds = toSelectionBounds(activeInteraction);
+        onSelectRegion?.(toRetranscriptionRegionSelection(selectionBounds, {
+          labelWidth,
+          width,
+          timeBounds,
+          pianoHeight,
+          drumHeight,
+          height
+        }));
         const intersectingNoteIds = noteLayouts
           .filter((layout) => intersects(selectionBounds, layout))
           .map((layout) => layout.draftNoteId)
@@ -206,7 +219,7 @@ export function PianoRollPreview({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [durationSec, gridWidth, interactionState, noteLayouts, onBoxSelect, onClearSelection, onMoveNote]);
+  }, [drumHeight, durationSec, gridWidth, height, interactionState, labelWidth, noteLayouts, onBoxSelect, onClearSelection, onMoveNote, onSelectRegion, pianoHeight, timeBounds, width]);
 
   return (
     <div className="preview-scroll">
@@ -268,6 +281,16 @@ export function PianoRollPreview({
           const x = labelWidth + (gridWidth / 8) * index;
           return <line className="preview-grid-line strong" key={`time-grid-${index}`} x1={x} x2={x} y1="0" y2={height} />;
         })}
+
+        {selectedRegion ? (
+          <rect
+            className="selection-box"
+            height={height}
+            width={Math.max(2, ((selectedRegion.endSec - selectedRegion.startSec) / durationSec) * gridWidth)}
+            x={labelWidth + ((selectedRegion.startSec - timeBounds.startSec) / durationSec) * gridWidth}
+            y={0}
+          />
+        ) : null}
 
         {pianoLayouts.map((note) => {
           const isSelected =
@@ -420,4 +443,42 @@ function intersects(
     noteLayout.y < bounds.y + bounds.height &&
     noteLayout.y + noteLayout.height > bounds.y
   );
+}
+
+function toRetranscriptionRegionSelection(
+  bounds: { x: number; y: number; width: number; height: number },
+  context: {
+    labelWidth: number;
+    width: number;
+    timeBounds: { startSec: number; durationSec: number };
+    pianoHeight: number;
+    drumHeight: number;
+    height: number;
+  }
+): RetranscriptionRegionSelection | null {
+  const usableStartX = Math.max(context.labelWidth, Math.min(context.width, bounds.x));
+  const usableEndX = Math.max(context.labelWidth, Math.min(context.width, bounds.x + bounds.width));
+  if (usableEndX - usableStartX < 4) {
+    return null;
+  }
+
+  const startRatio = (usableStartX - context.labelWidth) / Math.max(1, context.width - context.labelWidth);
+  const endRatio = (usableEndX - context.labelWidth) / Math.max(1, context.width - context.labelWidth);
+  const startSec = Number((context.timeBounds.startSec + startRatio * context.timeBounds.durationSec).toFixed(3));
+  const endSec = Number((context.timeBounds.startSec + endRatio * context.timeBounds.durationSec).toFixed(3));
+
+  if (endSec <= startSec) {
+    return null;
+  }
+
+  const top = bounds.y;
+  const bottom = bounds.y + bounds.height;
+  const overlapsPiano = top < context.pianoHeight;
+  const overlapsDrums = context.drumHeight > 0 && bottom > context.pianoHeight;
+
+  return {
+    instrument: overlapsPiano && overlapsDrums ? null : overlapsPiano ? "piano" : overlapsDrums ? "drums" : null,
+    startSec,
+    endSec
+  };
 }
