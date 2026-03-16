@@ -51,10 +51,10 @@
 - [x] document the timing helper boundaries for Phase 6 preparation
 
 ## Phase 6 - Export
-- [ ] MIDI export
+- [x] MIDI export
 - [ ] MusicXML export
-- [ ] file download endpoints
-- [ ] export buttons in UI
+- [x] file download endpoints
+- [x] export buttons in UI
 
 ## Phase 7 - Score Preview
 - [ ] piano-roll preview

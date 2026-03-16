@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import Response
 
 from app.models.schemas import CreateJobRequest, JobResponse
+from app.services.midi_export import MidiExportError, build_midi_file, build_midi_filename
 from app.services.job_runner import start_job
 from app.services.job_store import job_store
 from app.services.upload_registry import upload_registry
@@ -29,3 +31,23 @@ async def get_job(job_id: str) -> JobResponse:
 
     return JobResponse(job=job)
 
+
+@router.get("/{job_id}/exports/midi")
+async def export_job_midi(job_id: str) -> Response:
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    if job.result is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available for export yet.")
+
+    try:
+        midi_bytes = build_midi_file(job.result)
+    except MidiExportError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    filename = build_midi_filename(job.result.project_name)
+    return Response(
+        content=midi_bytes,
+        media_type="audio/midi",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -223,6 +223,35 @@ Follow-up:
 - Reuse the extracted timing helpers when implementing Phase 6 export transforms.
 - Reassess whether tempo-map or meter-aware helpers are needed once MIDI and MusicXML output begins.
 
+### 2026-03-16
+Decision:
+- Implement the first Phase 6 export path as a stdlib-only, on-demand MIDI exporter driven by the completed `JobResult`.
+
+Context:
+- The repository already had post-processed, timing-aligned track data with a single project BPM, quantized event timing, and piano/drum note events.
+- The product docs prioritize MIDI before MusicXML, and the current task explicitly asked for the smallest correct export implementation.
+- The backend did not yet expose any export endpoint, and adding export data directly into `JobResult` would have unnecessarily expanded the core result contract.
+
+Chosen option:
+- Add `apps/api/app/services/midi_export.py` to transform the completed normalized result into a format-1 MIDI file with a tempo track plus one track per exported instrument track.
+- Keep export generation on demand through a dedicated jobs endpoint instead of generating files during job completion.
+- Use piano notes on a melodic MIDI channel and drum hits on channel 10 semantics (channel index 9 in the MIDI bytes).
+- Reuse the existing post-processed BPM and event timing as the source of truth for export.
+
+Alternatives considered:
+- Introducing a dedicated MIDI-writing library.
+- Persisting MIDI files during job completion instead of generating them at request time.
+- Expanding shared schemas so every job result carried export metadata.
+
+Tradeoffs:
+- The stdlib-only exporter keeps setup light and predictable, but it intentionally supports only a simple single-tempo MIDI draft.
+- On-demand generation avoids extra storage and keeps the result contract stable, but export is recomputed per request.
+- Reusing the current normalized result makes the export path easy to reason about, but export fidelity is limited by the current heuristic transcription and post-processing layers.
+
+Follow-up:
+- Add MusicXML export as the remaining Phase 6 task.
+- Reassess whether any export helpers belong in shared packages once multiple export formats exist.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

@@ -54,3 +54,25 @@ export async function getJob(jobId: string): Promise<JobResponse> {
   return parseJson<JobResponse>(response);
 }
 
+export async function downloadMidiExport(jobId: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/exports/midi`, {
+    method: "GET"
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (body.detail) {
+        message = body.detail;
+      }
+    } catch {
+      // Ignore JSON parsing issues to preserve the original fallback message.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.blob();
+}

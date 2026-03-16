@@ -111,6 +111,20 @@ Current Phase 5.5 runtime behavior:
 - runtime output is intentionally kept aligned with Phase 5 behavior
 - the main goal is internal maintainability and clearer timing helper boundaries ahead of Phase 6
 
+### Phase 6 - Export
+In progress.
+
+Implemented features:
+- minimal MIDI export transformation added on top of the existing post-processed `JobResult`
+- backend export is generated on demand from normalized track events rather than changing the transcription pipeline
+- completed jobs now expose a dedicated MIDI download endpoint
+- frontend result view now includes a minimal MIDI export action
+
+Current Phase 6 runtime behavior:
+- export currently means MIDI only
+- MIDI uses the current single project-wide BPM, quantized note timing, and simple piano/drum track mapping
+- MusicXML export is still not implemented in this phase snapshot
+
 ---
 
 # Current Pipeline
@@ -129,9 +143,11 @@ run heuristic WAV drum transcription on the persisted drum stem when the stem is
 ->
 run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
 ->
+generate MIDI on demand from the completed normalized result when requested
+->
 return normalized stems + tracks + warnings
 ->
-frontend displays stems + piano notes + drum hits + track summaries + warnings
+frontend displays stems + piano notes + drum hits + track summaries + warnings, and can request MIDI export
 
 The architecture now supports replacing the local development separation backend plus the heuristic piano and drum providers with stronger providers in later phases.
 
@@ -153,6 +169,9 @@ pipeline/
 - drum_transcription.py
 - post_processing.py
 - timing.py
+
+services/
+- midi_export.py
 
 Current providers:
 - source separation provider: local development stem persistence backend
@@ -214,19 +233,17 @@ npm workspaces used for monorepo.
 
 # Next Development Phase
 
-## Phase 6 - Export
+## Phase 6 - Export Continuation
 
 Goal:
-Start export work on top of the normalized and post-processed event pipeline.
+Extend the new export layer beyond the minimal MIDI path without starting score rendering or editing work.
 
-Tasks:
-- MIDI export
+Remaining tasks:
 - MusicXML export
-- file download endpoints
-- export controls in the UI
+- refine export limitations and validation coverage
 
 Scope limitation:
-- do not start score rendering or editing work in this phase
+- do not start score rendering or editing work in this phase continuation
 
 ---
 
@@ -238,10 +255,11 @@ Current runtime limitations:
 - the real drum provider currently runs only on uncompressed PCM `.wav` stems
 - the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
 - post-processing currently assumes a simple 4/4 grid and does not support tempo changes
+- MIDI export currently assumes a single project-wide tempo and does not preserve tempo maps or notation-only semantics
 - job state is still in-memory and is lost when the API restarts
 
 Phase 6
-MIDI export and MusicXML export.
+Complete the remaining export work, including MusicXML.
 
 Phase 7
 Score rendering UI.

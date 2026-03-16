@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatEventTiming, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
-import { createJob, getJob, uploadAudio } from "../lib/api";
+import { createJob, downloadMidiExport, getJob, uploadAudio } from "../lib/api";
 
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
@@ -20,6 +20,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
+  const [isExportingMidi, setIsExportingMidi] = useState(false);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -80,6 +81,32 @@ export default function HomePage() {
     }
   }
 
+  async function handleMidiExport(): Promise<void> {
+    if (!job?.result) {
+      setError("Complete a job before exporting MIDI.");
+      return;
+    }
+
+    setError(null);
+    setIsExportingMidi(true);
+
+    try {
+      const midiBlob = await downloadMidiExport(job.id);
+      const url = window.URL.createObjectURL(midiBlob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${job.result.projectName || "ai-sheet-music-generator"}.mid`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Failed to export MIDI.");
+    } finally {
+      setIsExportingMidi(false);
+    }
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -87,11 +114,11 @@ export default function HomePage() {
           <div>
             <h1>AI Sheet Music Generator</h1>
             <p>
-              Upload a song or stem, create a job, and inspect a Phase 5 pipeline with persisted stems, heuristic WAV
-              transcription, lightweight tempo estimation, quantization, and aligned event previews.
+              Upload a song or stem, create a job, inspect the post-processed result, and export a minimal MIDI draft
+              built from the current heuristic transcription pipeline.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 5 post-processing</span>
+              <span className="pill">Phase 6 MIDI export</span>
               <span className="pill">Real heuristic PCM WAV providers</span>
               <span className="pill">Warnings stay explicit</span>
             </div>
@@ -142,6 +169,14 @@ export default function HomePage() {
                 }}
               >
                 Reset
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={!job?.result || isExportingMidi}
+                onClick={handleMidiExport}
+              >
+                {isExportingMidi ? "Exporting MIDI..." : "Download MIDI"}
               </button>
             </div>
           </div>
