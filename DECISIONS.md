@@ -4,6 +4,36 @@
 
 ### 2026-03-16
 Decision:
+- Implement Phase 11A source separation as an explicitly configured provider selection layer that keeps the existing development copy backend, adds an optional Demucs-backed provider, and supports graceful fallback without changing API routes or the normalized `JobResult`.
+
+Context:
+- Phase 10 was already complete, but source separation was still hard-wired to a placeholder backend that simply copied the uploaded file into both stems.
+- The project docs already expected stronger providers to swap in behind provider interfaces, while downstream piano/drum transcription, preview, editing, draft persistence, and export continued to depend on normalized persisted stems plus normalized `JobResult` output.
+- The repository still validates on Python 3.9 locally, while stronger ML tooling is more likely to live in Python 3.11+ environments.
+
+Chosen option:
+- Keep the existing source separation provider abstraction and extend it with runtime warnings so provider choice and fallback behavior can be surfaced honestly.
+- Add a configurable `demucs` provider that runs `python -m demucs.separate` through a configurable Python executable, allowing the stronger backend to live in a separate environment from the FastAPI runtime.
+- Preserve `development-copy` as the default local provider and optional fallback target.
+- Keep persisted stems normalized as `piano_stem` and `drum_stem`, mapping the Demucs outputs into the existing downstream contract.
+
+Alternatives considered:
+- Replacing the development backend outright with a single hard-coded ML stack.
+- Adding heavy ML dependencies directly to the current API requirements and requiring a Python 3.11 migration immediately.
+- Expanding `JobResult` with provider-specific separation metadata instead of using existing stem metadata and warnings.
+
+Tradeoffs:
+- The new path is materially stronger than the copy backend and keeps the architecture flexible, but the Demucs integration is still optional and depends on a separately prepared local runtime.
+- Mapping Demucs `other.wav` into the normalized `piano_stem` keeps downstream contracts stable, but it is not the same as validated piano-only isolation and is documented as such.
+- Graceful fallback preserves the rest of the pipeline in constrained environments, but it means some runs will still complete on placeholder stems unless the stronger provider is both configured and available.
+
+Follow-up:
+- Evaluate stronger piano and drum transcription providers for later Phase 11 work once better separated stems are available.
+- Revisit whether additional configurable separation providers should be added after real-world testing of the Demucs path.
+- Consider richer provider diagnostics only if the current warnings plus `StemAsset.provider` field prove insufficient.
+
+### 2026-03-16
+Decision:
 - Implement Phase 10 editing UX on top of the existing normalized draft `JobResult` by keeping reusable bulk-editing rules in `packages/music-engine` and keeping undo/redo history as session-local frontend state.
 
 Context:

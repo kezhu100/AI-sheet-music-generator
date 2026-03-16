@@ -39,7 +39,7 @@ def resolve_project_path(stored_path: str) -> Path:
     return settings.project_root / stored_path
 
 
-def persist_stem_copy(*, source_path: Path, job_id: str, stem_name: str, instrument_hint: str, provider: str) -> StemAsset:
+def persist_stem_file(*, source_path: Path, job_id: str, stem_name: str, instrument_hint: str, provider: str) -> StemAsset:
     settings = get_settings()
     stem_dir = settings.stems_dir / job_id
     stem_dir.mkdir(parents=True, exist_ok=True)
@@ -57,4 +57,14 @@ def persist_stem_copy(*, source_path: Path, job_id: str, stem_name: str, instrum
         fileName=file_name,
         fileFormat=suffix.lstrip(".").lower() or "bin",
         sizeBytes=destination.stat().st_size,
+    )
+
+
+def persist_stem_copy(*, source_path: Path, job_id: str, stem_name: str, instrument_hint: str, provider: str) -> StemAsset:
+    return persist_stem_file(
+        source_path=source_path,
+        job_id=job_id,
+        stem_name=stem_name,
+        instrument_hint=instrument_hint,
+        provider=provider,
     )

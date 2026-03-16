@@ -30,11 +30,12 @@ Current milestone:
 - Phase 8 engineering wrap-up completed: backend test setup is clearer, focused editing-helper tests now run, and draft-state orchestration is slightly more maintainable
 - Phase 9 completed: edited draft persistence, save/load draft APIs, auto-loaded saved drafts, explicit save action, minimal draft version tracking, and original-vs-draft export actions are now implemented
 - Phase 10 completed: undo/redo, additive and box note selection, keyboard editing shortcuts, quantization tools, drum lane reassignment, and richer editing tests are now implemented
+- Phase 11A completed: source separation now supports explicit provider selection, an optional stronger Demucs backend, and a documented fallback path while preserving normalized persisted stems and downstream contracts
 
 Current behavior:
 
 - The repository demonstrates the full `upload -> job -> result` pipeline
-- Source separation still runs through a local development backend that copies the uploaded file into per-job stem files
+- Source separation now runs through a configured provider: the default development copy backend remains available, and an optional Demucs-based backend can be selected with graceful fallback
 - Piano transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Drum transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Post-processing now estimates tempo, quantizes note timing, aligns beat/bar positions, and filters low-confidence events before result delivery
@@ -50,8 +51,8 @@ Current behavior:
 
 ### Backend environment
 
-- Current scaffold tested on Python 3.9.13
-- Recommended environment for future ML integrations: Python 3.11+
+- Current scaffold and validation workflow still run on Python 3.9.13
+- Recommended environment for stronger ML integrations: Python 3.11+
 - Backend stack: FastAPI
 - No new heavy DSP, ML, MIDI-writing, or MusicXML dependencies were introduced for the current Phase 6 export path
 
@@ -81,6 +82,17 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 Saved edited drafts are stored locally in `apps/api/data/drafts/<job-id>.json`.
+
+Optional source separation configuration:
+
+- `SOURCE_SEPARATION_PROVIDER=development-copy` keeps the local placeholder stem-copy backend
+- `SOURCE_SEPARATION_PROVIDER=demucs` enables the stronger Demucs-backed provider
+- `SOURCE_SEPARATION_FALLBACK_PROVIDER=development-copy` enables automatic fallback when the selected primary provider is unavailable
+- `SOURCE_SEPARATION_DEMUCS_PYTHON=/path/to/python` can point to a separate Python environment where Demucs is installed
+- `SOURCE_SEPARATION_DEMUCS_MODEL=htdemucs` selects the Demucs model name
+- `SOURCE_SEPARATION_DEMUCS_DEVICE=cpu` or another supported device string passes through to Demucs
+- `SOURCE_SEPARATION_DEMUCS_PIANO_SOURCE=other` controls which Demucs output is normalized into `piano_stem`
+- `SOURCE_SEPARATION_DEMUCS_DRUMS_SOURCE=drums` controls which Demucs output is normalized into `drum_stem`
 
 ## Local Development
 
@@ -142,7 +154,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running Phase 10 Locally
+## Running the Current Phase 11A Build Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
@@ -151,6 +163,14 @@ If the API venv is missing, the root dev script exits with a clear message inste
 5. Select notes from the piano roll or event lists, use Ctrl/Cmd-click for additive selection, or drag a selection box in the piano roll to select multiple notes.
 6. Drag the current selection horizontally to move timing, quantize selected notes or the whole draft, reassign selected drum hits to a different lane, use keyboard shortcuts such as `Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, `Delete`, arrow keys, and `Q`, then click `Save draft`.
 7. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads separately from the original completed result.
+
+To try the optional stronger separation backend locally, set environment variables before starting the API or `npm run dev`. Example PowerShell:
+
+```powershell
+$env:SOURCE_SEPARATION_PROVIDER = "demucs"
+$env:SOURCE_SEPARATION_FALLBACK_PROVIDER = "development-copy"
+$env:SOURCE_SEPARATION_DEMUCS_PYTHON = "C:\path\to\python.exe"
+```
 
 Current real transcription support:
 
@@ -161,7 +181,9 @@ Current real transcription support:
 
 Current limitations:
 
-- the separation backend is still a placeholder development backend, so uploaded audio is copied into `piano_stem` and `drum_stem` rather than truly separated
+- the default source separation provider is still the development copy backend unless you explicitly configure another provider
+- the optional Demucs backend is stronger than the copy provider, but it is only used when Demucs is installed in the configured Python environment and runnable from the local machine
+- the current Demucs integration normalizes `drum_stem` from Demucs `drums.wav` and normalizes `piano_stem` from a configurable non-drum source, which defaults to `other.wav`; that means the returned piano stem may still contain non-piano accompaniment
 - real piano transcription currently runs only on uncompressed PCM `.wav` stems
 - real drum transcription currently runs only on uncompressed PCM `.wav` stems
 - the heuristic piano provider is intentionally lightweight and may simplify or miss dense polyphonic passages
@@ -198,10 +220,10 @@ Current validation reality:
 
 ## What Is Not Implemented Yet
 
-- validated ML source separation quality
+- production-validated source separation quality tuning across multiple real-world audio sets
 - persisted multi-revision edit history or saved projects
 
 ## Future Roadmap
 
-- Phase 11: result quality improvements through stronger providers, smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
+- Phase 11: Phase 11A source separation upgrades are now in place; later Phase 11 work still includes stronger piano/drum providers, smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
 - Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment

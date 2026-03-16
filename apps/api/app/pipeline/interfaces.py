@@ -16,6 +16,13 @@ class SourceStem:
 
 
 @dataclass(frozen=True)
+class SourceSeparationRunResult:
+    provider_name: str
+    stems: list[SourceStem]
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class TranscriptionResult:
     provider_name: str
     instrument: str
@@ -27,7 +34,7 @@ class TranscriptionResult:
 class SourceSeparationProvider(Protocol):
     provider_name: str
 
-    def separate(self, audio_path: Path, job_id: str) -> List[SourceStem]:
+    def separate(self, audio_path: Path, job_id: str) -> SourceSeparationRunResult:
         ...
 
 

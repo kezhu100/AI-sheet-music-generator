@@ -10,6 +10,7 @@ import wave
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.models.schemas import NoteEvent, TrackResult
+from app.core.config import Settings
 from app.pipeline.development_pipeline import build_development_pipeline
 from app.pipeline.post_processing import LightweightPostProcessor
 
@@ -22,7 +23,11 @@ class DevelopmentPipelineTests(unittest.TestCase):
                 audio_path,
             )
 
-            result = build_development_pipeline().run(audio_path, "demo.wav", "job-test")
+            result = build_development_pipeline(
+                Settings(
+                    source_separation_provider="development-copy",
+                )
+            ).run(audio_path, "demo.wav", "job-test")
 
         self.assertEqual(result.project_name, "demo")
         self.assertEqual(result.bpm, 120)
@@ -31,6 +36,10 @@ class DevelopmentPipelineTests(unittest.TestCase):
         self.assertEqual({stem.instrument_hint for stem in result.stems}, {"piano", "drums"})
         self.assertEqual({track.instrument for track in result.tracks}, {"piano", "drums"})
         self.assertTrue(all(stem.stored_path.startswith("data/stems/job-test/") for stem in result.stems))
+        self.assertIn(
+            "Source separation ran with the development copy provider, so the uploaded file was duplicated into placeholder stems instead of being truly separated.",
+            result.warnings,
+        )
         self.assertIn(
             "Drum transcription is now a real heuristic MVP provider that consumes the persisted drum stem and currently supports only uncompressed PCM .wav stems.",
             result.warnings,

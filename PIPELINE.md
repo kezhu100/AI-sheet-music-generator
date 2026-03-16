@@ -31,3 +31,11 @@ Phase 10 editing UX update:
 - selection can now span multiple notes through additive click selection, event-list selection, or piano-roll box selection
 - richer editing actions such as keyboard nudging, quantization, bulk delete, and drum lane reassignment still operate on the same normalized draft result shape
 - export flow remains unchanged: original export uses the completed backend result, while draft export uses the current validated normalized draft payload
+
+Phase 11A source separation update:
+- the separation stage now selects a backend explicitly through configuration instead of always using the development copy provider
+- `development-copy` remains available for local development and deterministic fallback
+- `demucs` can be enabled as a stronger backend when Demucs is installed in the configured Python environment
+- fallback can automatically return to `development-copy` when the stronger provider is unavailable
+- persisted stems remain normalized as `piano_stem` and `drum_stem` so downstream transcription and frontend result handling stay unchanged
+- the current Demucs path maps `drum_stem` from `drums.wav` and maps `piano_stem` from a configurable non-drum output, defaulting to `other.wav`

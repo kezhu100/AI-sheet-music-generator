@@ -2,18 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.core.config import Settings, get_settings
 from app.models.schemas import JobResult, TrackResult
 from app.pipeline.interfaces import (
     DrumTranscriptionProvider,
     PianoTranscriptionProvider,
     ProcessingPipeline,
     SourceSeparationProvider,
+    SourceSeparationRunResult,
     TranscriptionResult,
 )
 from app.pipeline.drum_transcription import HeuristicWavDrumTranscriptionProvider
 from app.pipeline.post_processing import LightweightPostProcessor
 from app.pipeline.piano_transcription import HeuristicWavPianoTranscriptionProvider
-from app.pipeline.source_separation import LocalDevelopmentSourceSeparationProvider
+from app.pipeline.source_separation import build_source_separation_provider
 
 
 class DevelopmentProcessingPipeline:
@@ -30,11 +32,10 @@ class DevelopmentProcessingPipeline:
         self._post_processor = post_processor
 
     def run(self, audio_path: Path, original_file_name: str, job_id: str) -> JobResult:
-        stems = self._separation_provider.separate(audio_path, job_id)
+        separation_result: SourceSeparationRunResult = self._separation_provider.separate(audio_path, job_id)
+        stems = separation_result.stems
         transcriptions: list[TranscriptionResult] = []
-        warnings = [
-            "Source separation is still a local development backend that persists placeholder stems by copying the uploaded file.",
-        ]
+        warnings = list(separation_result.warnings)
 
         for stem in stems:
             if stem.instrument_hint == "piano":
@@ -68,10 +69,15 @@ class DevelopmentProcessingPipeline:
         )
 
 
-def build_development_pipeline() -> ProcessingPipeline:
+def build_processing_pipeline(settings: Settings | None = None) -> ProcessingPipeline:
+    resolved_settings = settings or get_settings()
     return DevelopmentProcessingPipeline(
-        separation_provider=LocalDevelopmentSourceSeparationProvider(),
+        separation_provider=build_source_separation_provider(resolved_settings),
         piano_provider=HeuristicWavPianoTranscriptionProvider(),
         drum_provider=HeuristicWavDrumTranscriptionProvider(),
         post_processor=LightweightPostProcessor(),
     )
+
+
+def build_development_pipeline(settings: Settings | None = None) -> ProcessingPipeline:
+    return build_processing_pipeline(settings)

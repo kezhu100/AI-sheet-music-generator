@@ -54,7 +54,7 @@ Responsibilities:
 
 1. upload audio
 2. create processing job
-3. route audio through the source separation provider
+3. route audio through the configured source separation provider
 4. persist stems
 5. run heuristic piano transcription on the persisted piano stem when supported
 6. run heuristic drum transcription on the persisted drum stem when supported
@@ -67,7 +67,10 @@ Responsibilities:
 13. return normalized result assets to the frontend
 
 Current runtime note:
-- step 3 is implemented with a local development separation backend that copies the uploaded file into per-job stems
+- step 3 now supports multiple source separation providers behind the same provider boundary
+- the default provider is still the development copy backend for predictable local setup
+- an optional Demucs-backed provider can generate stronger persisted stems when its runtime is configured
+- the stronger provider path can fall back to the development copy provider without changing API routes or downstream result contracts
 - step 5 is implemented with a stdlib-only heuristic piano provider for uncompressed PCM `.wav` stems
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
@@ -80,8 +83,12 @@ Current runtime note:
 ### Source Separation Providers
 - backend contract lives under `apps/api/app/pipeline/interfaces.py`
 - current implementation lives in `apps/api/app/pipeline/source_separation.py`
-- current backend persists placeholder stems by copying the upload into per-job files
-- later providers can swap in validated ML separation without changing API routes
+- provider selection is configured through backend settings and environment variables rather than being hard-wired inside the job runner
+- `development-copy` persists placeholder stems by copying the upload into per-job files
+- `demucs` can run a stronger external separation backend through a configurable Python executable and model name
+- fallback selection can automatically return to `development-copy` when the stronger backend is unavailable
+- persisted outputs are still normalized into the same `piano_stem` and `drum_stem` metadata expected by downstream transcription
+- the current Demucs integration maps `drum_stem` from `drums.wav` and maps `piano_stem` from a configurable non-drum output, defaulting to `other.wav`
 
 ### Piano Transcription Providers
 - backend contract lives under `apps/api/app/pipeline/interfaces.py`
@@ -106,6 +113,12 @@ Current runtime note:
 - `warnings`: explicit limitations and runtime caveats
 
 This keeps the frontend consuming normalized backend results rather than backend-specific storage details.
+
+Phase 11A separation boundary:
+- `JobResult` remains unchanged
+- `StemAsset.provider` records which source separation backend actually produced the persisted stem files
+- separation fallback behavior is surfaced through warnings instead of contract-breaking schema changes
+- downstream piano/drum transcription, preview, editing, persistence, and export still consume normalized persisted stems and normalized `JobResult`
 
 Phase 5.5 timing helper boundaries:
 - backend orchestration stays in `apps/api/app/pipeline/post_processing.py`

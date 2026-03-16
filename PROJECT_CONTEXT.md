@@ -56,6 +56,12 @@ Implemented features:
 - job results now include normalized stem metadata
 - frontend result view surfaces generated stems and warnings
 
+Phase 11A extension now implemented on top of Phase 2:
+- source separation provider selection is now explicit through backend configuration
+- the development copy backend remains available for local setup and deterministic fallback
+- an optional stronger Demucs-backed provider can now generate real separated stems behind the same provider boundary
+- fallback behavior now keeps the pipeline running and records warnings when the configured stronger backend is unavailable
+
 ### Phase 3 - Piano Transcription
 Completed.
 
@@ -184,6 +190,23 @@ Current Phase 10 runtime behavior:
 - piano-roll box selection and drag interaction stay inside `apps/web/app/components/PianoRollPreview.tsx`
 - export continues to run from validated normalized `JobResult` payloads for either the original result or the current draft override
 
+### Phase 11A - Stronger Source Separation Backend
+Completed.
+
+Implemented features:
+- backend source separation provider selection now comes from configuration rather than being hard-wired inside the pipeline factory
+- optional `demucs` source separation support added behind the existing provider contract
+- configurable fallback to the development copy provider added for environments where the stronger backend is unavailable
+- persisted stem metadata remains normalized and downstream piano/drum transcription still consumes the same `piano_stem` / `drum_stem` contract
+- provider-selection and fallback behavior now have direct backend test coverage
+
+Current Phase 11A runtime behavior:
+- default local behavior still uses the development copy provider unless `SOURCE_SEPARATION_PROVIDER` is changed
+- when `SOURCE_SEPARATION_PROVIDER=demucs`, the backend runs Demucs through a configurable Python executable so stronger separation can live in a different environment from the API runtime
+- if Demucs is unavailable and `SOURCE_SEPARATION_FALLBACK_PROVIDER=development-copy` is configured, the pipeline falls back gracefully and records a warning instead of failing the whole job
+- the normalized `drum_stem` maps from Demucs `drums.wav`
+- the normalized `piano_stem` currently maps from a configurable Demucs non-drum output, defaulting to `other.wav`, so it is stronger than the copy backend but is not equivalent to validated piano-isolated separation
+
 ### Phase 8 - Engineering Wrap-Up
 Completed.
 
@@ -228,7 +251,7 @@ upload audio
 ->
 create job
 ->
-persist placeholder stems through the source separation provider
+run the configured source separation provider and persist normalized stems
 ->
 run heuristic WAV piano transcription on the persisted piano stem when the stem is an uncompressed PCM `.wav`
 ->
@@ -250,7 +273,7 @@ return normalized stems + tracks + warnings
 ->
 frontend displays stems + track summaries + warnings, score previews, event details, and can request MIDI or MusicXML export
 
-The architecture now supports replacing the local development separation backend plus the heuristic piano and drum providers with stronger providers in later phases.
+The architecture now supports swapping source separation providers explicitly through config, while stronger piano and drum providers remain later Phase 11 follow-up work.
 
 ---
 
@@ -276,7 +299,9 @@ services/
 - musicxml_export.py
 
 Current providers:
-- source separation provider: local development stem persistence backend
+- source separation providers:
+  - local development stem persistence backend
+  - optional Demucs-backed separation backend with configurable fallback
 - piano transcription provider: heuristic stdlib-only WAV provider
 - drum transcription provider: heuristic stdlib-only WAV onset detector with simple kick/snare/hi-hat mapping
 
@@ -356,14 +381,16 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 11 - Next Candidate
+## Phase 11 - In Progress
 
-Goal:
-Improve transcription quality and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10.
+Current status:
+- Phase 11A is complete for stronger source separation provider selection and fallback
+- later Phase 11 work should still improve transcription quality and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
-- Phase 10 editing UX improvements are now complete
-- the next phase should focus on provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
+- Phase 10 editing UX improvements are complete
+- Phase 11A source separation work is complete
+- the next Phase 11 steps should focus on piano/drum provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
 
 ---
 
@@ -381,7 +408,8 @@ The next roadmap should extend the current architecture in the same order the pr
 This keeps the current `upload -> pipeline -> normalized JobResult -> editable draft -> validated export` design intact while moving the product toward a durable application.
 
 Current runtime limitations:
-- source separation is still a placeholder development backend that copies the upload into `piano_stem` and `drum_stem`
+- source separation defaults to the development copy backend unless a stronger provider is configured
+- the optional Demucs backend still normalizes `piano_stem` from a configurable non-drum output rather than a validated piano-only source
 - the real piano provider currently runs only on uncompressed PCM `.wav` stems
 - the real drum provider currently runs only on uncompressed PCM `.wav` stems
 - the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
