@@ -50,6 +50,10 @@ export default function HomePage() {
     return summarizeJobResult(job.result);
   }, [job]);
 
+  const pianoTrack = useMemo(() => {
+    return job?.result?.tracks.find((track) => track.instrument === "piano") ?? null;
+  }, [job]);
+
   async function handleUploadAndCreateJob(): Promise<void> {
     if (!selectedFile) {
       setError("Choose an audio file first.");
@@ -83,13 +87,13 @@ export default function HomePage() {
           <div>
             <h1>AI Sheet Music Generator</h1>
             <p>
-              Upload a song or stem, create a job, and inspect a Phase 2 pipeline with persisted local stems plus
-              mocked downstream transcription results.
+              Upload a song or stem, create a job, and inspect a Phase 3 pipeline with heuristic WAV piano
+              transcription, persisted stems, and mocked drum output.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 2 source separation</span>
-              <span className="pill">Local stem persistence</span>
-              <span className="pill">Mock transcription remains</span>
+              <span className="pill">Phase 3 piano transcription</span>
+              <span className="pill">Heuristic PCM WAV provider</span>
+              <span className="pill">Drums still mocked</span>
             </div>
           </div>
           <div className="panel">
@@ -115,7 +119,7 @@ export default function HomePage() {
                 accept="audio/*"
                 onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
               />
-            <p className="muted">Mixed songs and isolated stems both route through the same job pipeline.</p>
+              <p className="muted">Mixed songs and isolated stems both route through the same job pipeline.</p>
             </div>
 
             <div className="actions">
@@ -170,7 +174,7 @@ export default function HomePage() {
                 <div className="status-fill" style={{ width: `${job.progress.percent}%` }} />
               </div>
               <p className="status-text">
-                <strong>{job.status}</strong> · {job.progress.stage} · {job.progress.percent}%
+                <strong>{job.status}</strong> | {job.progress.stage} | {job.progress.percent}%
               </p>
               <p className="muted">{job.progress.message}</p>
               <div className="meta-list">
@@ -198,7 +202,7 @@ export default function HomePage() {
               {trackSummaries.map((track) => (
                 <article className="track-card" key={`${track.instrument}-${track.sourceStem}`}>
                   <strong>
-                    {track.instrument} · {track.sourceStem}
+                    {track.instrument} | {track.sourceStem}
                   </strong>
                   <div className="muted">Provider: {track.provider}</div>
                   <div>{track.eventCount} note events</div>
@@ -230,32 +234,40 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">Persisted stems will appear here once the Phase 2 separation step completes.</p>
+            <p className="muted">Persisted stems will appear here once the job completes.</p>
           )}
         </div>
       </section>
 
       <section className="content-grid">
         <div className="panel">
-          <h2>Note Preview</h2>
-          {job?.result ? (
+          <h2>Piano Note Preview</h2>
+          {pianoTrack ? (
             <div className="note-list">
-              {job.result.tracks.flatMap((track) =>
-                track.notes.slice(0, 4).map((note) => (
+              {pianoTrack.notes.length > 0 ? (
+                pianoTrack.notes.slice(0, 8).map((note) => (
                   <article className="note-card" key={note.id}>
                     <strong>{formatNote(note)}</strong>
                     <div>
                       {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
                     </div>
                     <div className="muted">
-                      stem {note.sourceStem ?? "unknown"} · confidence {note.confidence ?? 0}
+                      provider {pianoTrack.provider} | stem {note.sourceStem ?? "unknown"} | confidence{" "}
+                      {note.confidence ?? 0}
                     </div>
                   </article>
                 ))
+              ) : (
+                <article className="note-card">
+                  <strong>No piano notes detected</strong>
+                  <div className="muted">
+                    Phase 3 real transcription currently works best for simple uncompressed PCM WAV stems.
+                  </div>
+                </article>
               )}
             </div>
           ) : (
-            <p className="muted">The first mocked note events from each track will appear here.</p>
+            <p className="muted">Detected piano notes will appear here once the job completes.</p>
           )}
         </div>
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Protocol
 
@@ -21,6 +21,7 @@ class TranscriptionResult:
     instrument: str
     source_stem: str
     notes: list[NoteEvent]
+    warnings: list[str] = field(default_factory=list)
 
 
 class SourceSeparationProvider(Protocol):

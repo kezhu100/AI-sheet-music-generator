@@ -11,61 +11,8 @@ from app.pipeline.interfaces import (
     SourceStem,
     TranscriptionResult,
 )
+from app.pipeline.piano_transcription import HeuristicWavPianoTranscriptionProvider
 from app.pipeline.source_separation import LocalDevelopmentSourceSeparationProvider
-
-
-class MockPianoTranscriptionProvider:
-    provider_name = "mock-piano-provider"
-
-    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
-        notes = [
-            NoteEvent(
-                id=f"{stem.stem_name}-p1",
-                instrument="piano",
-                pitch=60,
-                onsetSec=0.0,
-                offsetSec=0.8,
-                velocity=96,
-                confidence=0.94,
-                channel=0,
-                bar=1,
-                beat=1.0,
-                sourceStem=stem.stem_name,
-            ),
-            NoteEvent(
-                id=f"{stem.stem_name}-p2",
-                instrument="piano",
-                pitch=64,
-                onsetSec=0.8,
-                offsetSec=1.4,
-                velocity=88,
-                confidence=0.9,
-                channel=0,
-                bar=1,
-                beat=3.0,
-                sourceStem=stem.stem_name,
-            ),
-            NoteEvent(
-                id=f"{stem.stem_name}-p3",
-                instrument="piano",
-                pitch=67,
-                onsetSec=1.4,
-                offsetSec=2.1,
-                velocity=92,
-                confidence=0.89,
-                channel=0,
-                bar=2,
-                beat=1.0,
-                sourceStem=stem.stem_name,
-            ),
-        ]
-
-        return TranscriptionResult(
-            provider_name=self.provider_name,
-            instrument="piano",
-            source_stem=stem.stem_name,
-            notes=notes,
-        )
 
 
 class MockDrumTranscriptionProvider:
@@ -122,10 +69,11 @@ class MockDrumTranscriptionProvider:
             instrument="drums",
             source_stem=stem.stem_name,
             notes=notes,
+            warnings=["Drum transcription remains mocked in Phase 3 and has not been replaced with a real provider yet."],
         )
 
 
-class MockProcessingPipeline:
+class DevelopmentProcessingPipeline:
     def __init__(
         self,
         separation_provider: SourceSeparationProvider,
@@ -139,12 +87,20 @@ class MockProcessingPipeline:
     def run(self, audio_path: Path, original_file_name: str, job_id: str) -> JobResult:
         stems = self._separation_provider.separate(audio_path, job_id)
         transcriptions: list[TranscriptionResult] = []
+        warnings = [
+            "Source separation is still a local development backend that persists placeholder stems by copying the uploaded file.",
+        ]
 
         for stem in stems:
             if stem.instrument_hint == "piano":
                 transcriptions.append(self._piano_provider.transcribe(stem))
             elif stem.instrument_hint == "drums":
                 transcriptions.append(self._drum_provider.transcribe(stem))
+
+        for transcription in transcriptions:
+            for warning in transcription.warnings:
+                if warning not in warnings:
+                    warnings.append(warning)
 
         tracks = [
             TrackResult(
@@ -162,16 +118,13 @@ class MockProcessingPipeline:
             bpm=120,
             stems=[stem.stem_asset for stem in stems],
             tracks=tracks,
-            warnings=[
-                "Source separation is a local development backend that persists placeholder stems by copying the uploaded file.",
-                "Piano and drum note events are still mocked and do not reflect real transcription output yet.",
-            ],
+            warnings=warnings,
         )
 
 
 def build_mock_pipeline() -> ProcessingPipeline:
-    return MockProcessingPipeline(
+    return DevelopmentProcessingPipeline(
         separation_provider=LocalDevelopmentSourceSeparationProvider(),
-        piano_provider=MockPianoTranscriptionProvider(),
+        piano_provider=HeuristicWavPianoTranscriptionProvider(),
         drum_provider=MockDrumTranscriptionProvider(),
     )

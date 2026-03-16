@@ -33,18 +33,6 @@ Implemented:
 - shared type definitions
 - music-engine helper package
 
-Structure:
-
-apps/
-- web (Next.js frontend)
-- api (FastAPI backend)
-
-packages/
-- shared-types
-- music-engine
-
----
-
 ### Phase 1 - Upload and Job Pipeline
 Completed.
 
@@ -58,8 +46,6 @@ Implemented features:
 - job polling
 - result display
 
----
-
 ### Phase 2 - Source Separation
 Completed.
 
@@ -70,10 +56,21 @@ Implemented features:
 - job results now include normalized stem metadata
 - frontend result view surfaces generated stems and warnings
 
-Current Phase 2 runtime behavior:
-- the separation backend writes `piano_stem` and `drum_stem` files into `apps/api/data/stems/<job-id>`
-- those stem files are currently placeholder copies of the uploaded source audio
-- piano and drum transcription are still mocked and continue to validate the downstream flow
+### Phase 3 - Piano Transcription
+Completed.
+
+Implemented features:
+- first real piano transcription provider added behind the provider abstraction
+- provider output is normalized into `NoteEvent`
+- backend pipeline now routes the persisted piano stem through the heuristic WAV provider
+- frontend result view now surfaces piano notes from the real provider
+- basic validation added with a generated PCM WAV sample clip
+
+Current Phase 3 runtime behavior:
+- the real piano provider currently supports only uncompressed PCM `.wav` stems
+- the provider is heuristic and best suited to simple monophonic or lightly overlapping piano phrases
+- the source separation step is still a placeholder file-copy backend, so piano stems are not truly isolated yet
+- drum transcription is still mocked
 
 ---
 
@@ -87,13 +84,15 @@ create job
 ->
 persist placeholder stems through the source separation provider
 ->
-generate mocked note events from the persisted stems
+run heuristic WAV piano transcription on the persisted piano stem when the stem is an uncompressed PCM `.wav`
 ->
-return result
+keep drum transcription mocked
 ->
-frontend displays stems + tracks + notes + warnings
+return normalized stems + tracks + warnings
+->
+frontend displays stems + piano notes + track summaries + warnings
 
-The architecture now supports replacing the local development separation backend and the mocked transcription providers with real ML models in later phases.
+The architecture now supports replacing both the local development separation backend and the heuristic piano provider with stronger providers in later phases.
 
 ---
 
@@ -109,10 +108,11 @@ pipeline/
 - interfaces.py
 - mock_pipeline.py
 - source_separation.py
+- piano_transcription.py
 
 Current providers:
 - source separation provider: local development stem persistence backend
-- piano transcription provider: mocked
+- piano transcription provider: heuristic stdlib-only WAV provider
 - drum transcription provider: mocked
 
 All providers must output normalized schemas shared between frontend and backend.
@@ -131,7 +131,7 @@ Current UI supports:
 - job status polling
 - stem summary display
 - track summary display
-- note preview display
+- piano note preview display
 - warning display
 
 Future UI features:
@@ -165,28 +165,24 @@ npm workspaces used for monorepo.
 
 # Next Development Phase
 
-## Phase 3 - Piano Transcription Provider
+## Phase 4 - Drum Transcription Provider
 
 Goal:
-Integrate a real piano transcription provider.
+Integrate a real drum transcription provider.
 
 Tasks:
-- define piano transcription provider interface
+- define drum transcription provider interface
 - implement first provider
-- convert output to `NoteEvent` schema
+- map drum outputs to the normalized schema
 - integrate provider into pipeline
-- return real piano notes instead of mocked notes
+- return real drum hits instead of mocked notes
 
 Scope limitation:
-- no drum transcription yet
-- do not replace later-phase export or score features in this phase
+- do not start export or score rendering work in this phase
 
 ---
 
 # Future Phases
-
-Phase 4
-Drum transcription provider.
 
 Phase 5
 MIDI export.

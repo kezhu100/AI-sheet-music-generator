@@ -39,7 +39,7 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             status="processing",
             stage="transcription",
             percent=75,
-            message="Generating mocked piano and drum note events.",
+            message="Running heuristic piano transcription and mocked drum transcription.",
         )
         sleep(0.6)
 

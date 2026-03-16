@@ -104,6 +104,36 @@ Follow-up:
 - Add stem download endpoints or static asset serving when users need direct access to generated files.
 - Begin Phase 3 by introducing a real piano transcription provider that consumes the persisted stems.
 
+### 2026-03-16
+Decision:
+- Implement Phase 3 with a stdlib-only `HeuristicWavPianoTranscriptionProvider` as the first real piano transcription backend.
+
+Context:
+- Phase 3 needed a real piano transcription stage without pulling in heavy ML or DSP dependencies.
+- The repository runtime on this machine is Python 3.9.13 with FastAPI dependencies declared, but no reliable lightweight scientific audio stack available in the project environment.
+- The backend already persisted stems in Phase 2 and already had a provider-based pipeline ready for swapping the mocked piano stage.
+
+Chosen option:
+- Keep the existing provider abstraction and add a real heuristic piano provider under `apps/api/app/pipeline/piano_transcription.py`.
+- Limit real transcription support in this phase to uncompressed PCM `.wav` stems.
+- Use only the Python standard library for WAV decoding, note-region detection, simple pitch estimation, and velocity heuristics.
+- Preserve the existing job result schema and surface runtime limitations through `warnings` plus updated docs.
+
+Alternatives considered:
+- Adding `basic_pitch` or another heavier ML transcription stack.
+- Adding `numpy`/`librosa` or other DSP dependencies for a stronger heuristic approach.
+- Keeping piano transcription mocked for another phase.
+
+Tradeoffs:
+- The stdlib-only provider keeps setup light and actually runnable in this repository today, but the transcription quality is intentionally limited.
+- Restricting support to PCM `.wav` stems is honest and predictable, but it means later work is needed for broader format coverage.
+- Returning simplified dominant-note output is safer than pretending to support reliable dense polyphonic transcription.
+
+Follow-up:
+- Replace the heuristic provider with a stronger backend when the project is ready to accept additional dependencies.
+- Revisit format support after real source separation is in place.
+- Start Phase 4 by replacing the mocked drum stage with a real drum transcription provider.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

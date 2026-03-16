@@ -20,13 +20,14 @@ Current milestone:
 - Phase 0 completed: monorepo scaffold, frontend app, backend app, shared package structure
 - Phase 1 completed: audio upload, job creation, job status polling, and UI integration
 - Phase 2 completed: source separation interface, first backend, persisted stems, and stem result display
+- Phase 3 completed: first real piano transcription provider, normalized piano note events, and piano note preview UI
 
 Current behavior:
 
 - The repository demonstrates the full `upload -> job -> result` pipeline
-- Source separation now runs through a dedicated backend provider and persists per-job stem files locally
-- The current separation backend is a local development placeholder that copies the uploaded audio into `piano_stem` and `drum_stem` files so the stem lifecycle is real even though the audio is not yet truly separated
-- Piano and drum transcription remain mocked on top of those persisted stems
+- Source separation still runs through a local development backend that copies the uploaded file into per-job stem files
+- Piano transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
+- Drum transcription remains mocked
 - Export, score rendering, and editing phases have not started yet
 
 ## Environment Requirements
@@ -36,6 +37,7 @@ Current behavior:
 - Current scaffold tested on Python 3.9.13
 - Recommended environment for future ML integrations: Python 3.11+
 - Backend stack: FastAPI
+- No new heavy DSP or ML dependencies were introduced for Phase 3
 
 ### Frontend environment
 
@@ -63,34 +65,39 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 
-## Running Phase 2 Locally
+## Running Phase 3 Locally
 
 1. Start the API with `py -m uvicorn app.main:app --reload --app-dir apps/api`.
 2. Start the frontend with `npm run dev:web`.
 3. Upload an audio file from the UI.
-4. Wait for the job to complete and inspect the returned stems, tracks, and warnings.
+4. Wait for the job to complete and inspect the returned stems, piano notes, track summaries, and warnings.
 
-Supported local-development stem formats:
+Current Phase 3 real piano transcription support:
 
-- `.wav`
-- `.mp3`
-- `.flac`
-- `.ogg`
-- `.m4a`
-- any other uploaded extension is copied through unchanged without extra validation
+- uncompressed PCM `.wav` stems
+- 8-bit, 16-bit, or 32-bit PCM WAV sample widths
+- simple monophonic or lightly overlapping piano phrases work best
 
-Current Phase 2 limitations:
+Current Phase 3 limitations:
 
-- The separation backend is provider-based and persists real files, but it is still a placeholder backend for local development rather than a validated ML separator
-- Generated `piano_stem` and `drum_stem` files currently contain copies of the original upload
-- Piano and drum note events are still mocked
-- There are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
-- Job state is still in-memory and is lost when the API restarts
+- the separation backend is still a placeholder development backend, so uploaded audio is copied into `piano_stem` and `drum_stem` rather than truly separated
+- real piano transcription currently runs only on uncompressed PCM `.wav` stems
+- the heuristic piano provider is intentionally lightweight and may simplify or miss dense polyphonic passages
+- drum note events are still mocked
+- there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
+- job state is still in-memory and is lost when the API restarts
+
+## Validation Performed
+
+- backend pipeline test with a generated PCM WAV sample clip
+- backend startup/import sanity check
+- frontend TypeScript typecheck
+- manual pipeline run against a real local WAV already present under `apps/api/data/uploads`
 
 ## What Is Not Implemented Yet
 
 - validated ML source separation quality
-- piano transcription backends
 - drum transcription backends
-- export endpoints
-- score editing
+- MIDI export
+- MusicXML export
+- score rendering and editing

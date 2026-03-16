@@ -23,11 +23,11 @@
 - [x] document supported formats and limitations
 
 ## Phase 3 - Piano Transcription
-- [ ] define piano transcription provider interface
-- [ ] add first piano provider
-- [ ] normalize provider output to NoteEvent schema
-- [ ] preview piano notes in UI
-- [ ] basic validation on a sample clip
+- [x] define piano transcription provider interface
+- [x] add first piano provider
+- [x] normalize provider output to NoteEvent schema
+- [x] preview piano notes in UI
+- [x] basic validation on a sample clip
 
 ## Phase 4 - Drum Transcription
 - [ ] define drum transcription provider interface
