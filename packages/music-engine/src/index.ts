@@ -1,6 +1,7 @@
 import type { InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 export {
   addNote,
+  applyCorrectionSuggestion,
   areJobResultsEqual,
   buildDraftNoteId,
   cloneJobResult,
@@ -28,11 +29,13 @@ export {
   transposeNotes,
   updateNoteDuration,
   updateNotePitch,
+  updateNoteVelocity,
   updateNoteTiming
 } from "./editing.js";
 export type {
   AddDraftNoteInput,
   AddDraftNoteResult,
+  ApplyCorrectionSuggestionInput,
   DraftSelection,
   QuantizeDraftNotesInput,
   ReplaceInstrumentRegionNotesInput,

@@ -296,6 +296,12 @@ code.inline {
   stroke-width: 2;
 }
 
+.piano-roll-note.has-suggestion {
+  stroke: rgba(214, 140, 69, 0.95);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+}
+
 .selection-box {
   fill: rgba(13, 110, 110, 0.12);
   stroke: rgba(13, 110, 110, 0.8);

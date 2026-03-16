@@ -1,4 +1,6 @@
 import type {
+  AnalyzeDraftRequest,
+  AnalyzeDraftResponse,
   CreateJobRequest,
   JobDraftResponse,
   JobExportRequest,
@@ -98,6 +100,18 @@ export async function retranscribeRegion(
   });
 
   return parseJson<RegionRetranscriptionResponse>(response);
+}
+
+export async function analyzeDraft(jobId: string, draftResult: JobResult): Promise<AnalyzeDraftResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/analyze-draft`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ draftResult } satisfies AnalyzeDraftRequest)
+  });
+
+  return parseJson<AnalyzeDraftResponse>(response);
 }
 
 export async function downloadMidiExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {

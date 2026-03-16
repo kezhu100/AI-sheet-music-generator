@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 InstrumentType = Literal["piano", "drums", "bass", "other"]
 RetranscriptionInstrumentType = Literal["piano", "drums"]
+CorrectionInstrumentType = Literal["piano", "drums"]
+CorrectionSuggestionType = Literal["pitch", "timing", "velocity", "drum-pattern"]
 JobStatus = Literal["queued", "processing", "failed", "completed"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
@@ -223,6 +225,73 @@ class JobDraftRecord(BaseModel):
 
 class SaveJobDraftRequest(BaseModel):
     draft_result: JobResult = Field(..., alias="draftResult")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class CorrectionSuggestedChange(BaseModel):
+    pitch: Optional[int] = None
+    onset_sec: Optional[float] = Field(default=None, alias="onsetSec")
+    offset_sec: Optional[float] = Field(default=None, alias="offsetSec")
+    velocity: Optional[int] = None
+    drum_label: Optional[str] = Field(default=None, alias="drumLabel")
+    midi_note: Optional[int] = Field(default=None, alias="midiNote")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("pitch")
+    @classmethod
+    def validate_suggested_pitch(cls, value: Optional[int]) -> Optional[int]:
+        return NoteEvent.validate_pitch(value)
+
+    @field_validator("midi_note")
+    @classmethod
+    def validate_suggested_midi_note(cls, value: Optional[int]) -> Optional[int]:
+        return NoteEvent.validate_midi_note(value)
+
+    @field_validator("velocity")
+    @classmethod
+    def validate_velocity(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return value
+        if value < 1 or value > 127:
+            raise ValueError("velocity must be between 1 and 127.")
+        return value
+
+    @field_validator("onset_sec", "offset_sec")
+    @classmethod
+    def validate_non_negative_timing(cls, value: Optional[float]) -> Optional[float]:
+        if value is not None and value < 0:
+            raise ValueError("Suggested timing values must be greater than or equal to 0.")
+        return value
+
+
+class CorrectionSuggestion(BaseModel):
+    type: CorrectionSuggestionType
+    instrument: CorrectionInstrumentType
+    note_id: str = Field(alias="noteId")
+    message: str
+    suggested_change: CorrectionSuggestedChange = Field(alias="suggestedChange")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("note_id", "message")
+    @classmethod
+    def validate_non_empty_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Suggestion text fields must not be empty.")
+        return value
+
+
+class AnalyzeDraftRequest(BaseModel):
+    draft_result: JobResult = Field(..., alias="draftResult")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class AnalyzeDraftResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    suggestions: List[CorrectionSuggestion]
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

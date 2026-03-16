@@ -1,4 +1,4 @@
-import type { InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
+import type { CorrectionSuggestedChange, InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 import { absoluteBeatToBarBeat, beatsToSeconds, quantizeSeconds, secondsToBeats } from "./timing.js";
 import { getTrackKey } from "./preview.js";
 
@@ -59,6 +59,11 @@ export interface ReplaceInstrumentRegionNotesInput {
 export interface ReplaceInstrumentRegionNotesResult {
   draftResult: JobResult;
   insertedDraftNoteIds: string[];
+}
+
+export interface ApplyCorrectionSuggestionInput {
+  draftNoteId: string;
+  suggestedChange: CorrectionSuggestedChange;
 }
 
 export function cloneJobResult(result: JobResult): JobResult {
@@ -251,6 +256,46 @@ export function updateNotePitch(result: JobResult, draftNoteId: string, pitch: n
     ...note,
     pitch
   }));
+}
+
+export function updateNoteVelocity(result: JobResult, draftNoteId: string, velocity: number): JobResult {
+  return updateDraftNote(result, draftNoteId, (note) => ({
+    ...note,
+    velocity
+  }));
+}
+
+export function applyCorrectionSuggestion(result: JobResult, input: ApplyCorrectionSuggestionInput): JobResult {
+  const selected = selectNote(result, input.draftNoteId);
+  if (!selected) {
+    return result;
+  }
+
+  return updateDraftNote(result, input.draftNoteId, (note) => {
+    const nextOnsetSec = input.suggestedChange.onsetSec ?? note.onsetSec;
+    const currentDurationSec = getNoteDurationSec(note, result.bpm);
+    const nextOffsetSec =
+      input.suggestedChange.offsetSec ??
+      (input.suggestedChange.onsetSec != null && note.offsetSec != null ? nextOnsetSec + currentDurationSec : note.offsetSec);
+
+    return {
+      ...note,
+      onsetSec: nextOnsetSec,
+      offsetSec: nextOffsetSec,
+      pitch:
+        note.instrument === "piano" && input.suggestedChange.pitch != null ? input.suggestedChange.pitch : note.pitch,
+      velocity: input.suggestedChange.velocity ?? note.velocity,
+      drumLabel:
+        note.instrument === "drums" && input.suggestedChange.drumLabel != null
+          ? normalizeDrumLabel(input.suggestedChange.drumLabel)
+          : note.drumLabel,
+      midiNote:
+        note.instrument === "drums"
+          ? input.suggestedChange.midiNote ??
+            (input.suggestedChange.drumLabel != null ? resolveDrumMidiNote(input.suggestedChange.drumLabel) : note.midiNote)
+          : note.midiNote
+    };
+  });
 }
 
 export function deleteNote(result: JobResult, draftNoteId: string): JobResult {

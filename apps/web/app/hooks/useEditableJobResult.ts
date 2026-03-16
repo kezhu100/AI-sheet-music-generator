@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   addNote,
+  applyCorrectionSuggestion,
   areJobResultsEqual,
   cloneJobResult,
   deleteNotes,
@@ -21,7 +22,12 @@ import {
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
 import type { AddDraftNoteInput, SelectedDraftNote } from "@ai-sheet-music-generator/music-engine";
-import type { JobDraftRecord, JobResult, RegionRetranscriptionResponse } from "@ai-sheet-music-generator/shared-types";
+import type {
+  CorrectionSuggestion,
+  JobDraftRecord,
+  JobResult,
+  RegionRetranscriptionResponse
+} from "@ai-sheet-music-generator/shared-types";
 import { retranscribeRegion as requestRegionRetranscription } from "../../lib/api";
 
 const MAX_HISTORY_ENTRIES = 50;
@@ -92,6 +98,7 @@ export interface EditableJobResultState {
   restoreSavedDraft: () => void;
   getCurrentDraftResult: () => JobResult | undefined;
   retranscribeSelectedRegion: () => Promise<void>;
+  applySuggestion: (suggestion: CorrectionSuggestion) => void;
 }
 
 function hydrateDraftResult(result: JobResult): JobResult {
@@ -504,6 +511,29 @@ export function useEditableJobResult(
     }
   }
 
+  function applySuggestion(suggestion: CorrectionSuggestion): void {
+    if (!draftResult) {
+      return;
+    }
+
+    const existing = selectNote(draftResult, suggestion.noteId);
+    if (!existing) {
+      return;
+    }
+
+    applyDraftUpdate(
+      (draft) =>
+        applyCorrectionSuggestion(draft, {
+          draftNoteId: suggestion.noteId,
+          suggestedChange: suggestion.suggestedChange
+        }),
+      {
+        selectedDraftNoteIds: [suggestion.noteId],
+        primarySelectedDraftNoteId: suggestion.noteId
+      }
+    );
+  }
+
   return {
     draftResult,
     activeResult,
@@ -546,6 +576,7 @@ export function useEditableJobResult(
     restoreSavedDraft,
     getCurrentDraftResult
     ,
-    retranscribeSelectedRegion
+    retranscribeSelectedRegion,
+    applySuggestion
   };
 }

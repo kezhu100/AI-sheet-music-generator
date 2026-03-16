@@ -4,6 +4,34 @@
 
 ### 2026-03-17
 Decision:
+- Implement Phase 11F AI-assisted correction as a draft-analysis suggestion layer that returns heuristic recommendations instead of automatically mutating the editable draft.
+
+Context:
+- By the end of Phase 11E, the repository already had provider-based source separation and transcription, stronger backend post-processing, a stable normalized `JobResult`, frontend draft editing with undo/redo, draft persistence, export, and draft-only region re-transcription.
+- The next step needed to help users spot likely transcription mistakes without redesigning the pipeline, changing provider contracts, or introducing hidden draft mutations that would confuse undo/redo and persistence.
+- The project already treats generated notation as an editable draft rather than a guaranteed final score, so correction assistance needed to preserve user control.
+
+Chosen option:
+- Add `POST /api/v1/jobs/{jobId}/analyze-draft` as a narrow endpoint that accepts the current editable draft `JobResult` and returns a list of heuristic suggestion objects only.
+- Keep correction analysis in a separate backend service that consumes normalized draft notes and existing timing helpers, without changing source separation, transcription providers, backend post-processing ownership, export logic, or the normalized `JobResult`.
+- Let the frontend render suggestion markers and allow users to apply a suggestion through the existing editing helpers so each acceptance becomes one normal undoable draft edit.
+
+Alternatives considered:
+- Automatically applying backend corrections directly to the current draft.
+- Writing suggestion metadata back into the stored completed job result or saved draft snapshot.
+- Expanding `JobResult` with correction-analysis fields so suggestions traveled with every result payload.
+
+Tradeoffs:
+- Suggestion-only behavior keeps user intent explicit and preserves the current draft as the single editable truth, but it requires one extra click for accepted fixes.
+- Keeping suggestions out of `JobResult` avoids schema churn and hidden persistence rules, but suggestion state stays ephemeral in the editor session.
+- Conservative heuristics are easier to explain and safer to trust than silent edits, but they will intentionally miss many possible issues rather than over-correcting.
+
+Follow-up:
+- Revisit richer suggestion ranking or grouping only if later phases need it without changing the current draft/result boundary.
+- Keep any future AI-assisted correction improvements suggestion-based unless the product explicitly chooses a different edit-trust model.
+
+### 2026-03-17
+Decision:
 - Implement Phase 11E region re-transcription as a separate backend pipeline hook plus draft-only frontend replacement flow, rather than modifying provider contracts or mutating the stored completed job result.
 
 Context:

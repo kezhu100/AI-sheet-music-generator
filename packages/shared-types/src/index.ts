@@ -78,6 +78,34 @@ export interface SaveJobDraftRequest {
   draftResult: JobResult;
 }
 
+export type CorrectionSuggestionType = "pitch" | "timing" | "velocity" | "drum-pattern";
+
+export interface CorrectionSuggestedChange {
+  pitch?: number;
+  onsetSec?: number;
+  offsetSec?: number;
+  velocity?: number;
+  drumLabel?: string;
+  midiNote?: number;
+}
+
+export interface CorrectionSuggestion {
+  type: CorrectionSuggestionType;
+  instrument: "piano" | "drums";
+  noteId: string;
+  message: string;
+  suggestedChange: CorrectionSuggestedChange;
+}
+
+export interface AnalyzeDraftRequest {
+  draftResult: JobResult;
+}
+
+export interface AnalyzeDraftResponse {
+  status: "ok";
+  suggestions: CorrectionSuggestion[];
+}
+
 export interface RegionRetranscriptionRequest {
   instrument: "piano" | "drums";
   startSec: number;

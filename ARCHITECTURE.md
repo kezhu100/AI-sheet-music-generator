@@ -64,8 +64,9 @@ Responsibilities:
 10. merge into a job result
 11. optionally load or save the latest edited draft snapshot for the completed job
 12. optionally re-transcribe a selected piano or drum region from the persisted stem and return normalized replacement notes for the current draft only
-13. generate MIDI or MusicXML on demand from either the original normalized result or a validated draft override when requested
-14. return normalized result assets to the frontend
+13. optionally analyze the current editable draft and return heuristic correction suggestions only
+14. generate MIDI or MusicXML on demand from either the original normalized result or a validated draft override when requested
+15. return normalized result assets to the frontend
 
 Current runtime note:
 - step 3 now supports multiple source separation providers behind the same provider boundary
@@ -164,6 +165,13 @@ Phase 11E region re-transcription boundary:
 - region requests reuse persisted `piano_stem` / `drum_stem` files, existing transcription providers, and the same backend post-processing stage used by the main pipeline
 - the original completed `JobResult` remains unchanged; the frontend applies returned notes only to the current editable draft
 - providers still stay responsible only for transcribing their input segment, not for draft replacement or persistence rules
+
+Phase 11F AI-assisted correction boundary:
+- backend draft analysis lives in `apps/api/app/services/correction_analysis.py`
+- the jobs API exposes `POST /api/v1/jobs/{jobId}/analyze-draft` as a narrow hook that accepts the current editable draft `JobResult` and returns suggestion objects only
+- heuristic analysis consumes normalized draft tracks and timing helpers only; it does not change provider output, post-processing ownership, or the normalized `JobResult`
+- the frontend displays suggestion markers and applies accepted suggestions back into the same editable draft using the existing editing-helper and undo/redo flow
+- suggestion state is ephemeral editor state and is not persisted separately from the saved draft result
 
 Phase 6 export boundary:
 - MIDI export generation lives in `apps/api/app/services/midi_export.py`

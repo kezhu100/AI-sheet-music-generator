@@ -18,6 +18,7 @@ interface PianoRollPreviewProps {
   selectedTrackKey?: string | null;
   selectedNoteId?: string | null;
   selectedNoteIds?: string[];
+  suggestedNoteIds?: string[];
   onSelectNote?: (trackKey: string, noteId: string, options?: { additive?: boolean }) => void;
   onBoxSelect?: (noteIds: string[], options?: { additive?: boolean }) => void;
   onSelectRegion?: (region: RetranscriptionRegionSelection | null) => void;
@@ -61,6 +62,7 @@ export function PianoRollPreview({
   selectedTrackKey,
   selectedNoteId,
   selectedNoteIds = [],
+  suggestedNoteIds = [],
   onSelectNote,
   onBoxSelect,
   onSelectRegion,
@@ -109,6 +111,7 @@ export function PianoRollPreview({
   const height = pianoHeight + drumHeight;
   const durationSec = Math.max(0.25, timeBounds.durationSec);
   const selectedIds = useMemo(() => new Set(selectedNoteIds), [selectedNoteIds]);
+  const suggestedIds = useMemo(() => new Set(suggestedNoteIds), [suggestedNoteIds]);
   const pianoLayouts = useMemo(
     () =>
       pianoNotes.map((note) => {
@@ -296,9 +299,10 @@ export function PianoRollPreview({
           const isSelected =
             (selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId) ||
             (note.draftNoteId ? selectedIds.has(note.draftNoteId) : false);
+          const hasSuggestion = note.draftNoteId ? suggestedIds.has(note.draftNoteId) : false;
           return (
             <rect
-              className={`piano-roll-note piano ${isSelected ? "is-selected" : ""}`}
+              className={`piano-roll-note piano ${isSelected ? "is-selected" : ""} ${hasSuggestion ? "has-suggestion" : ""}`}
               height={note.height}
               key={note.draftNoteId ?? `${note.trackKey}-${note.id}`}
               onPointerDown={(event) => {
@@ -342,10 +346,11 @@ export function PianoRollPreview({
                 const isSelected =
                   (selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId) ||
                   (note.draftNoteId ? selectedIds.has(note.draftNoteId) : false);
+                const hasSuggestion = note.draftNoteId ? suggestedIds.has(note.draftNoteId) : false;
 
                 return (
                   <rect
-                    className={`piano-roll-note drums ${isSelected ? "is-selected" : ""}`}
+                    className={`piano-roll-note drums ${isSelected ? "is-selected" : ""} ${hasSuggestion ? "has-suggestion" : ""}`}
                     height={rowHeight - 6}
                     key={note.draftNoteId ?? `${note.trackKey}-${note.id}`}
                     onPointerDown={(event) => {

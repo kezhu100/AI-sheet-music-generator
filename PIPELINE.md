@@ -69,3 +69,10 @@ Phase 11E region re-transcription update:
 - the backend reuses the persisted target stem, routes only the selected segment through the configured instrument provider, then reuses the existing post-processing stage before returning normalized region notes
 - the returned payload is region-note-only, not a partial `JobResult`, and now includes `providerUsed` so fallback-backed retranscription can be surfaced explicitly
 - the frontend applies the returned notes only to the current draft for the same instrument and time span, keeping undo/redo, draft persistence, and export behavior on the existing normalized draft workflow
+
+Phase 11F AI-assisted correction update:
+- after region re-transcription and other manual edits, the editor can now analyze the current editable draft without rerunning source separation, transcription, or export
+- the backend accepts the current draft `JobResult`, inspects normalized note events with conservative heuristics, and returns suggestion objects only
+- suggestion types currently include pitch, timing, velocity, and conservative drum-pattern anomalies, while same-pitch overlap cleanup is surfaced through `timing` suggestions to keep the contract small
+- the frontend highlights notes with suggestions and lets the user apply a suggestion as one undoable draft edit through the existing editing helpers
+- the draft remains the single editable state, saved drafts still store only edited `JobResult` data, and the normalized `JobResult` schema remains unchanged

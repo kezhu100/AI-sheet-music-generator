@@ -1,7 +1,7 @@
 "use client";
 
 import { getNoteDurationSec, getTrackKey, midiToNoteName } from "@ai-sheet-music-generator/music-engine";
-import type { JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
+import type { CorrectionSuggestion, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 import type { RetranscriptionRegionSelection } from "../hooks/useEditableJobResult";
 
 interface NoteEditorPanelProps {
@@ -13,6 +13,9 @@ interface NoteEditorPanelProps {
   isSavingDraft: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  suggestions: CorrectionSuggestion[];
+  isAnalyzingDraft: boolean;
+  suggestionsStale: boolean;
   retranscriptionRegion: RetranscriptionRegionSelection | null;
   isRetranscribingRegion: boolean;
   selectedTrack: TrackResult | null;
@@ -42,6 +45,8 @@ interface NoteEditorPanelProps {
   onQuantizeAll: (subdivision: number) => void;
   onReassignSelectedDrumLane: () => void;
   onRetranscribeRegion: () => void;
+  onAnalyzeDraft: () => void;
+  onApplySuggestion: (suggestion: CorrectionSuggestion) => void;
   onUndo: () => void;
   onRedo: () => void;
   onAddNote: () => void;
@@ -59,6 +64,9 @@ export function NoteEditorPanel({
   isSavingDraft,
   canUndo,
   canRedo,
+  suggestions,
+  isAnalyzingDraft,
+  suggestionsStale,
   retranscriptionRegion,
   isRetranscribingRegion,
   selectedTrack,
@@ -88,6 +96,8 @@ export function NoteEditorPanel({
   onQuantizeAll,
   onReassignSelectedDrumLane,
   onRetranscribeRegion,
+  onAnalyzeDraft,
+  onApplySuggestion,
   onUndo,
   onRedo,
   onAddNote,
@@ -107,6 +117,10 @@ export function NoteEditorPanel({
     retranscriptionRegion != null &&
     retranscriptionRegion.instrument != null &&
     retranscriptionRegion.endSec > retranscriptionRegion.startSec;
+  const selectedSuggestionCount = selectedNotes.reduce(
+    (count, note) => count + (note.draftNoteId && suggestions.some((suggestion) => suggestion.noteId === note.draftNoteId) ? 1 : 0),
+    0
+  );
 
   return (
     <div className="editor-panel">
@@ -134,6 +148,9 @@ export function NoteEditorPanel({
           </button>
           <button className="button secondary small" disabled={!hasSavedDraft} onClick={onRestoreSavedDraft} type="button">
             Reload saved draft
+          </button>
+          <button className="button secondary small" disabled={isAnalyzingDraft} onClick={onAnalyzeDraft} type="button">
+            {isAnalyzingDraft ? "Analyzing..." : "Analyze draft"}
           </button>
         </div>
       </div>
@@ -194,6 +211,35 @@ export function NoteEditorPanel({
                   Multi-selection supports delete, drag timing, quantize, keyboard nudging, and drum lane reassignment.
                 </div>
               )}
+
+              <div className="bulk-actions">
+                <strong>AI-Assisted Correction</strong>
+                <div className="muted">
+                  {suggestionsStale
+                    ? "Draft changed since the last analysis. Re-run Analyze draft to refresh suggestions."
+                    : suggestions.length > 0
+                    ? `${suggestions.length} active suggestions in the current draft${selectedSuggestionCount > 0 ? `, ${selectedSuggestionCount} on the current selection` : ""}.`
+                    : "Run Analyze draft to look for likely transcription issues in the editable draft."}
+                </div>
+                {suggestions.length > 0 ? (
+                  <div className="note-list">
+                    {suggestions.map((suggestion) => (
+                      <article className="note-card" key={`${suggestion.type}-${suggestion.noteId}`}>
+                        <strong>
+                          {suggestion.instrument} | {suggestion.type}
+                        </strong>
+                        <div>{suggestion.message}</div>
+                        <div className="muted">Target note: {suggestion.noteId}</div>
+                        <div className="actions">
+                          <button className="button secondary small" onClick={() => onApplySuggestion(suggestion)} type="button">
+                            Apply suggestion
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
 
               <div className="bulk-actions">
                 <strong>Quantize</strong>

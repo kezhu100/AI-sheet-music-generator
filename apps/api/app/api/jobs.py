@@ -5,6 +5,8 @@ from fastapi.responses import Response
 from pydantic import ValidationError
 
 from app.models.schemas import (
+    AnalyzeDraftRequest,
+    AnalyzeDraftResponse,
     CreateJobRequest,
     JobDraftResponse,
     JobExportRequest,
@@ -14,6 +16,7 @@ from app.models.schemas import (
     RegionRetranscriptionResponse,
     SaveJobDraftRequest,
 )
+from app.services.correction_analysis import CorrectionAnalysisService
 from app.services.draft_store import draft_store
 from app.services.midi_export import MidiExportError, build_midi_file, build_midi_filename
 from app.services.musicxml_export import MusicXmlExportError, build_musicxml_file, build_musicxml_filename
@@ -68,6 +71,19 @@ async def save_job_draft(job_id: str, payload: SaveJobDraftRequest) -> JobDraftR
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
     return JobDraftResponse(draft=draft)
+
+
+@router.post("/{job_id}/analyze-draft", response_model=AnalyzeDraftResponse)
+async def analyze_job_draft(job_id: str, payload: AnalyzeDraftRequest) -> AnalyzeDraftResponse:
+    _get_completed_job(job_id)
+
+    try:
+        draft_result = JobResult.model_validate(payload.draft_result.model_dump(mode="python", by_alias=True))
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    suggestions = CorrectionAnalysisService().analyze_draft(draft_result)
+    return AnalyzeDraftResponse(suggestions=suggestions)
 
 
 @router.post("/{job_id}/retranscribe-region", response_model=RegionRetranscriptionResponse)

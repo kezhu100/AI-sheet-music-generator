@@ -35,6 +35,7 @@ Current milestone:
 - Phase 11C completed: drum transcription now supports explicit provider selection, an optional stronger madmom-backed backend, and a documented fallback path while preserving the normalized result pipeline
 - Phase 11D completed: backend post-processing is now more robust, with stronger tempo estimation, confidence-aware cleanup, adaptive quantization, duplicate removal, overlap cleanup, and steadier merged track output while preserving the normalized `JobResult` contract
 - Phase 11E completed: region re-transcription now reuses persisted stems, the configured transcription providers, and backend post-processing to replace a selected draft time range without recomputing the whole job
+- Phase 11F completed: AI-assisted correction now analyzes the current editable draft, returns heuristic suggestion objects for likely note issues, highlights suggested notes in the editor, and lets users apply each suggestion as one undoable draft edit without changing the normalized `JobResult`
 
 Current behavior:
 
@@ -52,6 +53,7 @@ Current behavior:
 - Phase 10 now adds session-local undo/redo, multi-note selection, piano-roll box selection, keyboard nudging shortcuts, explicit quantization actions, and drum lane reassignment on the same normalized draft result shape
 - Phase 11E now adds draft-only region re-transcription for piano or drums, letting the editor request replacement notes for a selected time range without mutating the original completed backend result
 - the region re-transcription endpoint now reports which backend actually produced the returned region notes through `providerUsed`, including fallback cases
+- Phase 11F now adds a draft-only correction-analysis endpoint plus editor suggestion markers and apply actions; analysis stays heuristic, suggestion-based, and does not mutate the stored completed result or the `JobResult` contract
 
 ## Environment Requirements
 
@@ -178,14 +180,14 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running the Current Phase 11E Build Locally
+## Running the Current Phase 11F Build Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
 3. Upload an audio file from the UI.
 4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, saved-draft status, and original/draft MIDI/MusicXML export actions.
 5. Select notes from the piano roll or event lists, use Ctrl/Cmd-click for additive selection, or drag a selection box in the piano roll to select multiple notes.
-6. Drag the current selection horizontally to move timing, quantize selected notes or the whole draft, reassign selected drum hits to a different lane, draw a box over a piano-only or drum-only time region when you want to re-transcribe that section, use keyboard shortcuts such as `Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, `Delete`, arrow keys, and `Q`, then click `Save draft`.
+6. Drag the current selection horizontally to move timing, quantize selected notes or the whole draft, reassign selected drum hits to a different lane, draw a box over a piano-only or drum-only time region when you want to re-transcribe that section, run `Analyze draft` to fetch heuristic correction suggestions, apply any suggestion you want to accept, use keyboard shortcuts such as `Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, `Delete`, arrow keys, and `Q`, then click `Save draft`.
 7. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads separately from the original completed result.
 
 To try the optional stronger separation backend locally, set environment variables before starting the API or `npm run dev`. Example PowerShell:
@@ -239,6 +241,9 @@ Current limitations:
 - region re-transcription reuses the same persisted stems and configured transcription providers as the main job, so its quality remains bounded by the same source separation and provider limitations
 - region re-transcription currently extracts and re-transcribes only persisted PCM `.wav` stem segments; it does not rerun source separation or change the stored original `JobResult`
 - a valid region may legitimately return `notes: []`; this is treated as a successful re-transcription result rather than an error
+- AI-assisted correction runs only against the current editable draft and returns heuristic suggestions, not automatic edits or model-validated guarantees
+- suggestion state is ephemeral editor UI state and is not persisted as part of the saved draft snapshot
+- drum-pattern and velocity suggestions are intentionally conservative in Phase 11F and may miss many real issues rather than over-editing user drafts
 - post-processing now does more cleanup than Phase 5, but it still assumes a simple 4/4 grid and a single project-wide tempo estimate rather than a tempo map
 - tempo estimation is still heuristic; sparse, rubato, or heavily syncopated material may return only an approximate BPM or fall back to 120 BPM with a warning
 - quantization now chooses between simple eighth-note and sixteenth-note grids based on the detected timing evidence, but it does not model tuplets, swing, or notation-specific phrasing
@@ -281,5 +286,5 @@ Current validation reality:
 
 ## Future Roadmap
 
-- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, Phase 11C drum-provider upgrades, Phase 11D post-processing upgrades, and Phase 11E region re-transcription are now in place; later Phase 11 work still includes AI-assisted correction while keeping the normalized pipeline stable
+- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, Phase 11C drum-provider upgrades, Phase 11D post-processing upgrades, Phase 11E region re-transcription, and Phase 11F AI-assisted correction are now in place while keeping the normalized pipeline stable
 - Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment

@@ -140,6 +140,21 @@ Current Phase 11E runtime behavior:
 - current extraction and re-transcription support is intentionally limited to the same practical persisted PCM `.wav` stem constraints already documented for the main providers
 - valid silent or note-free regions return `notes: []` successfully rather than raising an error
 
+### Phase 11F - AI-Assisted Correction
+Completed.
+
+Implemented features:
+- backend draft-analysis endpoint added at `POST /api/v1/jobs/{jobId}/analyze-draft`
+- heuristic correction analysis now runs on normalized editable draft results only
+- current v1 heuristics cover piano pitch outliers, off-grid timing, same-pitch piano overlaps, conservative velocity outliers, and conservative suspicious drum stacks
+- frontend editor can now analyze the current draft, highlight suggested notes, and apply each suggestion as one undoable edit
+
+Current Phase 11F runtime behavior:
+- correction analysis returns suggestions only and never auto-edits the draft
+- the draft remains the single editable state, and the original completed backend `JobResult` remains unchanged
+- suggestion state is editor-session UI state only and is not stored in saved draft snapshots
+- the normalized `JobResult` schema remains unchanged
+
 ### Phase 5 - Post Processing
 Completed.
 
@@ -332,6 +347,8 @@ clone the completed normalized result into a frontend editing draft when the use
 -> 
 optionally re-transcribe a selected piano or drum region from the persisted stem and replace only that draft segment
 ->
+optionally analyze the current editable draft and return heuristic correction suggestions
+->
 load the latest saved draft for that job when one exists while keeping the original completed result unchanged
 ->
 allow manual note corrections against the draft in the web UI
@@ -368,6 +385,7 @@ pipeline/
 
 services/
 - region_retranscription.py
+- correction_analysis.py
 
 services/
 - midi_export.py
@@ -424,6 +442,7 @@ Current UI supports:
 - drum hit detail display
 - warning display
 - region selection and draft-only region re-transcription
+- AI-assisted draft analysis with suggestion markers and apply actions
 
 Future UI features:
 - waveform view
@@ -469,7 +488,7 @@ Current status:
 - Phase 11C is complete for stronger drum transcription provider selection and fallback
 - Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
 - Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
-- later Phase 11 work should still focus on AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
 - Phase 10 editing UX improvements are complete
@@ -478,7 +497,7 @@ Scope reminder:
 - Phase 11C drum transcription work is complete
 - Phase 11D post-processing work is complete
 - Phase 11E region re-transcription work is complete
-- the next Phase 11 steps should focus on correction assistance rather than redesigning the draft/export model
+- Phase 11F correction assistance work is complete
 
 ---
 

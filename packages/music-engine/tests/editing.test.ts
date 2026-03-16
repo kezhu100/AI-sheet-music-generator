@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { JobResult } from "@ai-sheet-music-generator/shared-types";
 import {
   addNote,
+  applyCorrectionSuggestion,
   buildDraftNoteId,
   deleteNote,
   deleteNotes,
@@ -17,6 +18,7 @@ import {
   sanitizeDraftNoteIds,
   transposeNotes,
   updateNotePitch,
+  updateNoteVelocity,
   updateNoteTiming
 } from "../src/index.js";
 import { getTrackKey } from "../src/preview.js";
@@ -155,6 +157,15 @@ runTest("updateNotePitch changes only the selected piano note", () => {
   assert.equal(updated.tracks[0].notes[1].pitch, 64);
 });
 
+runTest("updateNoteVelocity changes only the selected note", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const draftNoteId = draft.tracks[0].notes[0].draftNoteId!;
+  const updated = updateNoteVelocity(draft, draftNoteId, 110);
+
+  assert.equal(updated.tracks[0].notes[0].velocity, 110);
+  assert.equal(updated.tracks[0].notes[1].velocity, undefined);
+});
+
 runTest("selectNotes returns multiple notes in stable time order", () => {
   const draft = resetDraftFromOriginal(createOriginalResult());
   const selected = selectNotes(draft, [draft.tracks[0].notes[1].draftNoteId!, draft.tracks[0].notes[0].draftNoteId!]);
@@ -211,6 +222,35 @@ runTest("replaceInstrumentRegionNotes swaps only overlapping notes for one instr
   assert.equal(replaced.draftResult.tracks[1].notes[0].drumLabel, "snare");
   assert.equal(replaced.insertedDraftNoteIds.length, 1);
   assert.match(replaced.insertedDraftNoteIds[0], /^draft:user:/);
+});
+
+runTest("applyCorrectionSuggestion updates piano pitch and timing together", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const draftNoteId = draft.tracks[0].notes[0].draftNoteId!;
+  const updated = applyCorrectionSuggestion(draft, {
+    draftNoteId,
+    suggestedChange: {
+      pitch: 67,
+      onsetSec: 0.75
+    }
+  });
+
+  assert.equal(updated.tracks[0].notes[0].pitch, 67);
+  assert.equal(updated.tracks[0].notes[0].onsetSec, 0.75);
+  assert.equal(updated.tracks[0].notes[0].offsetSec, 1.25);
+});
+
+runTest("applyCorrectionSuggestion updates velocity only when requested", () => {
+  const draft = resetDraftFromOriginal(createOriginalResult());
+  const updated = applyCorrectionSuggestion(draft, {
+    draftNoteId: draft.tracks[0].notes[0].draftNoteId!,
+    suggestedChange: {
+      velocity: 101
+    }
+  });
+
+  assert.equal(updated.tracks[0].notes[0].velocity, 101);
+  assert.equal(updated.tracks[0].notes[0].draftNoteId, draft.tracks[0].notes[0].draftNoteId);
 });
 
 runTest("replaceInstrumentRegionNotes uses strict overlap boundaries", () => {

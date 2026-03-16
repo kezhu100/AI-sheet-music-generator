@@ -12,8 +12,23 @@ import {
   summarizeJobResult,
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
-import type { JobDraftRecord, JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
-import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, getJobDraft, saveJobDraft, uploadAudio } from "../lib/api";
+import type {
+  CorrectionSuggestion,
+  JobDraftRecord,
+  JobRecord,
+  NoteEvent,
+  UploadResponse
+} from "@ai-sheet-music-generator/shared-types";
+import {
+  analyzeDraft,
+  createJob,
+  downloadMidiExport,
+  downloadMusicXmlExport,
+  getJob,
+  getJobDraft,
+  saveJobDraft,
+  uploadAudio
+} from "../lib/api";
 import { DrumNotationPreview } from "./components/DrumNotationPreview";
 import { NoteEditorPanel } from "./components/NoteEditorPanel";
 import { PianoRollPreview } from "./components/PianoRollPreview";
@@ -43,6 +58,10 @@ export default function HomePage() {
   const [savedDraft, setSavedDraft] = useState<JobDraftRecord | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [suggestions, setSuggestions] = useState<CorrectionSuggestion[]>([]);
+  const [isAnalyzingDraft, setIsAnalyzingDraft] = useState(false);
+  const [suggestionsStale, setSuggestionsStale] = useState(false);
+  const [lastAnalyzedDraftSignature, setLastAnalyzedDraftSignature] = useState<string | null>(null);
   const [visibleTrackKeys, setVisibleTrackKeys] = useState<string[]>([]);
   const [addTrackKey, setAddTrackKey] = useState("");
   const [addOnsetSec, setAddOnsetSec] = useState(0);
@@ -91,7 +110,8 @@ export default function HomePage() {
     resetDraftFromOriginalResult,
     restoreSavedDraft,
     getCurrentDraftResult,
-    retranscribeSelectedRegion
+    retranscribeSelectedRegion,
+    applySuggestion
   } = useEditableJobResult(job?.result ?? null, savedDraft, job?.id ?? null);
 
   useEffect(() => {
@@ -260,6 +280,9 @@ export default function HomePage() {
     setUpload(null);
     setJob(null);
     setSavedDraft(null);
+    setSuggestions([]);
+    setSuggestionsStale(false);
+    setLastAnalyzedDraftSignature(null);
     lastDraftJobIdRef.current = null;
     clearEditableState();
 
@@ -381,6 +404,33 @@ export default function HomePage() {
     }
   }
 
+  async function handleAnalyzeDraft(): Promise<void> {
+    if (!job?.id) {
+      setError("Complete a job before analyzing the draft.");
+      return;
+    }
+
+    const currentDraft = getCurrentDraftResult();
+    if (!currentDraft) {
+      setError("Draft result is not available yet.");
+      return;
+    }
+
+    setError(null);
+    setIsAnalyzingDraft(true);
+
+    try {
+      const response = await analyzeDraft(job.id, currentDraft);
+      setSuggestions(response.suggestions);
+      setSuggestionsStale(false);
+      setLastAnalyzedDraftSignature(JSON.stringify(currentDraft));
+    } catch (analysisError) {
+      setError(analysisError instanceof Error ? analysisError.message : "Failed to analyze the draft.");
+    } finally {
+      setIsAnalyzingDraft(false);
+    }
+  }
+
   const draftMatchesOriginal = useMemo(() => {
     return areJobResultsEqual(activeResult, job?.result ?? null);
   }, [activeResult, job?.result]);
@@ -446,6 +496,41 @@ export default function HomePage() {
       );
     }
   }
+
+  function handleApplySuggestion(suggestion: CorrectionSuggestion): void {
+    applySuggestion(suggestion);
+    setSuggestions((currentSuggestions) =>
+      currentSuggestions.filter((currentSuggestion) => currentSuggestion.noteId !== suggestion.noteId)
+    );
+    setSuggestionsStale(true);
+    setLastAnalyzedDraftSignature(null);
+  }
+
+  useEffect(() => {
+    if (!activeResult) {
+      setSuggestions([]);
+      setSuggestionsStale(false);
+      setLastAnalyzedDraftSignature(null);
+      return;
+    }
+
+    const currentDraftSignature = JSON.stringify(activeResult);
+    if (lastAnalyzedDraftSignature && currentDraftSignature !== lastAnalyzedDraftSignature) {
+      setSuggestions([]);
+      setSuggestionsStale(true);
+      setLastAnalyzedDraftSignature(null);
+      return;
+    }
+
+    const availableNoteIds = new Set(
+      activeResult.tracks.flatMap((track) =>
+        track.notes.map((note) => note.draftNoteId).filter((draftNoteId): draftNoteId is string => Boolean(draftNoteId))
+      )
+    );
+    setSuggestions((currentSuggestions) =>
+      currentSuggestions.filter((suggestion) => availableNoteIds.has(suggestion.noteId))
+    );
+  }, [activeResult, lastAnalyzedDraftSignature]);
 
   useEffect(() => {
     if (!activeResult) {
@@ -567,13 +652,14 @@ export default function HomePage() {
             <h1>AI Sheet Music Generator</h1>
             <p>
               Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
-              and drum notation views, then save, multi-select, quantize, re-transcribe selected regions, and continue Phase 11E draft edits before exporting original or edited MIDI and MusicXML.
+              and drum notation views, then save, multi-select, quantize, re-transcribe selected regions, run AI-assisted draft analysis, and continue Phase 11F draft edits before exporting original or edited MIDI and MusicXML.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 11E region re-transcription</span>
+              <span className="pill">Phase 11F draft suggestions</span>
               <span className="pill">Undo / redo</span>
               <span className="pill">Box selection</span>
               <span className="pill">Quantize + region retry</span>
+              <span className="pill">Analyze + apply suggestions</span>
               <span className="pill">Track visibility toggles</span>
               <span className="pill">Original vs draft export</span>
             </div>
@@ -585,7 +671,8 @@ export default function HomePage() {
               <code className="inline"> /api/v1/jobs</code>, polls
               <code className="inline"> /api/v1/jobs/:id</code>, auto-loads
               <code className="inline"> /api/v1/jobs/:id/draft</code>, can call
-              <code className="inline"> /api/v1/jobs/:id/retranscribe-region</code>, and can save or export a validated edited result payload separately from the original job result.
+              <code className="inline"> /api/v1/jobs/:id/retranscribe-region</code> and
+              <code className="inline"> /api/v1/jobs/:id/analyze-draft</code>, and can save or export a validated edited result payload separately from the original job result.
             </p>
           </div>
         </div>
@@ -623,6 +710,9 @@ export default function HomePage() {
                   setUpload(null);
                   setJob(null);
                   setSavedDraft(null);
+                  setSuggestions([]);
+                  setSuggestionsStale(false);
+                  setLastAnalyzedDraftSignature(null);
                   lastDraftJobIdRef.current = null;
                   clearEditableState();
                   setError(null);
@@ -797,6 +887,7 @@ export default function HomePage() {
                 selectedRegion={retranscriptionRegion}
                 selectedNoteId={selectedDraftNoteId}
                 selectedNoteIds={selectedDraftNoteIds}
+                suggestedNoteIds={suggestions.map((suggestion) => suggestion.noteId)}
                 selectedTrackKey={selectedTrackKey}
                 tracks={visibleTracks}
               />
@@ -825,6 +916,9 @@ export default function HomePage() {
             isSavingDraft={isSavingDraft}
             canUndo={canUndo}
             canRedo={canRedo}
+            suggestions={suggestions}
+            isAnalyzingDraft={isAnalyzingDraft}
+            suggestionsStale={suggestionsStale}
             retranscriptionRegion={retranscriptionRegion}
             isRetranscribingRegion={isRetranscribingRegion}
             onAddNote={handleAddNote}
@@ -845,6 +939,8 @@ export default function HomePage() {
             onQuantizeAll={quantizeAllNotes}
             onReassignSelectedDrumLane={handleReassignSelectedDrumLane}
             onRetranscribeRegion={() => void handleRetranscribeRegion()}
+            onAnalyzeDraft={() => void handleAnalyzeDraft()}
+            onApplySuggestion={handleApplySuggestion}
             onUndo={undo}
             onRedo={redo}
             onSaveDraft={() => void handleSaveDraft()}
