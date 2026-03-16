@@ -252,6 +252,35 @@ Follow-up:
 - Add MusicXML export as the remaining Phase 6 task.
 - Reassess whether any export helpers belong in shared packages once multiple export formats exist.
 
+### 2026-03-16
+Decision:
+- Complete Phase 6 by adding a stdlib-only, on-demand MusicXML exporter that uses the same post-processed `JobResult` as the MIDI path.
+
+Context:
+- Phase 6 already had a working MIDI export service, endpoint, and frontend download action.
+- The remaining export work needed to add MusicXML without redesigning the pipeline or introducing notation-rendering scope.
+- The existing result already exposed the timing information needed for a minimal structural MusicXML file: constant BPM, quantized event timing, and bar/beat-aligned note data.
+
+Chosen option:
+- Add `apps/api/app/services/musicxml_export.py` using `xml.etree.ElementTree`.
+- Expose `GET /api/v1/jobs/{jobId}/exports/musicxml` alongside the existing MIDI endpoint.
+- Generate a minimal `score-partwise` document with part-list, measures, attributes, tempo marking, pitched piano notes, and unpitched drum notes.
+- Reuse the existing frontend export UX by adding a small MusicXML download action next to the MIDI button.
+
+Alternatives considered:
+- Deferring MusicXML until score preview work began.
+- Introducing a dedicated MusicXML library.
+- Expanding the core result schema with export-specific metadata before generating MusicXML.
+
+Tradeoffs:
+- The stdlib-only MusicXML exporter keeps setup light and understandable, but it intentionally models only simple structural notation.
+- Reusing the post-processed result keeps export deterministic, but the notation fidelity is limited by the current single-tempo, 4/4, quantized pipeline.
+- Avoiding notation-layout logic keeps the feature inside Phase 6, but engraving quality and richer notation semantics are deferred to later phases.
+
+Follow-up:
+- Start Phase 7 with score preview work that consumes the current normalized/exportable result.
+- Reassess whether some export formatting helpers should move into shared modules once preview and notation needs become clearer.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

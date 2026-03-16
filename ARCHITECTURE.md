@@ -59,7 +59,7 @@ Responsibilities:
 8. normalize timing through reusable helper boundaries
 9. normalize to the common event schema
 10. merge into a job result
-11. generate MIDI on demand from the normalized result when requested
+11. generate MIDI or MusicXML on demand from the normalized result when requested
 12. return normalized result assets to the frontend
 
 Current runtime note:
@@ -68,7 +68,7 @@ Current runtime note:
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
-- step 11 is currently implemented with a stdlib-only backend MIDI exporter that uses the completed `JobResult`
+- step 11 is currently implemented with stdlib-only backend MIDI and MusicXML exporters that use the completed `JobResult`
 
 ## Provider Design
 
@@ -109,6 +109,7 @@ Phase 5.5 timing helper boundaries:
 
 Phase 6 export boundary:
 - MIDI export generation lives in `apps/api/app/services/midi_export.py`
+- MusicXML export generation lives in `apps/api/app/services/musicxml_export.py`
 - the jobs API exposes a dedicated on-demand download endpoint rather than bloating `JobResult`
 
 ## Design Principles

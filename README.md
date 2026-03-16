@@ -24,7 +24,7 @@ Current milestone:
 - Phase 4 completed: first real drum transcription provider, normalized drum hit events, pipeline cleanup rename, and drum preview UI
 - Phase 5 completed: lightweight post-processing stage with tempo estimation, quantization, beat/bar alignment, track merge logic, and confidence-based filtering
 - Phase 5.5 completed: internal timing-layer consolidation with extracted reusable helper modules for backend and frontend-facing code
-- Phase 6 started: minimal MIDI export, download endpoint, and frontend export action are now implemented; MusicXML remains pending
+- Phase 6 completed: minimal MIDI and MusicXML export, download endpoints, and frontend export actions are now implemented
 
 Current behavior:
 
@@ -34,8 +34,8 @@ Current behavior:
 - Drum transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Post-processing now estimates tempo, quantizes note timing, aligns beat/bar positions, and filters low-confidence events before result delivery
 - Timing conversions and timing display helpers are now organized into reusable utility modules to prepare for later export work
-- Completed jobs can now be exported as a minimal MIDI draft generated from the post-processed result
-- MusicXML, score rendering, and editing phases have not started yet
+- Completed jobs can now be exported as minimal MIDI and MusicXML drafts generated from the post-processed result
+- Score rendering and editing phases have not started yet
 
 ## Environment Requirements
 
@@ -44,7 +44,7 @@ Current behavior:
 - Current scaffold tested on Python 3.9.13
 - Recommended environment for future ML integrations: Python 3.11+
 - Backend stack: FastAPI
-- No new heavy DSP, ML, or MIDI-writing dependencies were introduced for the current Phase 6 MIDI path
+- No new heavy DSP, ML, MIDI-writing, or MusicXML dependencies were introduced for the current Phase 6 export path
 
 ### Frontend environment
 
@@ -77,7 +77,7 @@ Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 1. Start the API with `py -m uvicorn app.main:app --reload --app-dir apps/api`.
 2. Start the frontend with `npm run dev:web`.
 3. Upload an audio file from the UI.
-4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano notes, drum hits, track summaries, warnings, and MIDI export action.
+4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano notes, drum hits, track summaries, warnings, and MIDI/MusicXML export actions.
 
 Current real transcription support:
 
@@ -95,6 +95,7 @@ Current limitations:
 - the heuristic drum provider is intentionally lightweight and may simplify or misclassify dense drum-kit material
 - post-processing currently assumes a simple 4/4 grid and a single project-wide tempo estimate
 - MIDI export currently assumes the same single tempo and quantized timing already produced by Phase 5
+- MusicXML export currently assumes the same single tempo and 4/4 grid, and focuses on structural compatibility rather than engraving quality
 - there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
 - job state is still in-memory and is lost when the API restarts
 
@@ -107,5 +108,4 @@ Current limitations:
 ## What Is Not Implemented Yet
 
 - validated ML source separation quality
-- MusicXML export
 - score rendering and editing

@@ -55,9 +55,15 @@ export async function getJob(jobId: string): Promise<JobResponse> {
 }
 
 export async function downloadMidiExport(jobId: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/exports/midi`, {
-    method: "GET"
-  });
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/midi`);
+}
+
+export async function downloadMusicXmlExport(jobId: string): Promise<Blob> {
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/musicxml`);
+}
+
+async function downloadExportBlob(path: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { method: "GET" });
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;

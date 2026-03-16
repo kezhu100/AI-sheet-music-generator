@@ -52,7 +52,7 @@
 
 ## Phase 6 - Export
 - [x] MIDI export
-- [ ] MusicXML export
+- [x] MusicXML export
 - [x] file download endpoints
 - [x] export buttons in UI
 

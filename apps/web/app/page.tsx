@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatEventTiming, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
-import { createJob, downloadMidiExport, getJob, uploadAudio } from "../lib/api";
+import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, uploadAudio } from "../lib/api";
 
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
@@ -21,6 +21,7 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [isExportingMidi, setIsExportingMidi] = useState(false);
+  const [isExportingMusicXml, setIsExportingMusicXml] = useState(false);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -107,6 +108,32 @@ export default function HomePage() {
     }
   }
 
+  async function handleMusicXmlExport(): Promise<void> {
+    if (!job?.result) {
+      setError("Complete a job before exporting MusicXML.");
+      return;
+    }
+
+    setError(null);
+    setIsExportingMusicXml(true);
+
+    try {
+      const musicXmlBlob = await downloadMusicXmlExport(job.id);
+      const url = window.URL.createObjectURL(musicXmlBlob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${job.result.projectName || "ai-sheet-music-generator"}.musicxml`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Failed to export MusicXML.");
+    } finally {
+      setIsExportingMusicXml(false);
+    }
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -118,7 +145,7 @@ export default function HomePage() {
               built from the current heuristic transcription pipeline.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 6 MIDI export</span>
+              <span className="pill">Phase 6 MIDI + MusicXML export</span>
               <span className="pill">Real heuristic PCM WAV providers</span>
               <span className="pill">Warnings stay explicit</span>
             </div>
@@ -177,6 +204,14 @@ export default function HomePage() {
                 onClick={handleMidiExport}
               >
                 {isExportingMidi ? "Exporting MIDI..." : "Download MIDI"}
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={!job?.result || isExportingMusicXml}
+                onClick={handleMusicXmlExport}
+              >
+                {isExportingMusicXml ? "Exporting MusicXML..." : "Download MusicXML"}
               </button>
             </div>
           </div>

@@ -112,18 +112,19 @@ Current Phase 5.5 runtime behavior:
 - the main goal is internal maintainability and clearer timing helper boundaries ahead of Phase 6
 
 ### Phase 6 - Export
-In progress.
+Completed.
 
 Implemented features:
 - minimal MIDI export transformation added on top of the existing post-processed `JobResult`
 - backend export is generated on demand from normalized track events rather than changing the transcription pipeline
-- completed jobs now expose a dedicated MIDI download endpoint
-- frontend result view now includes a minimal MIDI export action
+- minimal MusicXML export transformation added on top of the same post-processed `JobResult`
+- completed jobs now expose dedicated MIDI and MusicXML download endpoints
+- frontend result view now includes minimal MIDI and MusicXML export actions
 
 Current Phase 6 runtime behavior:
-- export currently means MIDI only
-- MIDI uses the current single project-wide BPM, quantized note timing, and simple piano/drum track mapping
-- MusicXML export is still not implemented in this phase snapshot
+- export currently means MIDI plus MusicXML
+- both export formats use the current single project-wide BPM, quantized note timing, and simple piano/drum track mapping
+- MusicXML assumes 4/4, constant tempo, a simple divisions grid, and intentionally omits advanced engraving semantics
 
 ---
 
@@ -143,11 +144,11 @@ run heuristic WAV drum transcription on the persisted drum stem when the stem is
 ->
 run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
 ->
-generate MIDI on demand from the completed normalized result when requested
+generate MIDI or MusicXML on demand from the completed normalized result when requested
 ->
 return normalized stems + tracks + warnings
 ->
-frontend displays stems + piano notes + drum hits + track summaries + warnings, and can request MIDI export
+frontend displays stems + piano notes + drum hits + track summaries + warnings, and can request MIDI or MusicXML export
 
 The architecture now supports replacing the local development separation backend plus the heuristic piano and drum providers with stronger providers in later phases.
 
@@ -172,6 +173,7 @@ pipeline/
 
 services/
 - midi_export.py
+- musicxml_export.py
 
 Current providers:
 - source separation provider: local development stem persistence backend
@@ -233,17 +235,19 @@ npm workspaces used for monorepo.
 
 # Next Development Phase
 
-## Phase 6 - Export Continuation
+## Phase 7 - Score Preview
 
 Goal:
-Extend the new export layer beyond the minimal MIDI path without starting score rendering or editing work.
+Start score preview work on top of the existing normalized and exportable result pipeline.
 
-Remaining tasks:
-- MusicXML export
-- refine export limitations and validation coverage
+Tasks:
+- piano-roll preview
+- score preview for piano
+- drum notation preview
+- track visibility toggles
 
 Scope limitation:
-- do not start score rendering or editing work in this phase continuation
+- do not start editing work in this phase
 
 ---
 
@@ -256,10 +260,11 @@ Current runtime limitations:
 - the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
 - post-processing currently assumes a simple 4/4 grid and does not support tempo changes
 - MIDI export currently assumes a single project-wide tempo and does not preserve tempo maps or notation-only semantics
+- MusicXML export currently assumes a single project-wide tempo, 4/4 meter, and simple structural notation without advanced engraving semantics
 - job state is still in-memory and is lost when the API restarts
 
 Phase 6
-Complete the remaining export work, including MusicXML.
+Completed: MIDI and MusicXML export.
 
 Phase 7
 Score rendering UI.
