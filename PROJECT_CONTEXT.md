@@ -98,6 +98,19 @@ Current Phase 5 runtime behavior:
 - quantization is intentionally lightweight and assumes a simple 4/4 beat grid
 - the result schema remains largely stable; Phase 5 reuses the existing `bpm`, `bar`, and `beat` fields
 
+### Phase 5.5 - Post-Processing Consolidation
+Completed.
+
+Implemented features:
+- reusable backend timing helpers extracted into `apps/api/app/pipeline/timing.py`
+- reusable frontend timing helpers extracted into `packages/music-engine/src/timing.ts`
+- post-processing orchestration now depends on smaller helper boundaries for second/beat conversion, quantization, and bar/beat calculation
+- frontend result timing display now consumes shared timing formatting helpers instead of ad hoc page-level formatting
+
+Current Phase 5.5 runtime behavior:
+- runtime output is intentionally kept aligned with Phase 5 behavior
+- the main goal is internal maintainability and clearer timing helper boundaries ahead of Phase 6
+
 ---
 
 # Current Pipeline
@@ -139,6 +152,7 @@ pipeline/
 - piano_transcription.py
 - drum_transcription.py
 - post_processing.py
+- timing.py
 
 Current providers:
 - source separation provider: local development stem persistence backend
@@ -146,6 +160,10 @@ Current providers:
 - drum transcription provider: heuristic stdlib-only WAV onset detector with simple kick/snare/hi-hat mapping
 
 All providers must output normalized schemas shared between frontend and backend.
+
+Shared timing helpers now live in:
+- backend: `apps/api/app/pipeline/timing.py`
+- frontend-facing shared package: `packages/music-engine/src/timing.ts`
 
 ---
 

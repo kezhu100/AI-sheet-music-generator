@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatBeatPosition, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
+import { formatEventTiming, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
 import { createJob, getJob, uploadAudio } from "../lib/api";
-
-function formatSeconds(seconds: number): string {
-  return `${seconds.toFixed(2)}s`;
-}
 
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
@@ -255,12 +251,9 @@ export default function HomePage() {
                 pianoTrack.notes.slice(0, 8).map((note) => (
                   <article className="note-card" key={note.id}>
                     <strong>{formatNote(note)}</strong>
-                    <div>
-                      {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
-                    </div>
+                    <div>{formatEventTiming(note)}</div>
                     <div className="muted">
-                      provider {pianoTrack.provider} | stem {note.sourceStem ?? "unknown"} | {formatBeatPosition(note)} |
-                      confidence {note.confidence ?? 0}
+                      provider {pianoTrack.provider} | stem {note.sourceStem ?? "unknown"} | confidence {note.confidence ?? 0}
                     </div>
                   </article>
                 ))
@@ -286,12 +279,9 @@ export default function HomePage() {
                 drumTrack.notes.slice(0, 12).map((note) => (
                   <article className="note-card" key={note.id}>
                     <strong>{formatNote(note)}</strong>
-                    <div>
-                      {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
-                    </div>
+                    <div>{formatEventTiming(note)}</div>
                     <div className="muted">
-                      provider {drumTrack.provider} | stem {note.sourceStem ?? "unknown"} | {formatBeatPosition(note)} |
-                      confidence {note.confidence ?? 0}
+                      provider {drumTrack.provider} | stem {note.sourceStem ?? "unknown"} | confidence {note.confidence ?? 0}
                     </div>
                   </article>
                 ))

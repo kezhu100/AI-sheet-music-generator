@@ -41,7 +41,7 @@ Responsibilities:
 Responsibilities:
 - reusable result summarization helpers
 - frontend-facing timing display helpers
-- later quantization helpers
+- reusable timing math helpers for frontend-facing consumption
 - later note event transforms
 - later beat/bar alignment logic
 
@@ -54,15 +54,17 @@ Responsibilities:
 5. run heuristic piano transcription on the persisted piano stem when supported
 6. run heuristic drum transcription on the persisted drum stem when supported
 7. run lightweight post-processing for confidence filtering, tempo estimation, quantization, track merge, and beat/bar alignment
-8. normalize to the common event schema
-9. merge into a job result
-10. return normalized result assets to the frontend
+8. normalize timing through reusable helper boundaries
+9. normalize to the common event schema
+10. merge into a job result
+11. return normalized result assets to the frontend
 
 Current runtime note:
 - step 3 is implemented with a local development separation backend that copies the uploaded file into per-job stems
 - step 5 is implemented with a stdlib-only heuristic piano provider for uncompressed PCM `.wav` stems
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
+- step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
 
 ## Provider Design
 
@@ -95,6 +97,11 @@ Current runtime note:
 - `warnings`: explicit limitations and runtime caveats
 
 This keeps the frontend consuming normalized backend results rather than backend-specific storage details.
+
+Phase 5.5 timing helper boundaries:
+- backend orchestration stays in `apps/api/app/pipeline/post_processing.py`
+- backend timing math lives in `apps/api/app/pipeline/timing.py`
+- frontend-facing reusable timing helpers live in `packages/music-engine/src/timing.ts`
 
 ## Design Principles
 

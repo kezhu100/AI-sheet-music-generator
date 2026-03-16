@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from statistics import median
 
 from app.models.schemas import NoteEvent, TrackResult
+from app.pipeline.timing import absolute_beat_to_bar_beat, beats_to_seconds, quantize_seconds, seconds_to_beats
 
 
 @dataclass(frozen=True)
@@ -120,18 +121,16 @@ class LightweightPostProcessor:
         return filtered
 
     def _quantize_note(self, note: NoteEvent, bpm: int) -> NoteEvent:
-        beat_duration = 60.0 / bpm
-        grid_duration = beat_duration / 4.0
-
-        quantized_onset = self._quantize_time(note.onset_sec, grid_duration)
+        quantized_onset = quantize_seconds(note.onset_sec, bpm)
         quantized_offset = note.offset_sec
         if note.offset_sec is not None:
+            minimum_duration = self._minimum_note_duration(bpm)
             quantized_offset = max(
-                quantized_onset + grid_duration,
-                self._quantize_time(note.offset_sec, grid_duration),
+                quantized_onset + minimum_duration,
+                quantize_seconds(note.offset_sec, bpm),
             )
 
-        bar, beat = self._estimate_bar_beat(quantized_onset, beat_duration)
+        bar, beat = absolute_beat_to_bar_beat(seconds_to_beats(quantized_onset, bpm))
         return note.model_copy(
             update={
                 "onset_sec": quantized_onset,
@@ -141,17 +140,8 @@ class LightweightPostProcessor:
             }
         )
 
-    def _quantize_time(self, value: float, grid_duration: float) -> float:
-        if grid_duration <= 0:
-            return round(value, 3)
-        return round(round(value / grid_duration) * grid_duration, 3)
-
-    def _estimate_bar_beat(self, onset_sec: float, beat_duration: float) -> tuple[int, float]:
-        beat_position = onset_sec / beat_duration if beat_duration > 0 else 0.0
-        beat_index = int(beat_position)
-        bar = (beat_index // 4) + 1
-        beat = round((beat_position % 4) + 1, 2)
-        return bar, beat
+    def _minimum_note_duration(self, bpm: int) -> float:
+        return beats_to_seconds(0.25, bpm)
 
     def _sort_notes(self, notes: list[NoteEvent]) -> list[NoteEvent]:
         return sorted(

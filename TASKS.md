@@ -43,6 +43,13 @@
 - [x] track merge logic
 - [x] confidence-based filtering
 
+## Phase 5.5 - Post-Processing Consolidation
+- [x] extract reusable timing utility functions
+- [x] split backend timing math from post-processing orchestration
+- [x] expose shared frontend timing helpers in `packages/music-engine`
+- [x] reduce ad hoc timing formatting in the result UI
+- [x] document the timing helper boundaries for Phase 6 preparation
+
 ## Phase 6 - Export
 - [ ] MIDI export
 - [ ] MusicXML export

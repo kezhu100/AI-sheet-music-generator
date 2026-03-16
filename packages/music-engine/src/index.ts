@@ -1,4 +1,16 @@
 import type { InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
+export {
+  DEFAULT_BEATS_PER_BAR,
+  DEFAULT_QUANTIZATION_SUBDIVISION,
+  absoluteBeatToBarBeat,
+  beatsToSeconds,
+  bpmToBeatDuration,
+  formatBeatPosition,
+  formatEventTiming,
+  quantizeBeat,
+  quantizeSeconds,
+  secondsToBeats
+} from "./timing";
 
 export interface TrackSummary {
   instrument: InstrumentType;
@@ -29,12 +41,4 @@ export function summarizeJobResult(result: JobResult): TrackSummary[] {
 
 export function sortEventsByTime(events: NoteEvent[]): NoteEvent[] {
   return [...events].sort((left, right) => left.onsetSec - right.onsetSec);
-}
-
-export function formatBeatPosition(note: NoteEvent): string {
-  if (note.bar == null || note.beat == null) {
-    return "bar n/a beat n/a";
-  }
-
-  return `bar ${note.bar} beat ${note.beat}`;
 }

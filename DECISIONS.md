@@ -194,6 +194,35 @@ Follow-up:
 - Improve beat tracking after source separation quality improves.
 - Start Phase 6 with export work rather than adding notation or editing behavior early.
 
+### 2026-03-16
+Decision:
+- Implement Phase 5.5 as a small consolidation step that extracts reusable timing helpers without changing the Phase 5 result contract.
+
+Context:
+- Phase 5 introduced timing logic in both backend post-processing and frontend timing display, but the helper boundaries were still embedded inside specific files.
+- Phase 6 export work will need stable timing conversion and quantization helpers, but Phase 5.5 must not jump ahead into actual export functionality.
+- The repository already had a natural shared frontend-facing helper location in `packages/music-engine`, while backend orchestration still needed its own small pure timing module.
+
+Chosen option:
+- Keep `apps/api/app/pipeline/post_processing.py` as the orchestration entry point.
+- Extract backend timing math into `apps/api/app/pipeline/timing.py`.
+- Extract frontend-facing timing helpers into `packages/music-engine/src/timing.ts` and re-export them from the package entry point.
+- Update the result page to consume shared timing formatting helpers rather than local ad hoc formatting.
+
+Alternatives considered:
+- Leaving the Phase 5 timing logic embedded where it was until Phase 6 started.
+- Attempting a cross-language shared implementation between Python and TypeScript.
+- Expanding shared types or API contracts just to support the consolidation step.
+
+Tradeoffs:
+- The consolidation improves maintainability and clarifies future extension points, but it does not remove the current single-tempo and simple-4/4 limitations.
+- Backend and frontend still keep separate implementations because the stack is split across Python and TypeScript, but the helper boundaries now align conceptually.
+- Avoiding schema changes keeps Phase 5.5 low-risk, but richer timing metadata remains a future concern.
+
+Follow-up:
+- Reuse the extracted timing helpers when implementing Phase 6 export transforms.
+- Reassess whether tempo-map or meter-aware helpers are needed once MIDI and MusicXML output begins.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

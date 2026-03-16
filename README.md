@@ -23,6 +23,7 @@ Current milestone:
 - Phase 3 completed: first real piano transcription provider, normalized piano note events, and piano note preview UI
 - Phase 4 completed: first real drum transcription provider, normalized drum hit events, pipeline cleanup rename, and drum preview UI
 - Phase 5 completed: lightweight post-processing stage with tempo estimation, quantization, beat/bar alignment, track merge logic, and confidence-based filtering
+- Phase 5.5 completed: internal timing-layer consolidation with extracted reusable helper modules for backend and frontend-facing code
 
 Current behavior:
 
@@ -31,6 +32,7 @@ Current behavior:
 - Piano transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Drum transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Post-processing now estimates tempo, quantizes note timing, aligns beat/bar positions, and filters low-confidence events before result delivery
+- Timing conversions and timing display helpers are now organized into reusable utility modules to prepare for later export work
 - Export, score rendering, and editing phases have not started yet
 
 ## Environment Requirements
