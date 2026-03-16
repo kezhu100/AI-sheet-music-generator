@@ -423,6 +423,65 @@ Follow-up:
 - Complete the ESLint migration when the project is ready to adopt a real lint configuration instead of `next lint`'s deprecated setup flow.
 - Expand shared editing coverage as future phases introduce richer editing behavior.
 
+### 2026-03-16
+Decision:
+- Prioritize editing persistence before editing UX expansion and model-quality upgrades in the documented roadmap.
+
+Context:
+- Phase 8 already delivered a usable frontend-first editing draft, but edits are still lost on refresh and API restart.
+- The current architecture already separates the original normalized `JobResult`, the editable draft layer, and validated export generation.
+- Stronger transcription providers and AI-assisted correction remain important, but those upgrades are less valuable if users cannot save and resume manual corrections.
+
+Chosen option:
+- Make Phase 9 focus on saved draft persistence with simple backend draft storage, save/load endpoints, and frontend draft rehydration.
+- Schedule richer editing ergonomics in Phase 10 after persistence exists.
+- Schedule model-quality and AI-assisted improvements in Phase 11, keeping them behind the existing provider and normalized-result boundaries.
+- Treat broader productization as Phase 12 work that builds on saved drafts and longer-lived project state.
+
+Alternatives considered:
+- Prioritizing stronger transcription models before saved edits.
+- Jumping directly into user accounts and project libraries before the editing workflow is durable.
+- Expanding editing UX before users can reliably preserve their work.
+
+Tradeoffs:
+- Prioritizing persistence first slows some visible AI-quality work in the short term, but it makes the existing editing workflow trustworthy and worth investing in.
+- Keeping model upgrades behind the current pipeline boundaries may constrain some future provider choices, but it protects the frontend, export, and shared schema contracts from churn.
+- Deferring productization until after saved drafts keeps scope more controlled, but some application-level features will intentionally wait.
+
+Follow-up:
+- Document Phase 9 through Phase 12 consistently across the planning docs.
+- Revisit storage architecture once draft persistence requirements are implemented concretely.
+
+### 2026-03-16
+Decision:
+- Implement Phase 9 draft persistence as a local file-backed latest-snapshot store that keeps saved edited `JobResult` data separate from the original completed backend job result.
+
+Context:
+- Phase 8 already had a stable frontend draft-editing workflow and validated export overrides, but edits were lost on refresh.
+- The project still uses an in-memory job store and explicitly does not want database, auth, or broader productization scope during Phase 9.
+- Export, preview, and editing already center on the normalized `JobResult` shape, so introducing a separate editor-only persistence model would have added unnecessary drift.
+
+Chosen option:
+- Add `apps/api/app/services/draft_store.py` backed by `apps/api/data/drafts/<job-id>.json`.
+- Persist one latest saved draft snapshot per completed job using the same normalized `JobResult` contract plus minimal metadata: `jobId`, `version`, and `savedAt`.
+- Expose `GET /api/v1/jobs/{jobId}/draft` and `PUT /api/v1/jobs/{jobId}/draft`.
+- Keep original export endpoints intact for the completed backend result, and continue using validated normalized override payloads for draft export.
+- Auto-load the saved draft in the frontend when it exists, while keeping explicit original-versus-draft export actions in the UI.
+
+Alternatives considered:
+- Writing edited data back into `job.result`.
+- Introducing a database or project library during Phase 9.
+- Saving editor deltas instead of the full edited normalized result.
+
+Tradeoffs:
+- Saving the full normalized result keeps the architecture simple and aligned across frontend, backend, and export, but each saved draft rewrites the whole edited payload.
+- A latest-snapshot model is easy to understand and local-development friendly, but it does not provide delete, branching, or historical revision restore.
+- Keeping draft storage outside `JobStore` preserves the distinction between original output and edited draft, but job metadata and draft metadata now live in separate persistence layers.
+
+Follow-up:
+- Add richer revision history, delete semantics, or project-level ownership only if later product phases actually need them.
+- Revisit whether saved drafts should survive API restart alongside job metadata once the repository moves beyond the current in-memory job store.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

@@ -1,6 +1,7 @@
 import type { InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 export {
   addNote,
+  areJobResultsEqual,
   buildDraftNoteId,
   cloneJobResult,
   DEFAULT_DRUM_MIDI_NOTE,

@@ -4,7 +4,8 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from app.models.schemas import CreateJobRequest, JobExportRequest, JobResponse, JobResult
+from app.models.schemas import CreateJobRequest, JobDraftResponse, JobExportRequest, JobResponse, JobResult, SaveJobDraftRequest
+from app.services.draft_store import draft_store
 from app.services.midi_export import MidiExportError, build_midi_file, build_midi_filename
 from app.services.musicxml_export import MusicXmlExportError, build_musicxml_file, build_musicxml_filename
 from app.services.job_runner import start_job
@@ -32,6 +33,31 @@ async def get_job(job_id: str) -> JobResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
 
     return JobResponse(job=job)
+
+
+@router.get("/{job_id}/draft", response_model=JobDraftResponse)
+async def get_job_draft(job_id: str) -> JobDraftResponse:
+    _get_completed_job(job_id)
+    draft = draft_store.get(job_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Draft not found.")
+
+    return JobDraftResponse(draft=draft)
+
+
+@router.put("/{job_id}/draft", response_model=JobDraftResponse)
+async def save_job_draft(job_id: str, payload: SaveJobDraftRequest) -> JobDraftResponse:
+    _get_completed_job(job_id)
+
+    try:
+        draft = draft_store.save(
+            job_id,
+            JobResult.model_validate(payload.draft_result.model_dump(mode="python", by_alias=True)),
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    return JobDraftResponse(draft=draft)
 
 
 @router.get("/{job_id}/exports/midi")
@@ -103,9 +129,7 @@ async def export_job_musicxml_override(job_id: str, payload: JobExportRequest) -
 
 
 def _get_export_result(job_id: str, payload: JobExportRequest | None = None) -> JobResult:
-    job = job_store.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    job = _get_completed_job(job_id, allow_processing_result=True)
     if payload is not None and payload.result_override is not None:
         try:
             return JobResult.model_validate(payload.result_override.model_dump(mode="python", by_alias=True))
@@ -114,3 +138,12 @@ def _get_export_result(job_id: str, payload: JobExportRequest | None = None) -> 
     if job.result is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available for export yet.")
     return job.result
+
+
+def _get_completed_job(job_id: str, *, allow_processing_result: bool = False):
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    if not allow_processing_result and (job.status != "completed" or job.result is None):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available yet.")
+    return job

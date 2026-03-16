@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -192,7 +192,36 @@ class JobResult(BaseModel):
 
 
 class JobExportRequest(BaseModel):
-    result_override: Annotated[Optional[JobResult], Field(alias="resultOverride")] = None
+    result_override: Optional[JobResult] = Field(default=None, alias="resultOverride")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class JobDraftRecord(BaseModel):
+    job_id: str = Field(alias="jobId")
+    version: int
+    saved_at: datetime = Field(alias="savedAt")
+    result: JobResult
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("job_id")
+    @classmethod
+    def validate_job_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("jobId must not be empty.")
+        return value
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("version must be greater than 0.")
+        return value
+
+
+class SaveJobDraftRequest(BaseModel):
+    draft_result: JobResult = Field(..., alias="draftResult")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -219,3 +248,8 @@ class JobRecord(BaseModel):
 class JobResponse(BaseModel):
     status: Literal["ok"] = "ok"
     job: JobRecord
+
+
+class JobDraftResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    draft: JobDraftRecord

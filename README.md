@@ -28,6 +28,7 @@ Current milestone:
 - Phase 7 completed: piano-roll preview, simplified piano score preview, simplified drum notation preview, and track visibility toggles are now implemented
 - Phase 8 completed: frontend draft editing with note selection, drag timing moves, piano pitch adjustment, add/delete note controls, and edited re-export is now implemented
 - Phase 8 engineering wrap-up completed: backend test setup is clearer, focused editing-helper tests now run, and draft-state orchestration is slightly more maintainable
+- Phase 9 completed: edited draft persistence, save/load draft APIs, auto-loaded saved drafts, explicit save action, minimal draft version tracking, and original-vs-draft export actions are now implemented
 
 Current behavior:
 
@@ -41,6 +42,7 @@ Current behavior:
 - Completed jobs can now be visually inspected in a piano-roll plus simplified piano/drum score preview UI driven by the normalized result
 - Editing tools are now available as a frontend-first draft workflow on completed jobs
 - Phase 8 hardening now adds stable draft note identity, centralized editing helpers, normalization before export, and stricter backend override validation
+- Phase 9 now persists the latest saved edited `JobResult` per completed job in local backend draft storage without mutating the original completed result
 
 ## Environment Requirements
 
@@ -76,6 +78,7 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
+Saved edited drafts are stored locally in `apps/api/data/drafts/<job-id>.json`.
 
 ## Local Development
 
@@ -137,13 +140,14 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running Phase 8 Locally
+## Running Phase 9 Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
 3. Upload an audio file from the UI.
-4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, and MIDI/MusicXML export actions.
-5. Select a note from the piano roll or event list, drag it horizontally to move timing, adjust piano pitch or duration in the editor, add/delete notes, and re-export the draft.
+4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, saved-draft status, and original/draft MIDI/MusicXML export actions.
+5. Select a note from the piano roll or event list, drag it horizontally to move timing, adjust piano pitch or duration in the editor, add/delete notes, and click `Save draft`.
+6. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads.
 
 Current real transcription support:
 
@@ -164,13 +168,15 @@ Current limitations:
 - MusicXML export currently assumes the same single tempo and 4/4 grid, and focuses on structural compatibility rather than engraving quality
 - the piano score preview is intentionally simplified, currently shows only the first visible piano track, and focuses on inspection rather than engraving fidelity
 - the drum preview is notation-oriented but lane/grid based rather than full percussion staff engraving, and currently shows only the first visible drum track
-- Phase 8 edits are draft-only in the frontend and are not persisted back into backend job storage
+- the latest saved draft is persisted separately from the original completed result, but only one saved draft snapshot is kept per job
 - edited draft notes now receive stable `draftNoteId` values used for selection and note operations
+- saved draft versioning is minimal and increments a single integer per save; there is no delete endpoint, rollback history, or branching yet
 - drum note lane reassignment is not implemented in this MVP; drum editing currently supports timing move, add, and delete only
 - backend edited export override payloads are now validated and rejected when note timing, pitch, duration, or track structure is invalid
 - preview panes currently limit notation-style rendering to the first 8 bars for readability
 - there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
 - job state is still in-memory and is lost when the API restarts
+- saved drafts are local-development files only and are not yet tied to accounts, project libraries, or cross-device sync
 
 ## Validation Performed
 
@@ -190,5 +196,11 @@ Current validation reality:
 ## What Is Not Implemented Yet
 
 - validated ML source separation quality
-- persisted edit history or saved projects
+- persisted multi-revision edit history or saved projects
 - drum lane reassignment
+
+## Future Roadmap
+
+- Phase 10: editing UX improvements such as undo/redo, multi-note and box selection, keyboard editing, quantization tools, and drum lane reassignment
+- Phase 11: result quality improvements through stronger providers, smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
+- Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment

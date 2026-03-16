@@ -25,6 +25,7 @@ Responsibilities:
 - persist generated stems
 - run transcription providers
 - transform completed results into export assets on demand
+- persist the latest saved edited draft separately from the completed job result
 - normalize outputs
 - expose result APIs
 
@@ -61,8 +62,9 @@ Responsibilities:
 8. normalize timing through reusable helper boundaries
 9. normalize to the common event schema
 10. merge into a job result
-11. generate MIDI or MusicXML on demand from the normalized result when requested
-12. return normalized result assets to the frontend
+11. optionally load or save the latest edited draft snapshot for the completed job
+12. generate MIDI or MusicXML on demand from either the original normalized result or a validated draft override when requested
+13. return normalized result assets to the frontend
 
 Current runtime note:
 - step 3 is implemented with a local development separation backend that copies the uploaded file into per-job stems
@@ -70,7 +72,8 @@ Current runtime note:
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
-- step 11 is currently implemented with stdlib-only backend MIDI and MusicXML exporters that use the completed `JobResult`
+- step 11 is currently implemented with a local file-backed draft store under `apps/api/data/drafts`
+- step 12 is currently implemented with stdlib-only backend MIDI and MusicXML exporters that use either the completed `JobResult` or a validated override payload
 
 ## Provider Design
 
@@ -131,6 +134,15 @@ Phase 8 editing boundary:
 - edited export uses narrow POST overrides to the existing jobs export endpoints instead of mutating backend job state
 - backend override validation lives in `apps/api/app/models/schemas.py` and is rechecked in `apps/api/app/api/jobs.py` before exporter execution
 
+Phase 9 persistence boundary:
+- backend draft persistence lives in `apps/api/app/services/draft_store.py`
+- local draft files are stored under `apps/api/data/drafts/<job-id>.json`
+- the jobs API now exposes `GET /api/v1/jobs/{jobId}/draft` and `PUT /api/v1/jobs/{jobId}/draft`
+- each saved draft stores a full edited `JobResult` plus minimal metadata (`jobId`, `version`, `savedAt`)
+- the original completed `job.result` remains the source artifact in `JobStore` and is never overwritten by draft saves
+- the frontend auto-loads a saved draft when one exists and keeps export choices explicit between original result and current draft
+- export still operates on validated normalized `JobResult` payloads rather than a separate export-only schema
+
 Validation boundary after the Phase 8 wrap-up:
 - backend unittest discovery runs through `scripts/test-api.mjs` and the project venv
 - focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests`
@@ -147,3 +159,4 @@ Validation boundary after the Phase 8 wrap-up:
 - post-processing should stay lightweight until later export or notation phases demand richer timing models
 - preview rendering should stay decoupled from editing behavior and avoid forcing backend contract changes before Phase 8
 - Phase 8 editing should stay draft-oriented and avoid introducing persistence until the product explicitly needs saved edits
+- Phase 9 draft persistence should extend the existing draft model rather than collapsing edited state into the original job result

@@ -179,6 +179,26 @@ Current wrap-up runtime behavior:
 - backend tests now run from the project venv when the dev requirements are installed
 - frontend lint is still not part of the reliable non-interactive validation path because ESLint setup is incomplete in the repo
 
+### Phase 9 - Editing Persistence
+Completed.
+
+Implemented features:
+- backend draft storage added under `apps/api/data/drafts/<job-id>.json`
+- save-draft API added at `PUT /api/v1/jobs/{jobId}/draft`
+- load-draft API added at `GET /api/v1/jobs/{jobId}/draft`
+- saved drafts are stored separately from the original completed `JobResult`
+- frontend now auto-loads a saved draft when a completed job is opened and a saved draft exists
+- editor UI now includes explicit save-draft and reload-saved-draft actions
+- export UI now distinguishes original-result export from draft-result export
+- saved drafts now carry minimal version tracking through an incrementing `version` plus `savedAt`
+
+Current Phase 9 runtime behavior:
+- each completed job can have one latest saved edited `JobResult` snapshot in local backend storage
+- saving a draft increments the saved version number and replaces the previous saved snapshot for that job
+- loading a completed job prefers the saved draft in the frontend while leaving the original completed backend result unchanged
+- original export still uses the completed job result, while draft export uses the current editable draft payload
+- saved drafts remain local-development artifacts and are not yet tied to accounts, libraries, or shared ownership
+
 ---
 
 # Current Pipeline
@@ -199,7 +219,11 @@ run lightweight post-processing for tempo estimation, confidence filtering, quan
 ->
 clone the completed normalized result into a frontend editing draft when the user opens a completed job
 ->
+load the latest saved draft for that job when one exists while keeping the original completed result unchanged
+->
 allow manual note corrections against the draft in the web UI
+->
+save the current edited draft back to backend draft storage on demand with an incrementing saved version
 ->
 generate MIDI or MusicXML on demand from either the completed normalized result or the current draft override
 ->
@@ -266,14 +290,16 @@ Current UI supports:
 - simplified drum notation preview display
 - track visibility toggles
 - note selection and editing draft controls
+- saved-draft auto-load and explicit save/reload controls
 - add/delete note controls
+- original-result versus draft-result export actions
 - piano note detail display
 - drum hit detail display
 - warning display
 
 Future UI features:
 - waveform view
-- saved edit sessions
+- fuller saved-project and multi-revision edit workflows
 - richer drum and notation editing tools
 
 ---
@@ -307,18 +333,29 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 9 - Next Candidate
+## Phase 10 - Next Candidate
 
 Goal:
-Build on the current editing MVP with stronger persistence and richer instrument-specific editing behavior.
+Build on the now-persisted editing MVP with stronger editing ergonomics and richer instrument-specific editing behavior.
 
 Scope reminder:
-- Phase 8 editing is now complete in a frontend-first draft workflow
-- saved edits, deeper drum editing, and richer notation editing are still future work
+- Phase 9 editing persistence is now complete
+- deeper editing ergonomics and richer notation editing are still future work
 
 ---
 
 # Future Phases
+
+## Roadmap Overview
+
+The next roadmap should extend the current architecture in the same order the product is maturing:
+
+1. preserve user edits first
+2. make editing faster and more ergonomic
+3. improve model quality without breaking the normalized pipeline
+4. productize the workflow once longer-lived project state exists
+
+This keeps the current `upload -> pipeline -> normalized JobResult -> editable draft -> validated export` design intact while moving the product toward a durable application.
 
 Current runtime limitations:
 - source separation is still a placeholder development backend that copies the upload into `piano_stem` and `drum_stem`
@@ -331,7 +368,7 @@ Current runtime limitations:
 - piano score preview currently uses a simplified grand-staff approximation rather than full engraving or MusicXML-quality notation layout
 - drum preview currently uses a notation-oriented lane/grid renderer rather than full percussion staff engraving
 - preview panes currently focus on the first visible piano track and first visible drum track for notation-style rendering
-- Phase 8 editing is draft-only and is lost if the page is refreshed or a new job is loaded
+- the saved draft system currently stores only the latest full edited result per job, not a revision history
 - drum-lane reassignment is not yet implemented
 - job state is still in-memory and is lost when the API restarts
 
@@ -340,6 +377,67 @@ Completed: score preview UI with piano-roll, simplified piano score, simplified 
 
 Phase 8
 Completed: frontend draft editing with note selection, drag timing moves, piano pitch adjustment, add/delete note controls, and edited export override support.
+
+## Phase 9 - Editing Persistence
+
+Completed:
+- save edited draft
+- reload saved draft
+- continue editing from an existing saved draft
+- export edited result versus original result
+- minimal version tracking for draft revisions
+
+## Phase 10 - Editing UX Improvements
+
+Goal:
+Make correction work faster and more ergonomic once edit persistence exists.
+
+Planned capabilities:
+- undo / redo
+- multi-note selection
+- box selection
+- keyboard editing
+- quantization tools
+- drum lane reassignment
+
+Motivation:
+- Phase 8 established single-note editing and Phase 9 makes edits durable
+- Phase 10 should improve editor throughput rather than changing the pipeline contract
+- richer editing should continue to operate on the same normalized draft result shape whenever possible
+
+## Phase 11 - Result Quality & AI Improvements
+
+Goal:
+Improve transcription quality and add AI-assisted correction tools without breaking the current modular pipeline.
+
+Possible improvements:
+- stronger source separation
+- improved piano transcription models
+- improved drum transcription
+- smarter post-processing
+- region re-transcription
+- AI-assisted correction tools
+
+Architecture note:
+- model upgrades should remain behind the existing provider and post-processing boundaries
+- future quality gains should continue producing normalized `JobResult` output so preview, editing, persistence, and export do not need a redesign
+
+## Phase 12 - Productization
+
+Goal:
+Turn the current technical workflow into a fuller application built around saved work and repeat usage.
+
+Possible capabilities:
+- project library
+- saved audio and drafts
+- user accounts
+- shareable score links
+- improved onboarding
+- hosted deployment
+
+Motivation:
+- productization becomes more coherent after draft persistence exists and editing workflows are less ephemeral
+- these features should build on the earlier saved-draft architecture rather than bypassing it with separate product state
 
 ---
 

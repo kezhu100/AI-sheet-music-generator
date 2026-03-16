@@ -67,6 +67,22 @@ export interface JobExportRequest {
   resultOverride?: JobResult;
 }
 
+export interface JobDraftRecord {
+  jobId: string;
+  version: number;
+  savedAt: string;
+  result: JobResult;
+}
+
+export interface SaveJobDraftRequest {
+  draftResult: JobResult;
+}
+
+export interface JobDraftResponse {
+  status: "ok";
+  draft: JobDraftRecord;
+}
+
 export interface JobProgress {
   stage: string;
   percent: number;

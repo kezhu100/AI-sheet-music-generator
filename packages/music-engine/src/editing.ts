@@ -54,7 +54,7 @@ export function cloneJobResult(result: JobResult): JobResult {
         ...track,
         notes: track.notes.map((note) => ({
           ...note,
-          draftNoteId: buildDraftNoteId(trackKey, note.id)
+          draftNoteId: note.draftNoteId ?? buildDraftNoteId(trackKey, note.id)
         }))
       };
     }),
@@ -214,6 +214,14 @@ export function addNote(result: JobResult, input: AddDraftNoteInput): AddDraftNo
 
 export function resetDraftFromOriginal(originalResult: JobResult): JobResult {
   return normalizeEditedResult(cloneJobResult(originalResult));
+}
+
+export function areJobResultsEqual(left: JobResult | null | undefined, right: JobResult | null | undefined): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return JSON.stringify(normalizeEditedResult(left)) === JSON.stringify(normalizeEditedResult(right));
 }
 
 export function resolveDrumMidiNote(drumLabel?: string, midiNote?: number): number {

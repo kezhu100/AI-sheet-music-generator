@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  areJobResultsEqual,
   buildPreviewTracks,
   formatEventTiming,
   getNoteDurationSec,
@@ -10,8 +11,8 @@ import {
   summarizeJobResult,
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
-import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
-import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, uploadAudio } from "../lib/api";
+import type { JobDraftRecord, JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
+import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, getJobDraft, saveJobDraft, uploadAudio } from "../lib/api";
 import { DrumNotationPreview } from "./components/DrumNotationPreview";
 import { NoteEditorPanel } from "./components/NoteEditorPanel";
 import { PianoRollPreview } from "./components/PianoRollPreview";
@@ -34,8 +35,13 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
-  const [isExportingMidi, setIsExportingMidi] = useState(false);
-  const [isExportingMusicXml, setIsExportingMusicXml] = useState(false);
+  const [isExportingOriginalMidi, setIsExportingOriginalMidi] = useState(false);
+  const [isExportingDraftMidi, setIsExportingDraftMidi] = useState(false);
+  const [isExportingOriginalMusicXml, setIsExportingOriginalMusicXml] = useState(false);
+  const [isExportingDraftMusicXml, setIsExportingDraftMusicXml] = useState(false);
+  const [savedDraft, setSavedDraft] = useState<JobDraftRecord | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [visibleTrackKeys, setVisibleTrackKeys] = useState<string[]>([]);
   const [addTrackKey, setAddTrackKey] = useState("");
   const [addOnsetSec, setAddOnsetSec] = useState(0);
@@ -43,10 +49,14 @@ export default function HomePage() {
   const [addPitch, setAddPitch] = useState(60);
   const [addDrumLabel, setAddDrumLabel] = useState("snare");
   const [addDrumMidiNote, setAddDrumMidiNote] = useState(38);
+  const lastDraftJobIdRef = useRef<string | null>(null);
   const {
     draftResult,
     activeResult,
     isDraftDirty,
+    hasSavedDraft,
+    savedDraftVersion,
+    savedDraftSavedAt,
     selectedDraftNoteId,
     selectedTrack,
     selectedNote,
@@ -60,8 +70,9 @@ export default function HomePage() {
     changeSelectedDuration,
     changeSelectedPitch,
     resetDraftFromOriginalResult,
-    getExportResultOverride
-  } = useEditableJobResult(job?.result ?? null);
+    restoreSavedDraft,
+    getCurrentDraftResult
+  } = useEditableJobResult(job?.result ?? null, savedDraft);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -79,6 +90,47 @@ export default function HomePage() {
 
     return () => window.clearInterval(intervalId);
   }, [job]);
+
+  useEffect(() => {
+    if (!job?.result || job.status !== "completed") {
+      setSavedDraft(null);
+      lastDraftJobIdRef.current = null;
+      return;
+    }
+
+    if (lastDraftJobIdRef.current === job.id) {
+      return;
+    }
+
+    let cancelled = false;
+    lastDraftJobIdRef.current = job.id;
+    setIsLoadingDraft(true);
+
+    void (async () => {
+      try {
+        const response = await getJobDraft(job.id);
+        if (!cancelled) {
+          setSavedDraft(response.draft);
+        }
+      } catch (draftError) {
+        if (!cancelled) {
+          const message = draftError instanceof Error ? draftError.message : "Failed to load saved draft.";
+          if (message !== "Draft not found.") {
+            setError(message);
+          }
+          setSavedDraft(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDraft(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, job?.result, job?.status]);
 
   useEffect(() => {
     if (!activeResult) {
@@ -173,6 +225,8 @@ export default function HomePage() {
     setIsUploading(true);
     setUpload(null);
     setJob(null);
+    setSavedDraft(null);
+    lastDraftJobIdRef.current = null;
     clearEditableState();
 
     try {
@@ -190,21 +244,30 @@ export default function HomePage() {
     }
   }
 
-  async function handleMidiExport(): Promise<void> {
+  async function handleMidiExport(mode: "original" | "draft"): Promise<void> {
     if (!job?.result) {
       setError("Complete a job before exporting MIDI.");
       return;
     }
 
+    if (mode === "draft" && !activeResult) {
+      setError("Draft result is not available yet.");
+      return;
+    }
+
     setError(null);
-    setIsExportingMidi(true);
+    if (mode === "original") {
+      setIsExportingOriginalMidi(true);
+    } else {
+      setIsExportingDraftMidi(true);
+    }
 
     try {
-      const midiBlob = await downloadMidiExport(job.id, getExportResultOverride());
+      const midiBlob = await downloadMidiExport(job.id, mode === "draft" ? getCurrentDraftResult() : undefined);
       const url = window.URL.createObjectURL(midiBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${(draftResult ?? job.result).projectName || "ai-sheet-music-generator"}.mid`;
+      anchor.download = `${(mode === "draft" ? activeResult : job.result)?.projectName || "ai-sheet-music-generator"}-${mode}.mid`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -212,25 +275,38 @@ export default function HomePage() {
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MIDI.");
     } finally {
-      setIsExportingMidi(false);
+      if (mode === "original") {
+        setIsExportingOriginalMidi(false);
+      } else {
+        setIsExportingDraftMidi(false);
+      }
     }
   }
 
-  async function handleMusicXmlExport(): Promise<void> {
+  async function handleMusicXmlExport(mode: "original" | "draft"): Promise<void> {
     if (!job?.result) {
       setError("Complete a job before exporting MusicXML.");
       return;
     }
 
+    if (mode === "draft" && !activeResult) {
+      setError("Draft result is not available yet.");
+      return;
+    }
+
     setError(null);
-    setIsExportingMusicXml(true);
+    if (mode === "original") {
+      setIsExportingOriginalMusicXml(true);
+    } else {
+      setIsExportingDraftMusicXml(true);
+    }
 
     try {
-      const musicXmlBlob = await downloadMusicXmlExport(job.id, getExportResultOverride());
+      const musicXmlBlob = await downloadMusicXmlExport(job.id, mode === "draft" ? getCurrentDraftResult() : undefined);
       const url = window.URL.createObjectURL(musicXmlBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${(draftResult ?? job.result).projectName || "ai-sheet-music-generator"}.musicxml`;
+      anchor.download = `${(mode === "draft" ? activeResult : job.result)?.projectName || "ai-sheet-music-generator"}-${mode}.musicxml`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -238,9 +314,42 @@ export default function HomePage() {
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MusicXML.");
     } finally {
-      setIsExportingMusicXml(false);
+      if (mode === "original") {
+        setIsExportingOriginalMusicXml(false);
+      } else {
+        setIsExportingDraftMusicXml(false);
+      }
     }
   }
+
+  async function handleSaveDraft(): Promise<void> {
+    if (!job?.result) {
+      setError("Complete a job before saving a draft.");
+      return;
+    }
+
+    const currentDraft = getCurrentDraftResult();
+    if (!currentDraft) {
+      setError("Draft result is not available yet.");
+      return;
+    }
+
+    setError(null);
+    setIsSavingDraft(true);
+
+    try {
+      const response = await saveJobDraft(job.id, currentDraft);
+      setSavedDraft(response.draft);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save draft.");
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }
+
+  const draftMatchesOriginal = useMemo(() => {
+    return areJobResultsEqual(activeResult, job?.result ?? null);
+  }, [activeResult, job?.result]);
 
   function toggleTrackVisibility(trackKey: string): void {
     setVisibleTrackKeys((currentKeys) =>
@@ -291,14 +400,14 @@ export default function HomePage() {
             <h1>AI Sheet Music Generator</h1>
             <p>
               Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
-              and drum notation views, then make simple Phase 8 draft edits before exporting MIDI or MusicXML.
+              and drum notation views, then save and continue Phase 9 draft edits before exporting original or edited MIDI and MusicXML.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 8 editing MVP</span>
+              <span className="pill">Phase 9 draft persistence</span>
               <span className="pill">Drag timing edits</span>
-              <span className="pill">Draft-only editing state</span>
+              <span className="pill">Saved draft reload</span>
               <span className="pill">Track visibility toggles</span>
-              <span className="pill">Warnings stay explicit</span>
+              <span className="pill">Original vs draft export</span>
             </div>
           </div>
           <div className="panel">
@@ -306,7 +415,8 @@ export default function HomePage() {
             <p className="muted">
               Frontend calls <code className="inline">/api/v1/uploads</code>, then
               <code className="inline"> /api/v1/jobs</code>, polls
-              <code className="inline"> /api/v1/jobs/:id</code>, and can post an edited result override when exporting.
+              <code className="inline"> /api/v1/jobs/:id</code>, auto-loads
+              <code className="inline"> /api/v1/jobs/:id/draft</code>, and can save or export a validated edited result payload separately from the original job result.
             </p>
           </div>
         </div>
@@ -343,6 +453,8 @@ export default function HomePage() {
                   setSelectedFile(null);
                   setUpload(null);
                   setJob(null);
+                  setSavedDraft(null);
+                  lastDraftJobIdRef.current = null;
                   clearEditableState();
                   setError(null);
                 }}
@@ -352,25 +464,43 @@ export default function HomePage() {
               <button
                 className="button secondary"
                 type="button"
-                disabled={!job?.result || isExportingMidi}
-                onClick={handleMidiExport}
+                disabled={!job?.result || isExportingOriginalMidi}
+                onClick={() => void handleMidiExport("original")}
               >
-                {isExportingMidi ? "Exporting MIDI..." : "Download MIDI"}
+                {isExportingOriginalMidi ? "Exporting original MIDI..." : "Download original MIDI"}
               </button>
               <button
                 className="button secondary"
                 type="button"
-                disabled={!job?.result || isExportingMusicXml}
-                onClick={handleMusicXmlExport}
+                disabled={!activeResult || isExportingDraftMidi}
+                onClick={() => void handleMidiExport("draft")}
               >
-                {isExportingMusicXml ? "Exporting MusicXML..." : "Download MusicXML"}
+                {isExportingDraftMidi ? "Exporting draft MIDI..." : "Download draft MIDI"}
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={!job?.result || isExportingOriginalMusicXml}
+                onClick={() => void handleMusicXmlExport("original")}
+              >
+                {isExportingOriginalMusicXml ? "Exporting original MusicXML..." : "Download original MusicXML"}
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={!activeResult || isExportingDraftMusicXml}
+                onClick={() => void handleMusicXmlExport("draft")}
+              >
+                {isExportingDraftMusicXml ? "Exporting draft MusicXML..." : "Download draft MusicXML"}
               </button>
             </div>
             {job?.result ? (
               <p className="muted">
-                {isDraftDirty
-                  ? "Exports will use the current edited draft result."
-                  : "Exports currently use the generated normalized result."}
+                {isLoadingDraft
+                  ? "Checking for a saved draft..."
+                  : hasSavedDraft
+                    ? `Saved draft v${savedDraftVersion ?? 1} is loaded separately from the original result.`
+                    : "No saved draft found yet. Draft export uses the current editor state."}
               </p>
             ) : null}
           </div>
@@ -515,6 +645,10 @@ export default function HomePage() {
             addTrackKey={addTrackKey}
             draftResult={activeResult}
             hasDraftChanges={isDraftDirty}
+            hasSavedDraft={hasSavedDraft}
+            savedDraftVersion={savedDraftVersion}
+            savedDraftSavedAt={savedDraftSavedAt}
+            isSavingDraft={isSavingDraft}
             onAddNote={handleAddNote}
             onChangeAddDrumLabel={setAddDrumLabel}
             onChangeAddDrumMidiNote={setAddDrumMidiNote}
@@ -527,7 +661,9 @@ export default function HomePage() {
             }
             onChangeSelectedPitch={changeSelectedPitch}
             onDeleteSelectedNote={handleDeleteSelectedNote}
+            onSaveDraft={() => void handleSaveDraft()}
             onRevertDraft={resetDraftFromOriginalResult}
+            onRestoreSavedDraft={restoreSavedDraft}
             onSelectAddTrack={setAddTrackKey}
             selectedNote={selectedNote}
             selectedTrack={selectedTrack}
@@ -537,17 +673,38 @@ export default function HomePage() {
           <h2>Editing Scope</h2>
           <div className="note-list">
             <article className="note-card">
-              <strong>Implemented in Phase 8 MVP</strong>
-              <div className="muted">Note selection, horizontal drag timing moves, piano pitch edits, add/delete, and edited MIDI/MusicXML export.</div>
+              <strong>Saved draft state</strong>
+              <div className="muted">
+                {hasSavedDraft
+                  ? `Loaded saved draft v${savedDraftVersion ?? 1}. Unsaved changes are tracked separately from that saved revision.`
+                  : "No saved draft is stored for this job yet. Use Save draft to persist the current edited JobResult."}
+              </div>
+            </article>
+            <article className="note-card">
+              <strong>Export distinction</strong>
+              <div className="muted">
+                Original export always uses the completed backend result. Draft export uses the current editable draft,
+                whether it came from auto-loaded saved data or unsaved in-browser changes.
+              </div>
             </article>
             <article className="note-card">
               <strong>Current limitation</strong>
-              <div className="muted">Drum notes can be moved, added, and deleted, but drum-lane reassignment is not included in this phase.</div>
+              <div className="muted">
+                Draft save stores only the latest full edited result per job. There is no delete, branching, or revision history beyond the incrementing version number.
+              </div>
             </article>
-            <article className="note-card">
-              <strong>Persistence boundary</strong>
-              <div className="muted">Edits stay in a frontend draft layer and do not overwrite the original completed job on the backend.</div>
-            </article>
+            {job?.result ? (
+              <article className="note-card">
+                <strong>Draft status</strong>
+                <div className="muted">
+                  {draftMatchesOriginal
+                    ? "The current draft matches the original completed result."
+                    : isDraftDirty
+                      ? "The current draft has unsaved changes relative to the last saved baseline."
+                      : "The current draft matches the latest saved draft and differs from the original result."}
+                </div>
+              </article>
+            ) : null}
           </div>
         </div>
       </section>

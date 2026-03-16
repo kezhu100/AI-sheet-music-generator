@@ -68,3 +68,40 @@
 - [x] adjust pitch
 - [x] delete/add notes
 - [x] re-export edited score
+
+## Phase 9 - Editing Persistence
+- [x] add draft storage for edited `JobResult` data
+- [x] add save draft API endpoint(s)
+- [x] add load draft API endpoint(s)
+- [x] auto-load a saved draft in the frontend when available
+- [x] add explicit save draft action in the editor UI
+- [x] support continuing edits from an existing saved draft
+- [x] distinguish export of original result versus edited draft result
+- [x] add minimal draft version tracking
+- [x] document saved-draft limitations and lifecycle clearly
+
+## Phase 10 - Editing UX Improvements
+- [ ] add undo / redo for draft edits
+- [ ] add multi-note selection
+- [ ] add box selection in the piano-roll editing surface
+- [ ] add keyboard editing shortcuts and affordances
+- [ ] add quantization tools for edited notes
+- [ ] add drum lane reassignment
+- [ ] expand tests around richer editing actions and state transitions
+
+## Phase 11 - Result Quality & AI Improvements
+- [ ] evaluate stronger source separation backends behind the existing provider contract
+- [ ] evaluate improved piano transcription backends behind the existing provider contract
+- [ ] evaluate improved drum transcription backends behind the existing provider contract
+- [ ] improve post-processing without breaking the normalized `JobResult` contract
+- [ ] add region re-transcription workflow hooks
+- [ ] explore AI-assisted correction helpers on top of the editable draft flow
+- [ ] document quality expectations and fallback behavior for upgraded providers
+
+## Phase 12 - Productization
+- [ ] add a project library view
+- [ ] persist saved audio and drafts as user-facing project assets
+- [ ] introduce user accounts when storage and ownership rules are defined
+- [ ] support shareable score links
+- [ ] improve first-run onboarding and guidance
+- [ ] document hosted deployment targets and operational assumptions

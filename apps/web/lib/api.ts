@@ -1,4 +1,12 @@
-import type { CreateJobRequest, JobExportRequest, JobResponse, JobResult, UploadResponse } from "@ai-sheet-music-generator/shared-types";
+import type {
+  CreateJobRequest,
+  JobDraftResponse,
+  JobExportRequest,
+  JobResponse,
+  JobResult,
+  SaveJobDraftRequest,
+  UploadResponse
+} from "@ai-sheet-music-generator/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -52,6 +60,27 @@ export async function getJob(jobId: string): Promise<JobResponse> {
   });
 
   return parseJson<JobResponse>(response);
+}
+
+export async function getJobDraft(jobId: string): Promise<JobDraftResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/draft`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  return parseJson<JobDraftResponse>(response);
+}
+
+export async function saveJobDraft(jobId: string, draftResult: JobResult): Promise<JobDraftResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/draft`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ draftResult } satisfies SaveJobDraftRequest)
+  });
+
+  return parseJson<JobDraftResponse>(response);
 }
 
 export async function downloadMidiExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {

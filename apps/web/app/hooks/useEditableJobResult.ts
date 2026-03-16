@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   addNote,
+  areJobResultsEqual,
+  cloneJobResult,
   deleteNote,
   normalizeEditedResult,
   resetDraftFromOriginal,
@@ -12,12 +14,15 @@ import {
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
 import type { AddDraftNoteInput, SelectedDraftNote } from "@ai-sheet-music-generator/music-engine";
-import type { JobResult } from "@ai-sheet-music-generator/shared-types";
+import type { JobDraftRecord, JobResult } from "@ai-sheet-music-generator/shared-types";
 
 export interface EditableJobResultState {
   draftResult: JobResult | null;
   activeResult: JobResult | null;
   isDraftDirty: boolean;
+  hasSavedDraft: boolean;
+  savedDraftVersion: number | null;
+  savedDraftSavedAt: string | null;
   selectedDraftNoteId: string | null;
   selectedDraftNote: SelectedDraftNote | null;
   selectedTrack: SelectedDraftNote["track"] | null;
@@ -33,31 +38,46 @@ export interface EditableJobResultState {
   changeSelectedDuration: (durationSec: number) => void;
   changeSelectedPitch: (pitch: number) => void;
   resetDraftFromOriginalResult: () => void;
-  getExportResultOverride: () => JobResult | undefined;
+  restoreSavedDraft: () => void;
+  getCurrentDraftResult: () => JobResult | undefined;
 }
 
-export function useEditableJobResult(result: JobResult | null): EditableJobResultState {
+function hydrateDraftResult(result: JobResult): JobResult {
+  return normalizeEditedResult(cloneJobResult(result));
+}
+
+export function useEditableJobResult(result: JobResult | null, savedDraft: JobDraftRecord | null): EditableJobResultState {
   const [originalResult, setOriginalResult] = useState<JobResult | null>(null);
+  const [savedDraftRecord, setSavedDraftRecord] = useState<JobDraftRecord | null>(null);
+  const [savedDraftResult, setSavedDraftResult] = useState<JobResult | null>(null);
   const [draftResult, setDraftResult] = useState<JobResult | null>(null);
-  const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [selectedDraftNoteId, setSelectedDraftNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!result) {
       setOriginalResult(null);
+      setSavedDraftRecord(null);
+      setSavedDraftResult(null);
       setDraftResult(null);
-      setIsDraftDirty(false);
       setSelectedDraftNoteId(null);
       return;
     }
 
+    const nextDraftResult = savedDraft ? hydrateDraftResult(savedDraft.result) : resetDraftFromOriginal(result);
     setOriginalResult(result);
-    setDraftResult(resetDraftFromOriginal(result));
-    setIsDraftDirty(false);
+    setSavedDraftRecord(savedDraft);
+    setSavedDraftResult(savedDraft ? nextDraftResult : null);
+    setDraftResult(nextDraftResult);
     setSelectedDraftNoteId(null);
-  }, [result]);
+  }, [result, savedDraft]);
 
   const activeResult = draftResult ?? result ?? null;
+  const baselineDraftResult = savedDraftResult ?? (originalResult ? resetDraftFromOriginal(originalResult) : null);
+  const isDraftDirty = useMemo(
+    () => !areJobResultsEqual(draftResult, baselineDraftResult),
+    [baselineDraftResult, draftResult]
+  );
+  const hasSavedDraft = savedDraftRecord != null;
 
   const selectedDraftNote = useMemo(() => {
     if (!activeResult || !selectedDraftNoteId) {
@@ -83,8 +103,9 @@ export function useEditableJobResult(result: JobResult | null): EditableJobResul
 
   function clearEditableState(): void {
     setOriginalResult(null);
+    setSavedDraftRecord(null);
+    setSavedDraftResult(null);
     setDraftResult(null);
-    setIsDraftDirty(false);
     setSelectedDraftNoteId(null);
   }
 
@@ -94,9 +115,8 @@ export function useEditableJobResult(result: JobResult | null): EditableJobResul
         return current;
       }
 
-      return mutator(current);
+      return normalizeEditedResult(mutator(current));
     });
-    setIsDraftDirty(true);
   }
 
   function updateSelectedNote(mutator: (draft: JobResult, draftNoteId: string) => JobResult): void {
@@ -114,7 +134,6 @@ export function useEditableJobResult(result: JobResult | null): EditableJobResul
 
     const { draftResult: nextDraftResult, draftNoteId } = addNote(draftResult, input);
     setDraftResult(nextDraftResult);
-    setIsDraftDirty(true);
     setSelectedDraftNoteId(draftNoteId);
   }
 
@@ -145,18 +164,29 @@ export function useEditableJobResult(result: JobResult | null): EditableJobResul
     }
 
     setDraftResult(resetDraftFromOriginal(originalResult));
-    setIsDraftDirty(false);
     setSelectedDraftNoteId(null);
   }
 
-  function getExportResultOverride(): JobResult | undefined {
-    return isDraftDirty && draftResult ? normalizeEditedResult(draftResult) : undefined;
+  function restoreSavedDraft(): void {
+    if (!savedDraftResult) {
+      return;
+    }
+
+    setDraftResult(hydrateDraftResult(savedDraftResult));
+    setSelectedDraftNoteId(null);
+  }
+
+  function getCurrentDraftResult(): JobResult | undefined {
+    return draftResult ? normalizeEditedResult(draftResult) : undefined;
   }
 
   return {
     draftResult,
     activeResult,
     isDraftDirty,
+    hasSavedDraft,
+    savedDraftVersion: savedDraftRecord?.version ?? null,
+    savedDraftSavedAt: savedDraftRecord?.savedAt ?? null,
     selectedDraftNoteId,
     selectedDraftNote,
     selectedTrack,
@@ -172,6 +202,7 @@ export function useEditableJobResult(result: JobResult | null): EditableJobResul
     changeSelectedDuration,
     changeSelectedPitch,
     resetDraftFromOriginalResult,
-    getExportResultOverride
+    restoreSavedDraft,
+    getCurrentDraftResult
   };
 }

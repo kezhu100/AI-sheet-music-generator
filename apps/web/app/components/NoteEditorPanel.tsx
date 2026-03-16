@@ -6,6 +6,10 @@ import type { JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generato
 interface NoteEditorPanelProps {
   draftResult: JobResult | null;
   hasDraftChanges: boolean;
+  hasSavedDraft: boolean;
+  savedDraftVersion: number | null;
+  savedDraftSavedAt: string | null;
+  isSavingDraft: boolean;
   selectedTrack: TrackResult | null;
   selectedNote: NoteEvent | null;
   addTrackKey: string;
@@ -25,12 +29,18 @@ interface NoteEditorPanelProps {
   onChangeSelectedPitch: (value: number) => void;
   onDeleteSelectedNote: () => void;
   onAddNote: () => void;
+  onSaveDraft: () => void;
   onRevertDraft: () => void;
+  onRestoreSavedDraft: () => void;
 }
 
 export function NoteEditorPanel({
   draftResult,
   hasDraftChanges,
+  hasSavedDraft,
+  savedDraftVersion,
+  savedDraftSavedAt,
+  isSavingDraft,
   selectedTrack,
   selectedNote,
   addTrackKey,
@@ -50,7 +60,9 @@ export function NoteEditorPanel({
   onChangeSelectedPitch,
   onDeleteSelectedNote,
   onAddNote,
-  onRevertDraft
+  onSaveDraft,
+  onRevertDraft,
+  onRestoreSavedDraft
 }: NoteEditorPanelProps) {
   if (!draftResult) {
     return <p className="muted">Editing controls unlock after a completed job returns a normalized result.</p>;
@@ -65,12 +77,22 @@ export function NoteEditorPanel({
         <div>
           <strong>{hasDraftChanges ? "Draft edited" : "Draft matches generated result"}</strong>
           <div className="muted">
-            Phase 8 keeps edits in the browser. Exports use this draft only when changes have been made.
+            {hasSavedDraft
+              ? `Saved draft v${savedDraftVersion ?? 1}${savedDraftSavedAt ? ` from ${new Date(savedDraftSavedAt).toLocaleString()}` : ""}.`
+              : "No saved draft yet."}
           </div>
         </div>
-        <button className="button secondary small" disabled={!hasDraftChanges} onClick={onRevertDraft} type="button">
-          Revert draft
-        </button>
+        <div className="actions">
+          <button className="button small" disabled={isSavingDraft} onClick={onSaveDraft} type="button">
+            {isSavingDraft ? "Saving..." : "Save draft"}
+          </button>
+          <button className="button secondary small" onClick={onRevertDraft} type="button">
+            Reset to original
+          </button>
+          <button className="button secondary small" disabled={!hasSavedDraft} onClick={onRestoreSavedDraft} type="button">
+            Reload saved draft
+          </button>
+        </div>
       </div>
 
       <div className="editor-grid">
