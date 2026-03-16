@@ -1,0 +1,16 @@
+{
+  "name": "ai-sheet-music-generator",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/shared-types",
+    "packages/music-engine"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:web": "npm run dev --workspace @ai-sheet-music-generator/web"
+  }
+}
+

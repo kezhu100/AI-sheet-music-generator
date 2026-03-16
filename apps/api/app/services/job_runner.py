@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from threading import Thread
+from time import sleep
+
+from app.models.schemas import UploadedFileDescriptor
+from app.pipeline.mock_pipeline import build_mock_pipeline
+from app.services.job_store import job_store
+from app.services.storage import resolve_upload_path
+
+
+def start_job(job_id: str, upload: UploadedFileDescriptor) -> None:
+    thread = Thread(target=_run_job, args=(job_id, upload), daemon=True)
+    thread.start()
+
+
+def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
+    try:
+        job_store.update_progress(
+            job_id,
+            status="processing",
+            stage="normalizing",
+            percent=15,
+            message="Preparing uploaded audio for pipeline execution.",
+        )
+        sleep(0.6)
+
+        job_store.update_progress(
+            job_id,
+            status="processing",
+            stage="source_separation",
+            percent=45,
+            message="Routing audio through the separation provider interface.",
+        )
+        sleep(0.6)
+
+        job_store.update_progress(
+            job_id,
+            status="processing",
+            stage="transcription",
+            percent=75,
+            message="Generating mocked piano and drum note events.",
+        )
+        sleep(0.6)
+
+        pipeline = build_mock_pipeline()
+        result = pipeline.run(resolve_upload_path(upload.stored_path), upload.file_name, job_id)
+        job_store.complete(job_id, result)
+    except Exception as exc:
+        job_store.fail(job_id, str(exc))

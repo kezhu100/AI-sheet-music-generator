@@ -1,0 +1,11 @@
+node_modules/
+.next/
+dist/
+coverage/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.venv/
+apps/api/data/
+

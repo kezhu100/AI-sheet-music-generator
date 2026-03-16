@@ -1,0 +1,63 @@
+# TASKS.md
+
+## Phase 0 - Repository Bootstrap
+- [x] create monorepo structure
+- [x] add frontend app
+- [x] add backend app
+- [x] add shared types package
+- [x] add music engine package
+- [x] add basic README and developer setup
+
+## Phase 1 - Upload and Job Pipeline
+- [x] add audio upload flow
+- [x] create job creation API
+- [x] create job status API
+- [x] store uploaded files locally for development
+- [x] display job progress in UI
+
+## Phase 2 - Source Separation
+- [x] define separation provider interface
+- [x] add first separation backend
+- [x] persist generated stems
+- [x] display stems in UI
+- [x] document supported formats and limitations
+
+## Phase 3 - Piano Transcription
+- [ ] define piano transcription provider interface
+- [ ] add first piano provider
+- [ ] normalize provider output to NoteEvent schema
+- [ ] preview piano notes in UI
+- [ ] basic validation on a sample clip
+
+## Phase 4 - Drum Transcription
+- [ ] define drum transcription provider interface
+- [ ] add first drum provider
+- [ ] map drum labels to MIDI notes
+- [ ] preview drum hits in UI
+- [ ] basic validation on a sample clip
+
+## Phase 5 - Post Processing
+- [ ] tempo estimation integration
+- [ ] quantization helpers
+- [ ] bar and beat alignment
+- [ ] track merge logic
+- [ ] confidence-based filtering
+
+## Phase 6 - Export
+- [ ] MIDI export
+- [ ] MusicXML export
+- [ ] file download endpoints
+- [ ] export buttons in UI
+
+## Phase 7 - Score Preview
+- [ ] piano-roll preview
+- [ ] score preview for piano
+- [ ] drum notation preview
+- [ ] track visibility toggles
+
+## Phase 8 - Editing
+- [ ] note selection
+- [ ] drag to move note timing
+- [ ] adjust pitch
+- [ ] delete/add notes
+- [ ] re-export edited score
