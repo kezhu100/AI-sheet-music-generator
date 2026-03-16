@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatEventTiming, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
+import {
+  buildPreviewTracks,
+  formatEventTiming,
+  getVisibleTracks,
+  summarizeJobResult
+} from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
 import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, uploadAudio } from "../lib/api";
+import { DrumNotationPreview } from "./components/DrumNotationPreview";
+import { PianoRollPreview } from "./components/PianoRollPreview";
+import { PianoScorePreview } from "./components/PianoScorePreview";
+import { TrackVisibilityControls } from "./components/TrackVisibilityControls";
 
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
@@ -22,6 +31,7 @@ export default function HomePage() {
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [isExportingMidi, setIsExportingMidi] = useState(false);
   const [isExportingMusicXml, setIsExportingMusicXml] = useState(false);
+  const [visibleTrackKeys, setVisibleTrackKeys] = useState<string[]>([]);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -48,13 +58,39 @@ export default function HomePage() {
     return summarizeJobResult(job.result);
   }, [job]);
 
-  const pianoTrack = useMemo(() => {
-    return job?.result?.tracks.find((track) => track.instrument === "piano") ?? null;
+  const previewTracks = useMemo(() => {
+    return job?.result ? buildPreviewTracks(job.result.tracks) : [];
   }, [job]);
 
+  useEffect(() => {
+    if (!previewTracks.length) {
+      setVisibleTrackKeys([]);
+      return;
+    }
+
+    setVisibleTrackKeys((currentKeys) => {
+      if (currentKeys.length === 0) {
+        return previewTracks.map((track) => track.key);
+      }
+
+      const validTrackKeys = new Set(previewTracks.map((track) => track.key));
+      const nextKeys = currentKeys.filter((trackKey) => validTrackKeys.has(trackKey));
+
+      return nextKeys.length > 0 ? nextKeys : previewTracks.map((track) => track.key);
+    });
+  }, [previewTracks]);
+
+  const visibleTracks = useMemo(() => {
+    return job?.result ? getVisibleTracks(job.result.tracks, visibleTrackKeys) : [];
+  }, [job, visibleTrackKeys]);
+
+  const pianoTrack = useMemo(() => {
+    return visibleTracks.find((track) => track.instrument === "piano") ?? null;
+  }, [visibleTracks]);
+
   const drumTrack = useMemo(() => {
-    return job?.result?.tracks.find((track) => track.instrument === "drums") ?? null;
-  }, [job]);
+    return visibleTracks.find((track) => track.instrument === "drums") ?? null;
+  }, [visibleTracks]);
 
   async function handleUploadAndCreateJob(): Promise<void> {
     if (!selectedFile) {
@@ -134,6 +170,12 @@ export default function HomePage() {
     }
   }
 
+  function toggleTrackVisibility(trackKey: string): void {
+    setVisibleTrackKeys((currentKeys) =>
+      currentKeys.includes(trackKey) ? currentKeys.filter((key) => key !== trackKey) : [...currentKeys, trackKey]
+    );
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -141,11 +183,12 @@ export default function HomePage() {
           <div>
             <h1>AI Sheet Music Generator</h1>
             <p>
-              Upload a song or stem, create a job, inspect the post-processed result, and export a minimal MIDI draft
-              built from the current heuristic transcription pipeline.
+              Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
+              and drum notation views before exporting a draft MIDI or MusicXML file.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 6 MIDI + MusicXML export</span>
+              <span className="pill">Phase 7 score preview</span>
+              <span className="pill">Track visibility toggles</span>
               <span className="pill">Real heuristic PCM WAV providers</span>
               <span className="pill">Warnings stay explicit</span>
             </div>
@@ -312,9 +355,53 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="content-grid preview-layout">
+        <div className="panel">
+          <h2>Track Visibility</h2>
+          <TrackVisibilityControls
+            onHideAllTracks={() => setVisibleTrackKeys([])}
+            onShowAllTracks={() => setVisibleTrackKeys(previewTracks.map((track) => track.key))}
+            onToggleTrack={toggleTrackVisibility}
+            tracks={previewTracks}
+            visibleTrackKeys={visibleTrackKeys}
+          />
+        </div>
+
+        <div className="panel">
+          <h2>Piano-Roll Preview</h2>
+          {job?.result ? <PianoRollPreview tracks={visibleTracks} /> : <p className="muted">Visible track notes will render here after the job completes.</p>}
+        </div>
+      </section>
+
+      <section className="content-grid preview-layout">
+        <div className="panel">
+          <h2>Piano Score Preview</h2>
+          {job?.result ? (
+            <>
+              <p className="muted">Simplified grand-staff preview for the first visible piano track and the first 8 bars.</p>
+              <PianoScorePreview bpm={job.result.bpm} track={pianoTrack} />
+            </>
+          ) : (
+            <p className="muted">A simple piano score preview will appear here once the job completes.</p>
+          )}
+        </div>
+
+        <div className="panel">
+          <h2>Drum Notation Preview</h2>
+          {job?.result ? (
+            <>
+              <p className="muted">Lane-based drum hit grid for the first visible drum track and the first 8 bars.</p>
+              <DrumNotationPreview bpm={job.result.bpm} track={drumTrack} />
+            </>
+          ) : (
+            <p className="muted">A simple drum notation view will appear here once the job completes.</p>
+          )}
+        </div>
+      </section>
+
       <section className="content-grid">
         <div className="panel">
-          <h2>Piano Note Preview</h2>
+          <h2>Piano Event Details</h2>
           {pianoTrack ? (
             <div className="note-list">
               {pianoTrack.notes.length > 0 ? (
@@ -337,12 +424,12 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <p className="muted">Detected piano notes will appear here once the job completes.</p>
+            <p className="muted">Visible piano event details will appear here once the job completes.</p>
           )}
         </div>
 
         <div className="panel">
-          <h2>Drum Hit Preview</h2>
+          <h2>Drum Event Details</h2>
           {drumTrack ? (
             <div className="note-list">
               {drumTrack.notes.length > 0 ? (
@@ -366,7 +453,7 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <p className="muted">Detected drum hits will appear here once the job completes.</p>
+            <p className="muted">Visible drum event details will appear here once the job completes.</p>
           )}
         </div>
       </section>

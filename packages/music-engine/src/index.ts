@@ -11,6 +11,20 @@ export {
   quantizeSeconds,
   secondsToBeats
 } from "./timing";
+export {
+  buildPreviewTracks,
+  getDrumLanes,
+  getPianoPitchRange,
+  getPianoStaffPlacement,
+  getPreviewTimeBounds,
+  getTrackEvents,
+  getTrackKey,
+  getVisibleTracks,
+  groupNotesByBar,
+  midiToNoteName,
+  resolveBarBeat
+} from "./preview";
+export type { DrumLane, PreviewMeasure, PreviewTimeBounds, PreviewTrack, ResolvedBarBeat, StaffPlacement } from "./preview";
 
 export interface TrackSummary {
   instrument: InstrumentType;

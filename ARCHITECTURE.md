@@ -10,8 +10,9 @@ Responsibilities:
 - create processing jobs
 - display status
 - show stems, tracks, and note events
+- render score-preview UI from normalized result tracks
 - expose current limitations clearly
-- later support export and score preview flows
+- support export and score preview flows
 
 ### Backend
 `apps/api`
@@ -43,6 +44,7 @@ Responsibilities:
 - reusable result summarization helpers
 - frontend-facing timing display helpers
 - reusable timing math helpers for frontend-facing consumption
+- frontend score-preview helper functions for track filtering, bar grouping, pitch naming, and notation-oriented layout math
 - later note event transforms
 - later beat/bar alignment logic
 - later export-facing transforms when sharing logic is worthwhile
@@ -112,6 +114,12 @@ Phase 6 export boundary:
 - MusicXML export generation lives in `apps/api/app/services/musicxml_export.py`
 - the jobs API exposes a dedicated on-demand download endpoint rather than bloating `JobResult`
 
+Phase 7 preview boundary:
+- preview rendering lives in `apps/web/app/components`
+- preview orchestration stays in `apps/web/app/page.tsx`
+- preview math helpers live in `packages/music-engine/src/preview.ts`
+- the backend remains unchanged and still returns the same normalized `JobResult`
+
 ## Design Principles
 
 - provider-based model integrations
@@ -120,3 +128,4 @@ Phase 6 export boundary:
 - export logic should remain independent from ML providers
 - frontend should consume normalized results only
 - post-processing should stay lightweight until later export or notation phases demand richer timing models
+- preview rendering should stay decoupled from editing behavior and avoid forcing backend contract changes before Phase 8

@@ -1,5 +1,6 @@
 node_modules/
 .next/
+*.tsbuildinfo
 dist/
 coverage/
 __pycache__/
@@ -8,4 +9,3 @@ __pycache__/
 .mypy_cache/
 .venv/
 apps/api/data/
-

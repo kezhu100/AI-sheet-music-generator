@@ -281,6 +281,63 @@ Follow-up:
 - Start Phase 7 with score preview work that consumes the current normalized/exportable result.
 - Reassess whether some export formatting helpers should move into shared modules once preview and notation needs become clearer.
 
+### 2026-03-16
+Decision:
+- Implement Phase 7 score preview entirely in the frontend by reusing the existing normalized `JobResult` and adding lightweight preview helpers in `packages/music-engine`.
+
+Context:
+- The repository already had normalized, post-processed piano and drum note events plus working MIDI and MusicXML export from the same result shape.
+- Phase 7 was scoped to preview only: piano-roll preview, piano score preview, drum notation preview, and track visibility toggles.
+- A true engraving renderer would have added unnecessary dependency and architecture weight for this phase.
+
+Chosen option:
+- Keep the backend and shared result contract unchanged.
+- Add `packages/music-engine/src/preview.ts` for reusable frontend preview math such as track-key generation, visible-track filtering, measure grouping, pitch naming, and simplified staff placement.
+- Render a piano-roll timeline, a simplified piano grand-staff preview, and a lane/grid drum notation preview inside the web app.
+- Limit notation-oriented panes to the first visible piano track, the first visible drum track, and the first 8 bars so the UI remains readable without pretending to offer full engraving quality.
+
+Alternatives considered:
+- Adding a full notation-rendering library during Phase 7.
+- Expanding `JobResult` with preview-specific layout data from the backend.
+- Deferring score preview until a richer engraving pipeline existed.
+
+Tradeoffs:
+- The chosen renderer is honest, lightweight, and aligned with the current MVP architecture, but it is not publication-grade notation.
+- Reusing the current result contract keeps the pipeline stable, but preview fidelity remains bounded by the existing single-tempo, 4/4, heuristic transcription pipeline.
+- Restricting notation-style panes to the first visible instrument track of each type keeps the implementation cohesive, but multi-track notation layout is deferred.
+
+Follow-up:
+- Consider a dedicated notation renderer only when preview fidelity or editing needs justify the extra complexity.
+- Revisit multi-track score layout and richer percussion notation in later phases if the product direction still calls for it.
+
+### 2026-03-16
+Decision:
+- Add a root one-command local development workflow with a small Node orchestration script instead of introducing extra monorepo tooling.
+
+Context:
+- Local development previously required separate terminals for the Next.js frontend and the FastAPI backend.
+- The repository already had `npm` workspaces for the frontend packages, but the backend remained outside workspace script orchestration.
+- The current environment and docs are Windows-leaning, and the backend already uses a project-local virtual environment at `apps/api/venv`.
+
+Chosen option:
+- Add `npm run dev` at the repository root.
+- Implement the workflow in `scripts/dev.mjs`, which starts the frontend workspace and the FastAPI backend together.
+- Make the script call the Python interpreter inside `apps/api/venv` directly rather than relying on shell-specific venv activation behavior.
+- Add `npm run dev:api` as a small supporting command and document the exact backend prerequisite clearly.
+
+Alternatives considered:
+- Adding `concurrently` or a larger task runner dependency.
+- Requiring developers to activate the Python venv manually in a separate terminal.
+- Moving the backend into an `npm` workspace package just for dev orchestration.
+
+Tradeoffs:
+- The Node script keeps the change small and reviewable, but it assumes the backend venv lives at the documented project-local path.
+- Directly invoking the venv interpreter avoids shell activation issues, but developers must create the venv in the expected location.
+- The solution improves local startup convenience without changing runtime product behavior or repo architecture.
+
+Follow-up:
+- Revisit whether backend setup should be further automated if the project later adds more contributors or CI-level environment bootstrap tooling.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

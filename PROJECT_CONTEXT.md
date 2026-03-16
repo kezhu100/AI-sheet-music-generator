@@ -126,6 +126,23 @@ Current Phase 6 runtime behavior:
 - both export formats use the current single project-wide BPM, quantized note timing, and simple piano/drum track mapping
 - MusicXML assumes 4/4, constant tempo, a simple divisions grid, and intentionally omits advanced engraving semantics
 
+### Phase 7 - Score Preview
+Completed.
+
+Implemented features:
+- frontend piano-roll preview added on top of the existing normalized visible-track result data
+- frontend simplified piano score preview added for the first visible piano track
+- frontend drum notation-style lane/grid preview added for the first visible drum track
+- frontend track visibility toggles added so preview panes can focus on selected tracks without changing the result contract
+- shared frontend preview helper functions added in `packages/music-engine` for track filtering, measure grouping, pitch display, and notation-oriented rendering math
+
+Current Phase 7 runtime behavior:
+- preview rendering stays entirely in the web app and consumes the existing normalized `JobResult` plus `tracks[].notes`
+- piano-roll preview can show visible piano notes plus visible drum-hit markers in a shared timeline view
+- piano score preview is intentionally simplified and renders only the first visible piano track plus the first 8 bars
+- drum notation preview is intentionally lane/grid based rather than full engraved percussion notation and renders only the first visible drum track plus the first 8 bars
+- Phase 7 adds visual inspection only; there is still no note editing, correction, or drag interaction
+
 ---
 
 # Current Pipeline
@@ -148,7 +165,7 @@ generate MIDI or MusicXML on demand from the completed normalized result when re
 ->
 return normalized stems + tracks + warnings
 ->
-frontend displays stems + piano notes + drum hits + track summaries + warnings, and can request MIDI or MusicXML export
+frontend displays stems + track summaries + warnings, score previews, event details, and can request MIDI or MusicXML export
 
 The architecture now supports replacing the local development separation backend plus the heuristic piano and drum providers with stronger providers in later phases.
 
@@ -195,21 +212,28 @@ Frontend stack:
 - TypeScript
 - React
 
+Current local development workflow:
+- repository root `npm run dev` starts both the Next.js frontend and the FastAPI backend together
+- the root dev script expects the backend Python interpreter to live in `apps/api/venv`
+
 Current UI supports:
 - audio file upload
 - job status polling
 - stem summary display
 - track summary display
-- piano note preview display
-- drum hit preview display
+- piano-roll preview display
+- simplified piano score preview display
+- simplified drum notation preview display
+- track visibility toggles
+- piano note detail display
+- drum hit detail display
 - warning display
 
 Future UI features:
 - waveform view
 - timeline editor
-- piano roll
-- sheet music rendering
 - export controls
+- editing tools
 
 ---
 
@@ -231,23 +255,25 @@ Frontend
 Node.js 18+
 npm workspaces used for monorepo.
 
+Local dev startup
+- root command: `npm run dev`
+- web app: `http://127.0.0.1:3000`
+- API: `http://127.0.0.1:8000`
+- API health check: `http://127.0.0.1:8000/health`
+- backend prerequisite: install `apps/api/requirements.txt` into `apps/api/venv`
+
 ---
 
 # Next Development Phase
 
-## Phase 7 - Score Preview
+## Phase 8 - Editing
 
 Goal:
-Start score preview work on top of the existing normalized and exportable result pipeline.
+Start manual correction on top of the current normalized and previewable result pipeline.
 
-Tasks:
-- piano-roll preview
-- score preview for piano
-- drum notation preview
-- track visibility toggles
-
-Scope limitation:
-- do not start editing work in this phase
+Scope reminder:
+- Phase 7 preview is complete
+- editing work is still not implemented in the current runtime
 
 ---
 
@@ -261,13 +287,13 @@ Current runtime limitations:
 - post-processing currently assumes a simple 4/4 grid and does not support tempo changes
 - MIDI export currently assumes a single project-wide tempo and does not preserve tempo maps or notation-only semantics
 - MusicXML export currently assumes a single project-wide tempo, 4/4 meter, and simple structural notation without advanced engraving semantics
+- piano score preview currently uses a simplified grand-staff approximation rather than full engraving or MusicXML-quality notation layout
+- drum preview currently uses a notation-oriented lane/grid renderer rather than full percussion staff engraving
+- preview panes currently focus on the first visible piano track and first visible drum track for notation-style rendering
 - job state is still in-memory and is lost when the API restarts
 
-Phase 6
-Completed: MIDI and MusicXML export.
-
 Phase 7
-Score rendering UI.
+Completed: score preview UI with piano-roll, simplified piano score, simplified drum notation, and track visibility toggles.
 
 Phase 8
 Editing tools.

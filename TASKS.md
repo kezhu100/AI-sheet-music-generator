@@ -57,10 +57,10 @@
 - [x] export buttons in UI
 
 ## Phase 7 - Score Preview
-- [ ] piano-roll preview
-- [ ] score preview for piano
-- [ ] drum notation preview
-- [ ] track visibility toggles
+- [x] piano-roll preview
+- [x] score preview for piano
+- [x] drum notation preview
+- [x] track visibility toggles
 
 ## Phase 8 - Editing
 - [ ] note selection
