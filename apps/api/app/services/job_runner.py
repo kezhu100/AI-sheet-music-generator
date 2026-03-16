@@ -41,7 +41,10 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             status="processing",
             stage="transcription",
             percent=75,
-            message=f"Running configured piano transcription ({settings.piano_transcription_provider}) and current drum transcription on the persisted stems.",
+            message=(
+                f"Running configured piano transcription ({settings.piano_transcription_provider}) "
+                f"and configured drum transcription ({settings.drum_transcription_provider}) on the persisted stems."
+            ),
         )
         sleep(0.6)
 

@@ -28,6 +28,10 @@ class Settings(BaseModel):
     piano_transcription_fallback_provider: Optional[str] = None
     piano_transcription_ml_python: Optional[str] = None
     piano_transcription_ml_min_confidence: float = 0.35
+    drum_transcription_provider: str = "heuristic"
+    drum_transcription_fallback_provider: Optional[str] = None
+    drum_transcription_ml_python: Optional[str] = None
+    drum_transcription_ml_min_confidence: float = 0.35
 
 
 @lru_cache
@@ -44,6 +48,10 @@ def get_settings() -> Settings:
         piano_transcription_fallback_provider=os.getenv("PIANO_TRANSCRIPTION_FALLBACK_PROVIDER"),
         piano_transcription_ml_python=os.getenv("PIANO_TRANSCRIPTION_ML_PYTHON"),
         piano_transcription_ml_min_confidence=float(os.getenv("PIANO_TRANSCRIPTION_ML_MIN_CONFIDENCE", "0.35")),
+        drum_transcription_provider=os.getenv("DRUM_TRANSCRIPTION_PROVIDER", "heuristic"),
+        drum_transcription_fallback_provider=os.getenv("DRUM_TRANSCRIPTION_FALLBACK_PROVIDER"),
+        drum_transcription_ml_python=os.getenv("DRUM_TRANSCRIPTION_ML_PYTHON"),
+        drum_transcription_ml_min_confidence=float(os.getenv("DRUM_TRANSCRIPTION_ML_MIN_CONFIDENCE", "0.35")),
     )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)

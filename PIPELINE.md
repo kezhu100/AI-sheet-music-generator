@@ -46,3 +46,11 @@ Phase 11B piano transcription update:
 - `ml` and `basic-pitch` can be enabled as stronger piano backends when Basic Pitch is installed in the configured Python environment
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized piano note events still flow into the same post-processing stage and the same `JobResult` structure
+
+Phase 11C drum transcription update:
+- the transcription stage now selects the drum backend explicitly through configuration instead of always using the heuristic WAV provider
+- `heuristic` remains available for local development and deterministic fallback
+- `ml` and `madmom` can be enabled as stronger drum backends when madmom is installed in the configured Python environment
+- fallback can automatically return to `heuristic` when the stronger provider is unavailable
+- normalized drum note events still flow into the same post-processing stage and the same `JobResult` structure
+- the stronger drum path keeps output mapped to the stable `kick`, `snare`, and `hi-hat` lanes expected by the current editor workflow

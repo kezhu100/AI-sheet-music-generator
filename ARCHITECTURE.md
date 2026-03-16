@@ -57,7 +57,7 @@ Responsibilities:
 3. route audio through the configured source separation provider
 4. persist stems
 5. run the configured piano transcription provider on the persisted piano stem when supported
-6. run heuristic drum transcription on the persisted drum stem when supported
+6. run the configured drum transcription provider on the persisted drum stem when supported
 7. run lightweight post-processing for confidence filtering, tempo estimation, quantization, track merge, and beat/bar alignment
 8. normalize timing through reusable helper boundaries
 9. normalize to the common event schema
@@ -75,7 +75,10 @@ Current runtime note:
 - the default piano transcription provider is still the heuristic WAV backend for predictable local setup
 - an optional Basic Pitch-backed provider can generate stronger normalized piano note events when its runtime is configured
 - the stronger piano provider path can fall back to the heuristic provider without changing downstream contracts
-- step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
+- step 6 now supports multiple drum transcription providers behind the same provider boundary
+- the default drum transcription provider is still the heuristic WAV backend for predictable local setup
+- an optional madmom-backed provider can generate stronger normalized drum hit events when its runtime is configured
+- the stronger drum provider path can fall back to the heuristic provider without changing downstream contracts
 - step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
 - step 11 is currently implemented with a local file-backed draft store under `apps/api/data/drafts`
@@ -106,8 +109,12 @@ Current runtime note:
 ### Drum Transcription Providers
 - backend contract lives under `apps/api/app/pipeline/interfaces.py`
 - current implementation lives in `apps/api/app/pipeline/drum_transcription.py`
-- current provider uses only the Python standard library and returns normalized drum `NoteEvent` values
-- current provider is intentionally heuristic and optimized for simple onset-focused drum hit detection rather than full kit accuracy
+- provider selection is configured through backend settings and environment variables rather than being hard-wired inside the pipeline factory
+- `heuristic` uses only the Python standard library and returns normalized drum `NoteEvent` values from PCM `.wav` stems
+- `ml` and `madmom` currently resolve to a stronger madmom-backed provider that can run through a separate Python executable
+- fallback selection can automatically return to `heuristic` when the stronger backend is unavailable
+- the stronger provider uses ML-backed onset detection and then normalizes drum hits into the existing stable label and `midiNote` mapping expected by the editor workflow
+- the current heuristic provider remains intentionally lightweight and optimized for simple onset-focused drum hit detection rather than full kit accuracy
 
 ## Shared Result Shape
 
@@ -131,6 +138,12 @@ Phase 11B piano transcription boundary:
 - `JobResult` remains unchanged
 - `TrackResult.provider` records which piano transcription backend actually produced the normalized note events
 - piano-provider fallback behavior is surfaced through warnings instead of schema changes
+- post-processing, preview, editing, persistence, and export still consume the same normalized `tracks[].notes` structure
+
+Phase 11C drum transcription boundary:
+- `JobResult` remains unchanged
+- `TrackResult.provider` records which drum transcription backend actually produced the normalized note events
+- drum-provider fallback behavior is surfaced through warnings instead of schema changes
 - post-processing, preview, editing, persistence, and export still consume the same normalized `tracks[].notes` structure
 
 Phase 5.5 timing helper boundaries:

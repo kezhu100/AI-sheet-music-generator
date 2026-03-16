@@ -92,7 +92,7 @@
 ## Phase 11 - Result Quality & AI Improvements
 - [x] evaluate stronger source separation backends behind the existing provider contract
 - [x] evaluate improved piano transcription backends behind the existing provider contract
-- [ ] evaluate improved drum transcription backends behind the existing provider contract
+- [x] evaluate improved drum transcription backends behind the existing provider contract
 - [ ] improve post-processing without breaking the normalized `JobResult` contract
 - [ ] add region re-transcription workflow hooks
 - [ ] explore AI-assisted correction helpers on top of the editable draft flow

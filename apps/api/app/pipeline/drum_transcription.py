@@ -1,16 +1,36 @@
 from __future__ import annotations
 
 import audioop
+import json
 import math
 import struct
+import subprocess
+import sys
 import wave
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from app.core.config import Settings
 from app.models.schemas import NoteEvent
 from app.pipeline.interfaces import DrumTranscriptionProvider, SourceStem, TranscriptionResult
 
+DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC = "heuristic"
+DRUM_TRANSCRIPTION_PROVIDER_ML = "ml"
+DRUM_TRANSCRIPTION_PROVIDER_MADMOM = "madmom"
+
+DRUM_MIDI_BY_LABEL = {
+    "kick": 36,
+    "snare": 38,
+    "hi-hat": 42,
+}
+
 
 class UnsupportedDrumStemError(Exception):
+    pass
+
+
+class DrumTranscriptionProviderError(RuntimeError):
     pass
 
 
@@ -25,7 +45,7 @@ class HeuristicWavDrumTranscriptionProvider(DrumTranscriptionProvider):
 
         if stem.file_path.suffix.lower() != ".wav":
             warnings.append(
-                f"Skipping real drum transcription for stem '{stem.stem_name}' because only PCM .wav stems are supported in Phase 4."
+                f"Skipping real drum transcription for stem '{stem.stem_name}' because only PCM .wav stems are supported in the heuristic drum provider."
             )
             return TranscriptionResult(
                 provider_name=self.provider_name,
@@ -48,6 +68,28 @@ class HeuristicWavDrumTranscriptionProvider(DrumTranscriptionProvider):
             )
 
         hits = self._detect_hits(samples, sample_rate)
+        notes = self._build_note_events(stem, samples, sample_rate, hits)
+
+        if not notes:
+            warnings.append(
+                "The heuristic drum provider did not detect reliable percussive onsets in this stem. Clear isolated hits and simple rhythms work best in the current fallback path."
+            )
+
+        return TranscriptionResult(
+            provider_name=self.provider_name,
+            instrument="drums",
+            source_stem=stem.stem_name,
+            notes=notes,
+            warnings=warnings,
+        )
+
+    def _build_note_events(
+        self,
+        stem: SourceStem,
+        samples: list[float],
+        sample_rate: int,
+        hits: list[tuple[int, int, float]],
+    ) -> list[NoteEvent]:
         notes: list[NoteEvent] = []
 
         for index, (start_sample, end_sample, peak_level) in enumerate(hits, start=1):
@@ -73,18 +115,7 @@ class HeuristicWavDrumTranscriptionProvider(DrumTranscriptionProvider):
                 )
             )
 
-        if not notes:
-            warnings.append(
-                "The heuristic drum provider did not detect reliable percussive onsets in this stem. Clear isolated hits and simple rhythms work best in Phase 4."
-            )
-
-        return TranscriptionResult(
-            provider_name=self.provider_name,
-            instrument="drums",
-            source_stem=stem.stem_name,
-            notes=notes,
-            warnings=warnings,
-        )
+        return notes
 
     def _load_wav_samples(self, file_path: Path) -> tuple[list[float], int]:
         try:
@@ -230,3 +261,256 @@ class HeuristicWavDrumTranscriptionProvider(DrumTranscriptionProvider):
         bar = (beat_index // 4) + 1
         beat = round((onset_sec / beat_duration) % 4 + 1, 2)
         return bar, beat
+
+
+class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
+    provider_name = "madmom-drum-provider"
+
+    def __init__(
+        self,
+        python_executable: Optional[str] = None,
+        minimum_confidence: float = 0.35,
+    ) -> None:
+        self._python_executable = python_executable or sys.executable
+        self._minimum_confidence = minimum_confidence
+        self._runner_path = Path(__file__).with_name("madmom_drum_runner.py")
+        self._fallback_classifier = HeuristicWavDrumTranscriptionProvider()
+
+    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
+        warnings = [
+            "Drum transcription attempted the stronger madmom-backed onset provider behind the existing provider contract.",
+            "madmom runtime availability depends on the configured Python environment and optional ML dependencies.",
+        ]
+
+        try:
+            samples, sample_rate = self._fallback_classifier._load_wav_samples(stem.file_path)
+        except UnsupportedDrumStemError as exc:
+            warnings.append(str(exc))
+            return TranscriptionResult(
+                provider_name=self.provider_name,
+                instrument="drums",
+                source_stem=stem.stem_name,
+                notes=[],
+                warnings=warnings,
+            )
+
+        raw_onsets = self._run_madmom(stem.file_path)
+        hits = self._build_hits_from_onsets(samples, sample_rate, raw_onsets)
+        notes = self._build_note_events(stem, samples, sample_rate, hits)
+
+        if not notes:
+            warnings.append(
+                "The madmom-backed drum provider did not return any normalized drum hits above the configured confidence threshold for this stem."
+            )
+
+        return TranscriptionResult(
+            provider_name=self.provider_name,
+            instrument="drums",
+            source_stem=stem.stem_name,
+            notes=notes,
+            warnings=warnings,
+        )
+
+    def _run_madmom(self, audio_path: Path) -> List[Any]:
+        with NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
+            output_path = Path(temp_file.name)
+
+        command = [
+            self._python_executable,
+            str(self._runner_path),
+            "--input",
+            str(audio_path),
+            "--output",
+            str(output_path),
+        ]
+
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError as exc:
+            raise DrumTranscriptionProviderError(
+                f"madmom Python executable was not found at '{self._python_executable}'."
+            ) from exc
+
+        try:
+            if completed.returncode != 0:
+                detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+                raise DrumTranscriptionProviderError(
+                    f"madmom drum transcription failed with exit code {completed.returncode}: {detail}"
+                )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict) or not isinstance(payload.get("onsets"), list):
+                raise DrumTranscriptionProviderError("madmom drum runner returned an invalid onset payload.")
+            return list(payload["onsets"])
+        finally:
+            output_path.unlink(missing_ok=True)
+
+    def _build_hits_from_onsets(
+        self,
+        samples: list[float],
+        sample_rate: int,
+        raw_onsets: Iterable[Any],
+    ) -> list[tuple[int, int, float]]:
+        normalized_onsets: list[tuple[float, float]] = []
+        for raw_onset in raw_onsets:
+            coerced = self._coerce_onset(raw_onset)
+            if coerced is not None:
+                normalized_onsets.append(coerced)
+
+        normalized_onsets.sort(key=lambda item: item[0])
+        hits: list[tuple[int, int, float]] = []
+
+        for index, (onset_sec, onset_confidence) in enumerate(normalized_onsets):
+            start_sample = max(0, int(round(onset_sec * sample_rate)))
+            next_onset_sec = normalized_onsets[index + 1][0] if index + 1 < len(normalized_onsets) else None
+            max_hit_sec = 0.14
+            min_hit_sec = 0.05
+            if next_onset_sec is None:
+                duration_sec = max_hit_sec
+            else:
+                duration_sec = min(max_hit_sec, max(min_hit_sec, next_onset_sec - onset_sec - 0.01))
+
+            end_sample = min(len(samples), start_sample + int(round(duration_sec * sample_rate)))
+            if end_sample - start_sample < max(1, int(round(0.05 * sample_rate))):
+                continue
+
+            segment = samples[start_sample:end_sample]
+            peak_level = max((abs(sample) for sample in segment), default=0.0)
+            if peak_level <= 0.0:
+                continue
+
+            peak_level = min(1.0, max(peak_level, onset_confidence))
+            hits.append((start_sample, end_sample, peak_level))
+
+        return hits
+
+    def _build_note_events(
+        self,
+        stem: SourceStem,
+        samples: list[float],
+        sample_rate: int,
+        hits: list[tuple[int, int, float]],
+    ) -> list[NoteEvent]:
+        notes: list[NoteEvent] = []
+
+        for index, (start_sample, end_sample, peak_level) in enumerate(hits, start=1):
+            drum_label, midi_note, confidence = self._fallback_classifier._classify_hit(
+                samples, sample_rate, start_sample, end_sample, peak_level
+            )
+            if confidence < self._minimum_confidence:
+                continue
+
+            onset_sec = round(start_sample / sample_rate, 3)
+            offset_sec = round(end_sample / sample_rate, 3)
+            bar, beat = self._fallback_classifier._estimate_bar_beat(onset_sec)
+
+            notes.append(
+                NoteEvent(
+                    id=f"{stem.stem_name}-drums-{index}",
+                    instrument="drums",
+                    drumLabel=drum_label,
+                    midiNote=midi_note,
+                    onsetSec=onset_sec,
+                    offsetSec=offset_sec,
+                    velocity=self._fallback_classifier._estimate_velocity(peak_level),
+                    confidence=round(confidence, 2),
+                    channel=9,
+                    bar=bar,
+                    beat=beat,
+                    sourceStem=stem.stem_name,
+                )
+            )
+
+        notes.sort(key=lambda note: (note.onset_sec, note.midi_note or 0, note.id))
+        return notes
+
+    def _coerce_onset(self, raw_onset: Any) -> Optional[tuple[float, float]]:
+        onset_sec: Optional[float] = None
+        confidence: Optional[float] = None
+
+        if isinstance(raw_onset, dict):
+            onset_sec = _coerce_float(raw_onset.get("onsetSec", raw_onset.get("time", raw_onset.get("onset"))))
+            confidence = _coerce_float(raw_onset.get("confidence", raw_onset.get("strength")))
+        elif isinstance(raw_onset, Sequence) and not isinstance(raw_onset, (str, bytes, bytearray)):
+            if len(raw_onset) >= 1:
+                onset_sec = _coerce_float(raw_onset[0])
+            if len(raw_onset) >= 2:
+                confidence = _coerce_float(raw_onset[1])
+        else:
+            onset_sec = _coerce_float(raw_onset)
+
+        if onset_sec is None or onset_sec < 0:
+            return None
+
+        safe_confidence = 0.8 if confidence is None else max(0.0, min(1.0, confidence))
+        return onset_sec, safe_confidence
+
+
+class FallbackDrumTranscriptionProvider(DrumTranscriptionProvider):
+    def __init__(self, primary: DrumTranscriptionProvider, fallback: DrumTranscriptionProvider) -> None:
+        self._primary = primary
+        self._fallback = fallback
+        self.provider_name = primary.provider_name
+
+    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
+        try:
+            return self._primary.transcribe(stem)
+        except DrumTranscriptionProviderError as exc:
+            fallback_result = self._fallback.transcribe(stem)
+            warnings = [
+                f"Configured drum transcription provider '{self._primary.provider_name}' was unavailable, so the pipeline fell back to '{fallback_result.provider_name}': {exc}"
+            ]
+            warnings.extend(fallback_result.warnings)
+            return TranscriptionResult(
+                provider_name=fallback_result.provider_name,
+                instrument=fallback_result.instrument,
+                source_stem=fallback_result.source_stem,
+                notes=fallback_result.notes,
+                warnings=_dedupe_warnings(warnings),
+            )
+
+
+def build_drum_transcription_provider(settings: Settings) -> DrumTranscriptionProvider:
+    provider_id = settings.drum_transcription_provider
+    fallback_id = settings.drum_transcription_fallback_provider
+
+    primary = _create_provider(provider_id, settings)
+    if fallback_id and fallback_id != provider_id:
+        fallback = _create_provider(fallback_id, settings)
+        return FallbackDrumTranscriptionProvider(primary=primary, fallback=fallback)
+
+    return primary
+
+
+def _create_provider(provider_id: str, settings: Settings) -> DrumTranscriptionProvider:
+    if provider_id == DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC:
+        return HeuristicWavDrumTranscriptionProvider()
+    if provider_id in {DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM}:
+        return MadmomDrumTranscriptionProvider(
+            python_executable=settings.drum_transcription_ml_python,
+            minimum_confidence=settings.drum_transcription_ml_min_confidence,
+        )
+
+    raise ValueError(f"Unsupported drum transcription provider '{provider_id}'.")
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _dedupe_warnings(warnings: List[str]) -> List[str]:
+    deduped: List[str] = []
+    for warning in warnings:
+        if warning not in deduped:
+            deduped.append(warning)
+    return deduped

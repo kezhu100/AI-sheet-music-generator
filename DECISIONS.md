@@ -4,6 +4,36 @@
 
 ### 2026-03-16
 Decision:
+- Implement Phase 11C drum transcription as an explicitly configured provider selection layer that keeps the existing heuristic WAV backend, adds an optional madmom-backed provider, and supports graceful fallback without changing the normalized `JobResult`.
+
+Context:
+- Phase 11A and 11B had already made source separation and piano transcription configurable, but drum transcription was still hard-wired to the original heuristic provider.
+- The architecture already expected future stronger drum backends behind the `DrumTranscriptionProvider` contract, while post-processing, preview, editing, persistence, and export continued to depend on normalized drum `NoteEvent` output.
+- The repository still validates on Python 3.9 locally, while stronger ML tooling is more likely to live in separate Python 3.10+ or 3.11+ environments.
+
+Chosen option:
+- Keep the heuristic WAV provider as the default safe path and optional fallback target.
+- Add a madmom-backed provider that can run through a configurable Python executable so optional ML dependencies do not need to be installed into the FastAPI runtime itself.
+- Use the stronger provider for onset detection while preserving stable drum-lane normalization back to the existing `kick`, `snare`, and `hi-hat` mapping used by the current editor workflow.
+- Surface provider selection and fallback through config, warnings, and the existing `TrackResult.provider` field rather than changing the result schema.
+
+Alternatives considered:
+- Replacing the heuristic provider outright with a single hard-coded drum ML stack.
+- Adding heavy ML dependencies directly to the current API requirements and requiring an immediate runtime migration.
+- Expanding the normalized result schema with richer drum-kit metadata during the provider swap.
+
+Tradeoffs:
+- The new path is materially stronger than the heuristic fallback and keeps the architecture modular, but the madmom integration is still optional and depends on a separately prepared local runtime.
+- Reusing the existing kick/snare/hi-hat mapping keeps editing and export behavior stable, but richer multi-lane drum-kit coverage is deferred.
+- Running ML inference in a separate Python executable reduces coupling with the current API environment, but it adds subprocess orchestration and a small runner shim.
+
+Follow-up:
+- Start Phase 11D by improving post-processing without collapsing provider responsibilities into the timing layer.
+- Revisit richer drum-lane coverage only if later product work can still preserve the normalized editing/export boundary.
+- Validate the madmom path on a real prepared ML runtime before making stronger quality claims.
+
+### 2026-03-16
+Decision:
 - Implement Phase 11B piano transcription as an explicitly configured provider selection layer that keeps the existing heuristic WAV backend, adds an optional Basic Pitch-backed provider, and supports graceful fallback without changing the normalized `JobResult`.
 
 Context:

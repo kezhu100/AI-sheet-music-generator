@@ -32,13 +32,14 @@ Current milestone:
 - Phase 10 completed: undo/redo, additive and box note selection, keyboard editing shortcuts, quantization tools, drum lane reassignment, and richer editing tests are now implemented
 - Phase 11A completed: source separation now supports explicit provider selection, an optional stronger Demucs backend, and a documented fallback path while preserving normalized persisted stems and downstream contracts
 - Phase 11B completed: piano transcription now supports explicit provider selection, an optional stronger Basic Pitch backend, and a documented fallback path while preserving the normalized result pipeline
+- Phase 11C completed: drum transcription now supports explicit provider selection, an optional stronger madmom-backed backend, and a documented fallback path while preserving the normalized result pipeline
 
 Current behavior:
 
 - The repository demonstrates the full `upload -> job -> result` pipeline
 - Source separation now runs through a configured provider: the default development copy backend remains available, and an optional Demucs-based backend can be selected with graceful fallback
 - Piano transcription now runs through a configured provider: the default heuristic backend remains available, and an optional Basic Pitch-based backend can be selected with graceful fallback
-- Drum transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
+- Drum transcription now runs through a configured provider: the default heuristic backend remains available, and an optional madmom-based backend can be selected with graceful fallback
 - Post-processing now estimates tempo, quantizes note timing, aligns beat/bar positions, and filters low-confidence events before result delivery
 - Timing conversions and timing display helpers are now organized into reusable utility modules to prepare for later export work
 - Completed jobs can now be exported as minimal MIDI and MusicXML drafts generated from the post-processed result
@@ -104,6 +105,15 @@ Optional piano transcription configuration:
 - `PIANO_TRANSCRIPTION_ML_PYTHON=/path/to/python` can point to a separate Python environment where `basic-pitch` is installed
 - `PIANO_TRANSCRIPTION_ML_MIN_CONFIDENCE=0.35` controls the minimum confidence threshold before raw ML notes are normalized into `NoteEvent` output
 
+Optional drum transcription configuration:
+
+- `DRUM_TRANSCRIPTION_PROVIDER=heuristic` keeps the stdlib heuristic drum backend
+- `DRUM_TRANSCRIPTION_PROVIDER=ml` enables the stronger madmom-backed drum provider
+- `DRUM_TRANSCRIPTION_PROVIDER=madmom` also enables the same madmom-backed drum provider explicitly
+- `DRUM_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic` enables automatic fallback when the selected primary provider is unavailable
+- `DRUM_TRANSCRIPTION_ML_PYTHON=/path/to/python` can point to a separate Python environment where `madmom` is installed
+- `DRUM_TRANSCRIPTION_ML_MIN_CONFIDENCE=0.35` controls the minimum confidence threshold before normalized drum hits are emitted from the stronger provider path
+
 ## Local Development
 
 ### One-command startup from the repo root
@@ -164,7 +174,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running the Current Phase 11B Build Locally
+## Running the Current Phase 11C Build Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
@@ -190,6 +200,14 @@ $env:PIANO_TRANSCRIPTION_FALLBACK_PROVIDER = "heuristic"
 $env:PIANO_TRANSCRIPTION_ML_PYTHON = "C:\path\to\python.exe"
 ```
 
+To try the optional stronger drum backend locally, set environment variables before starting the API or `npm run dev`. Example PowerShell:
+
+```powershell
+$env:DRUM_TRANSCRIPTION_PROVIDER = "ml"
+$env:DRUM_TRANSCRIPTION_FALLBACK_PROVIDER = "heuristic"
+$env:DRUM_TRANSCRIPTION_ML_PYTHON = "C:\path\to\python.exe"
+```
+
 Current real transcription support:
 
 - uncompressed PCM `.wav` stems
@@ -206,10 +224,14 @@ Current limitations:
 - the optional Basic Pitch backend is stronger than the heuristic fallback, but it is only used when `basic-pitch` is installed in the configured Python environment and runnable from the local machine
 - Basic Pitch validation has not been completed in this repository environment yet, so the current implementation documents and tests provider selection, normalization, and fallback behavior without claiming production-ready ML accuracy
 - real piano transcription fallback currently runs only on uncompressed PCM `.wav` stems
-- real drum transcription currently runs only on uncompressed PCM `.wav` stems
+- the default drum transcription provider is still the heuristic WAV backend unless you explicitly configure another provider
+- the optional madmom-backed drum backend is stronger than the heuristic fallback, but it is only used when `madmom` is installed in the configured Python environment and runnable from the local machine
+- madmom validation has not been completed in this repository environment yet, so the current implementation documents and tests provider selection, normalization, and fallback behavior without claiming production-ready ML accuracy
+- real drum transcription fallback currently runs only on uncompressed PCM `.wav` stems
 - the heuristic piano provider is intentionally lightweight and may simplify or miss dense polyphonic passages
 - the current Basic Pitch integration normalizes note start/end/pitch/confidence output into the existing `NoteEvent` shape, but it does not yet add provider-specific controls such as sustain-pedal reasoning or piano-only post-filters
 - the heuristic drum provider is intentionally lightweight and may simplify or misclassify dense drum-kit material
+- the current madmom integration uses a stronger ML-backed onset path but still maps final drum lanes back into the stable `kick` / `snare` / `hi-hat` labels expected by the current editor workflow
 - post-processing currently assumes a simple 4/4 grid and a single project-wide tempo estimate
 - MIDI export currently assumes the same single tempo and quantized timing already produced by Phase 5
 - MusicXML export currently assumes the same single tempo and 4/4 grid, and focuses on structural compatibility rather than engraving quality
@@ -244,9 +266,10 @@ Current validation reality:
 
 - production-validated source separation quality tuning across multiple real-world audio sets
 - production-validated piano transcription quality tuning across multiple real-world audio sets
+- production-validated drum transcription quality tuning across multiple real-world audio sets
 - persisted multi-revision edit history or saved projects
 
 ## Future Roadmap
 
-- Phase 11: Phase 11A source separation upgrades and Phase 11B piano-provider upgrades are now in place; later Phase 11 work still includes stronger drum providers, smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
+- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, and Phase 11C drum-provider upgrades are now in place; later Phase 11 work still includes smarter post-processing, region re-transcription, and AI-assisted correction while keeping the normalized pipeline stable
 - Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment

@@ -27,6 +27,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
                 Settings(
                     source_separation_provider="development-copy",
                     piano_transcription_provider="heuristic",
+                    drum_transcription_provider="heuristic",
                 )
             ).run(audio_path, "demo.wav", "job-test")
 

@@ -88,6 +88,24 @@ Implemented features:
 - frontend result view now surfaces drum hits from the real provider
 - pipeline module renamed from `mock_pipeline.py` to `development_pipeline.py` to reflect mixed real and placeholder stages
 
+### Phase 11C - Stronger Drum Transcription Backend
+Completed.
+
+Implemented features:
+- backend drum transcription provider selection now comes from configuration rather than being hard-wired in the processing pipeline
+- optional madmom-backed drum transcription support added behind the existing provider contract
+- configurable fallback to the heuristic WAV provider added for environments where the stronger backend is unavailable
+- the stronger provider path normalizes drum hits into the existing `NoteEvent` shape before post-processing
+- provider-selection, normalization, and fallback behavior now have direct backend test coverage
+
+Current Phase 11C runtime behavior:
+- default local behavior still uses the heuristic drum provider unless `DRUM_TRANSCRIPTION_PROVIDER` is changed
+- `DRUM_TRANSCRIPTION_PROVIDER=ml` and `DRUM_TRANSCRIPTION_PROVIDER=madmom` both select the stronger madmom-backed provider
+- when `DRUM_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic` is configured, the pipeline falls back gracefully and records a warning instead of failing the whole job
+- the stronger provider can run through a separate configured Python executable so optional ML dependencies do not need to be installed into the FastAPI runtime itself
+- the current stronger path uses ML-backed onset detection but still normalizes output into the stable `kick`, `snare`, and `hi-hat` lane mapping expected by the existing editor workflow
+- this repository environment validates provider selection and fallback behavior, but it has not yet validated end-to-end madmom quality on a real installed ML runtime
+
 ### Phase 5 - Post Processing
 Completed.
 
@@ -272,7 +290,7 @@ run the configured source separation provider and persist normalized stems
 ->
 run the configured piano transcription provider on the persisted piano stem
 ->
-run heuristic WAV drum transcription on the persisted drum stem when the stem is an uncompressed PCM `.wav`
+run the configured drum transcription provider on the persisted drum stem
 ->
 run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
 ->
@@ -290,7 +308,7 @@ return normalized stems + tracks + warnings
 ->
 frontend displays stems + track summaries + warnings, score previews, event details, and can request MIDI or MusicXML export
 
-The architecture now supports swapping source separation and piano transcription providers explicitly through config, while stronger drum providers and later Phase 11 post-processing work remain follow-up tasks.
+The architecture now supports swapping source separation, piano transcription, and drum transcription providers explicitly through config, while later Phase 11 post-processing work remains follow-up work.
 
 ---
 
@@ -322,7 +340,9 @@ Current providers:
 - piano transcription providers:
   - heuristic stdlib-only WAV provider
   - optional Basic Pitch-backed provider with configurable fallback
-- drum transcription provider: heuristic stdlib-only WAV onset detector with simple kick/snare/hi-hat mapping
+- drum transcription providers:
+  - heuristic stdlib-only WAV onset detector with simple kick/snare/hi-hat mapping
+  - optional madmom-backed provider with configurable fallback
 
 All providers must output normalized schemas shared between frontend and backend.
 
@@ -405,13 +425,15 @@ Local dev startup
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
 - Phase 11B is complete for stronger piano transcription provider selection and fallback
-- later Phase 11 work should still improve drum quality, post-processing, and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 11C is complete for stronger drum transcription provider selection and fallback
+- later Phase 11 work should still improve post-processing and AI-assisted correction without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 
 Scope reminder:
 - Phase 10 editing UX improvements are complete
 - Phase 11A source separation work is complete
 - Phase 11B piano transcription work is complete
-- the next Phase 11 steps should focus on drum provider quality, smarter post-processing, and correction assistance rather than redesigning the draft/export model
+- Phase 11C drum transcription work is complete
+- the next Phase 11 steps should focus on smarter post-processing and correction assistance rather than redesigning the draft/export model
 
 ---
 
@@ -434,8 +456,10 @@ Current runtime limitations:
 - piano transcription defaults to the heuristic WAV backend unless a stronger provider is configured
 - the optional Basic Pitch backend depends on a separately prepared Python runtime with the required ML package installed
 - the heuristic piano fallback currently runs only on uncompressed PCM `.wav` stems
-- the real drum provider currently runs only on uncompressed PCM `.wav` stems
-- the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
+- drum transcription defaults to the heuristic WAV backend unless a stronger provider is configured
+- the optional madmom backend depends on a separately prepared Python runtime with the required ML package installed
+- the heuristic drum fallback currently runs only on uncompressed PCM `.wav` stems
+- the drum provider keeps normalized output aligned to stable kick/snare/hi-hat lane mapping, so richer drum-kit label coverage is still future work
 - post-processing currently assumes a simple 4/4 grid and does not support tempo changes
 - MIDI export currently assumes a single project-wide tempo and does not preserve tempo maps or notation-only semantics
 - MusicXML export currently assumes a single project-wide tempo, 4/4 meter, and simple structural notation without advanced engraving semantics
