@@ -22,6 +22,7 @@ export interface CreateJobRequest {
 
 export interface NoteEvent {
   id: string;
+  draftNoteId?: string;
   instrument: InstrumentType;
   pitch?: number;
   drumLabel?: string;
@@ -60,6 +61,10 @@ export interface JobResult {
   stems: StemAsset[];
   tracks: TrackResult[];
   warnings: string[];
+}
+
+export interface JobExportRequest {
+  resultOverride?: JobResult;
 }
 
 export interface JobProgress {

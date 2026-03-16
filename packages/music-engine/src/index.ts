@@ -1,5 +1,28 @@
 import type { InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 export {
+  addNote,
+  buildDraftNoteId,
+  cloneJobResult,
+  DEFAULT_DRUM_MIDI_NOTE,
+  DEFAULT_DRUM_DURATION_BEATS,
+  deleteNote,
+  generateDraftNoteId,
+  getNoteDurationSec,
+  MIN_NOTE_DURATION_SEC,
+  normalizeDrumLabel,
+  normalizeEditedResult,
+  normalizeJobResult,
+  normalizeNoteEvent,
+  normalizeTrackResult,
+  resetDraftFromOriginal,
+  resolveDrumMidiNote,
+  selectNote,
+  updateNoteDuration,
+  updateNotePitch,
+  updateNoteTiming
+} from "./editing.js";
+export type { AddDraftNoteInput, AddDraftNoteResult, DraftSelection, SelectedDraftNote } from "./editing.js";
+export {
   DEFAULT_BEATS_PER_BAR,
   DEFAULT_QUANTIZATION_SUBDIVISION,
   absoluteBeatToBarBeat,
@@ -10,7 +33,7 @@ export {
   quantizeBeat,
   quantizeSeconds,
   secondsToBeats
-} from "./timing";
+} from "./timing.js";
 export {
   buildPreviewTracks,
   getDrumLanes,
@@ -23,8 +46,8 @@ export {
   groupNotesByBar,
   midiToNoteName,
   resolveBarBeat
-} from "./preview";
-export type { DrumLane, PreviewMeasure, PreviewTimeBounds, PreviewTrack, ResolvedBarBeat, StaffPlacement } from "./preview";
+} from "./preview.js";
+export type { DrumLane, PreviewMeasure, PreviewTimeBounds, PreviewTrack, ResolvedBarBeat, StaffPlacement } from "./preview.js";
 
 export interface TrackSummary {
   instrument: InstrumentType;

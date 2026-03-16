@@ -42,6 +42,22 @@ class MusicXmlExportTests(unittest.TestCase):
         self.assertIn(build_musicxml_filename(result.project_name), response.headers["content-disposition"])
         self.assertTrue(response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>'))
 
+    def test_post_export_endpoint_uses_result_override(self) -> None:
+        result = self._build_result()
+        edited_result = result.model_copy(deep=True)
+        edited_result.tracks[0].notes[0].pitch = 72
+        job = job_store.create("upload-musicxml-edit-test")
+        job_store.complete(job.id, result)
+
+        client = TestClient(app)
+        response = client.post(
+            f"/api/v1/jobs/{job.id}/exports/musicxml",
+            json={"resultOverride": edited_result.model_dump(mode="json", by_alias=True)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, build_musicxml_file(edited_result))
+
     def _build_result(self):
         with TemporaryDirectory() as temp_dir:
             audio_path = Path(temp_dir) / "demo.wav"

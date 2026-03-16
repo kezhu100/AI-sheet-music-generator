@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AI Sheet Music Generator",
-  description: "Upload audio, create a processing job, and preview mocked piano and drum note events."
+  description: "Upload audio, preview piano and drum draft notation, make simple edits, and export MIDI or MusicXML."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -13,4 +13,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-

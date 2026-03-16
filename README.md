@@ -26,6 +26,8 @@ Current milestone:
 - Phase 5.5 completed: internal timing-layer consolidation with extracted reusable helper modules for backend and frontend-facing code
 - Phase 6 completed: minimal MIDI and MusicXML export, download endpoints, and frontend export actions are now implemented
 - Phase 7 completed: piano-roll preview, simplified piano score preview, simplified drum notation preview, and track visibility toggles are now implemented
+- Phase 8 completed: frontend draft editing with note selection, drag timing moves, piano pitch adjustment, add/delete note controls, and edited re-export is now implemented
+- Phase 8 engineering wrap-up completed: backend test setup is clearer, focused editing-helper tests now run, and draft-state orchestration is slightly more maintainable
 
 Current behavior:
 
@@ -37,7 +39,8 @@ Current behavior:
 - Timing conversions and timing display helpers are now organized into reusable utility modules to prepare for later export work
 - Completed jobs can now be exported as minimal MIDI and MusicXML drafts generated from the post-processed result
 - Completed jobs can now be visually inspected in a piano-roll plus simplified piano/drum score preview UI driven by the normalized result
-- Editing tools have not started yet
+- Editing tools are now available as a frontend-first draft workflow on completed jobs
+- Phase 8 hardening now adds stable draft note identity, centralized editing helpers, normalization before export, and stricter backend override validation
 
 ## Environment Requirements
 
@@ -67,8 +70,9 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 
 1. Install Python 3.9 for the current scaffold, or Python 3.11+ if you are preparing for future ML integrations.
 2. Create a virtual environment in `apps/api`.
-3. Install dependencies with `py -m pip install -r apps/api/requirements.txt`.
-4. Keep the virtual environment located at `apps/api/venv` so the root dev script can find its Python interpreter automatically.
+3. Install runtime dependencies with `py -m pip install -r apps/api/requirements.txt`.
+4. Install backend test dependencies with `py -m pip install -r apps/api/requirements-dev.txt` if you want to run the API test suite locally.
+5. Keep the virtual environment located at `apps/api/venv` so the root dev script can find its Python interpreter automatically.
 
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
@@ -100,12 +104,14 @@ Before `npm run dev` will work, make sure:
 1. `npm install` has been run from the repository root.
 2. A Python virtual environment exists at `apps/api/venv`.
 3. The API dependencies from `apps/api/requirements.txt` are installed into that venv.
+4. If you want backend tests locally, install `apps/api/requirements-dev.txt` into that same venv.
 
 Example Windows PowerShell setup:
 
 ```powershell
 py -m venv apps/api/venv
 apps/api/venv/Scripts/python.exe -m pip install -r apps/api/requirements.txt
+apps/api/venv/Scripts/python.exe -m pip install -r apps/api/requirements-dev.txt
 ```
 
 Unix-like example:
@@ -113,6 +119,7 @@ Unix-like example:
 ```bash
 python3 -m venv apps/api/venv
 apps/api/venv/bin/python -m pip install -r apps/api/requirements.txt
+apps/api/venv/bin/python -m pip install -r apps/api/requirements-dev.txt
 ```
 
 If the API venv is missing, the root dev script exits with a clear message instead of silently falling back to another Python installation.
@@ -130,12 +137,13 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running Phase 7 Locally
+## Running Phase 8 Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
 3. Upload an audio file from the UI.
-4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, warnings, and MIDI/MusicXML export actions.
+4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, and MIDI/MusicXML export actions.
+5. Select a note from the piano roll or event list, drag it horizontally to move timing, adjust piano pitch or duration in the editor, add/delete notes, and re-export the draft.
 
 Current real transcription support:
 
@@ -156,18 +164,31 @@ Current limitations:
 - MusicXML export currently assumes the same single tempo and 4/4 grid, and focuses on structural compatibility rather than engraving quality
 - the piano score preview is intentionally simplified, currently shows only the first visible piano track, and focuses on inspection rather than engraving fidelity
 - the drum preview is notation-oriented but lane/grid based rather than full percussion staff engraving, and currently shows only the first visible drum track
+- Phase 8 edits are draft-only in the frontend and are not persisted back into backend job storage
+- edited draft notes now receive stable `draftNoteId` values used for selection and note operations
+- drum note lane reassignment is not implemented in this MVP; drum editing currently supports timing move, add, and delete only
+- backend edited export override payloads are now validated and rejected when note timing, pitch, duration, or track structure is invalid
 - preview panes currently limit notation-style rendering to the first 8 bars for readability
 - there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
 - job state is still in-memory and is lost when the API restarts
 
 ## Validation Performed
 
-- backend pipeline test with a generated PCM WAV sample clip
-- backend startup/import sanity check
-- frontend TypeScript typecheck
-- frontend preview UI TypeScript typecheck after Phase 7 changes
+Recommended local validation commands:
+
+- `npm run typecheck`
+- `npm run test:music-engine`
+- `npm run test:api`
+- `npm run validate`
+
+Current validation reality:
+
+- `npm run validate` now runs workspace typecheck, focused `packages/music-engine` editing tests, and backend unittest discovery through the project venv
+- backend tests require `apps/api/requirements-dev.txt` because `fastapi.testclient` depends on `httpx`
+- frontend lint is still not part of the reliable validation workflow because the repo does not yet include a completed ESLint setup and `next lint` still opens the interactive Next.js configuration prompt
 
 ## What Is Not Implemented Yet
 
 - validated ML source separation quality
-- editing and manual correction
+- persisted edit history or saved projects
+- drum lane reassignment

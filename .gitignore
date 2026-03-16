@@ -3,6 +3,7 @@ node_modules/
 *.tsbuildinfo
 dist/
 coverage/
+.test-dist/
 __pycache__/
 *.pyc
 .pytest_cache/

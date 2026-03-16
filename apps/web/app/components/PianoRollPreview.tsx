@@ -1,18 +1,65 @@
 "use client";
 
-import { getDrumLanes, getPianoPitchRange, getPreviewTimeBounds, midiToNoteName } from "@ai-sheet-music-generator/music-engine";
-import type { TrackResult } from "@ai-sheet-music-generator/shared-types";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getDrumLanes,
+  getNoteDurationSec,
+  getPianoPitchRange,
+  getPreviewTimeBounds,
+  getTrackKey,
+  midiToNoteName
+} from "@ai-sheet-music-generator/music-engine";
+import type { NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
 
 interface PianoRollPreviewProps {
   tracks: TrackResult[];
+  bpm: number;
+  selectedTrackKey?: string | null;
+  selectedNoteId?: string | null;
+  onSelectNote?: (trackKey: string, noteId: string) => void;
+  onMoveNote?: (trackKey: string, noteId: string, onsetSec: number) => void;
 }
 
-export function PianoRollPreview({ tracks }: PianoRollPreviewProps) {
-  const pianoNotes = tracks
-    .filter((track) => track.instrument === "piano")
-    .flatMap((track) => track.notes)
-    .filter((note) => note.pitch != null);
-  const drumNotes = tracks.filter((track) => track.instrument === "drums").flatMap((track) => track.notes);
+interface DragState {
+  trackKey: string;
+  draftNoteId: string;
+  startClientX: number;
+  originalOnsetSec: number;
+}
+
+interface PreviewNote extends NoteEvent {
+  trackKey: string;
+  offsetSec: number;
+}
+
+export function PianoRollPreview({
+  tracks,
+  bpm,
+  selectedTrackKey,
+  selectedNoteId,
+  onSelectNote,
+  onMoveNote
+}: PianoRollPreviewProps) {
+  const [dragState, setDragState] = useState<DragState | null>(null);
+
+  const pianoNotes = useMemo(
+    () =>
+      tracks
+        .filter((track) => track.instrument === "piano")
+        .flatMap((track) =>
+          track.notes
+            .filter((note) => note.pitch != null)
+            .map((note) => toPreviewNote(note, getTrackKey(track), bpm))
+        ),
+    [bpm, tracks]
+  );
+  const drumNotes = useMemo(
+    () =>
+      tracks.filter((track) => track.instrument === "drums").flatMap((track) =>
+        track.notes.map((note) => toPreviewNote(note, getTrackKey(track), bpm))
+      ),
+    [bpm, tracks]
+  );
   const allNotes = [...pianoNotes, ...drumNotes];
 
   if (allNotes.length === 0) {
@@ -32,6 +79,33 @@ export function PianoRollPreview({ tracks }: PianoRollPreviewProps) {
   const drumHeight = drumRowCount > 0 ? drumRowCount * rowHeight + 24 : 0;
   const height = pianoHeight + drumHeight;
   const durationSec = Math.max(0.25, timeBounds.durationSec);
+
+  useEffect(() => {
+    if (!dragState || !onMoveNote) {
+      return;
+    }
+
+    const activeDrag = dragState;
+    const moveNote = onMoveNote;
+
+    function handlePointerMove(event: PointerEvent): void {
+      const deltaX = event.clientX - activeDrag.startClientX;
+      const deltaSec = (deltaX / gridWidth) * durationSec;
+      moveNote(activeDrag.trackKey, activeDrag.draftNoteId, Math.max(0, activeDrag.originalOnsetSec + deltaSec));
+    }
+
+    function handlePointerUp(): void {
+      setDragState(null);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [dragState, durationSec, gridWidth, onMoveNote]);
 
   return (
     <div className="preview-scroll">
@@ -62,19 +136,33 @@ export function PianoRollPreview({ tracks }: PianoRollPreviewProps) {
         {pianoNotes.map((note) => {
           const pitch = note.pitch ?? pitchRange.minPitch;
           const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
-          const noteWidth = Math.max(
-            8,
-            (((note.offsetSec ?? note.onsetSec + 0.12) - note.onsetSec) / durationSec) * gridWidth
-          );
+          const noteWidth = Math.max(8, ((note.offsetSec - note.onsetSec) / durationSec) * gridWidth);
           const rowIndex = pitchRange.maxPitch - pitch;
           const y = rowIndex * rowHeight + 2;
+          const isSelected = selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId;
 
           return (
             <rect
-              className="piano-roll-note piano"
+              className={`piano-roll-note piano ${isSelected ? "is-selected" : ""}`}
               height={rowHeight - 4}
-              key={note.id}
+              key={note.draftNoteId ?? `${note.trackKey}-${note.id}`}
+              onPointerDown={(event) => {
+                if (!note.draftNoteId) {
+                  return;
+                }
+
+                onSelectNote?.(note.trackKey, note.draftNoteId);
+                if (onMoveNote) {
+                  setDragState({
+                    trackKey: note.trackKey,
+                    draftNoteId: note.draftNoteId,
+                    startClientX: event.clientX,
+                    originalOnsetSec: note.onsetSec
+                  });
+                }
+              }}
               rx="5"
+              style={{ cursor: onMoveNote ? "grab" : "pointer" }}
               width={noteWidth}
               x={x}
               y={y}
@@ -92,10 +180,38 @@ export function PianoRollPreview({ tracks }: PianoRollPreviewProps) {
               </text>
               <line className="preview-grid-line" x1={labelWidth} x2={width} y1={laneTop + rowHeight} y2={laneTop + rowHeight} />
 
-              {lane.notes.map((note) => {
+              {lane.notes.map((laneNote) => {
+                const note = laneNote as PreviewNote;
                 const x = labelWidth + ((note.onsetSec - timeBounds.startSec) / durationSec) * gridWidth;
+                const isSelected = selectedTrackKey === note.trackKey && selectedNoteId === note.draftNoteId;
 
-                return <rect className="piano-roll-note drums" height={rowHeight - 6} key={note.id} rx="4" width="8" x={x - 4} y={laneTop + 3} />;
+                return (
+                  <rect
+                    className={`piano-roll-note drums ${isSelected ? "is-selected" : ""}`}
+                    height={rowHeight - 6}
+                    key={note.draftNoteId ?? `${note.trackKey}-${note.id}`}
+                    onPointerDown={(event) => {
+                      if (!note.draftNoteId) {
+                        return;
+                      }
+
+                      onSelectNote?.(note.trackKey, note.draftNoteId);
+                      if (onMoveNote) {
+                        setDragState({
+                          trackKey: note.trackKey,
+                          draftNoteId: note.draftNoteId,
+                          startClientX: event.clientX,
+                          originalOnsetSec: note.onsetSec
+                        });
+                      }
+                    }}
+                    rx="4"
+                    style={{ cursor: onMoveNote ? "grab" : "pointer" }}
+                    width="8"
+                    x={x - 4}
+                    y={laneTop + 3}
+                  />
+                );
               })}
             </g>
           );
@@ -103,4 +219,12 @@ export function PianoRollPreview({ tracks }: PianoRollPreviewProps) {
       </svg>
     </div>
   );
+}
+
+function toPreviewNote(note: NoteEvent, trackKey: string, bpm: number): PreviewNote {
+  return {
+    ...note,
+    trackKey,
+    offsetSec: note.offsetSec ?? note.onsetSec + getNoteDurationSec(note, bpm)
+  };
 }

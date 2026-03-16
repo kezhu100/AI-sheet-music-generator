@@ -1,4 +1,4 @@
-import type { CreateJobRequest, JobResponse, UploadResponse } from "@ai-sheet-music-generator/shared-types";
+import type { CreateJobRequest, JobExportRequest, JobResponse, JobResult, UploadResponse } from "@ai-sheet-music-generator/shared-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -54,16 +54,27 @@ export async function getJob(jobId: string): Promise<JobResponse> {
   return parseJson<JobResponse>(response);
 }
 
-export async function downloadMidiExport(jobId: string): Promise<Blob> {
-  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/midi`);
+export async function downloadMidiExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/midi`, resultOverride);
 }
 
-export async function downloadMusicXmlExport(jobId: string): Promise<Blob> {
-  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/musicxml`);
+export async function downloadMusicXmlExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/musicxml`, resultOverride);
 }
 
-async function downloadExportBlob(path: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { method: "GET" });
+async function downloadExportBlob(path: string, resultOverride?: JobResult): Promise<Blob> {
+  const requestOptions: RequestInit =
+    resultOverride == null
+      ? { method: "GET" }
+      : {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ resultOverride } satisfies JobExportRequest)
+        };
+
+  const response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;

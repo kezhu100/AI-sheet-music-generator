@@ -74,7 +74,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
                     drumLabel="snare",
                     midiNote=38,
                     onsetSec=0.24,
-                    offsetSec=0.29,
+                    offsetSec=0.31,
                     confidence=0.2,
                     sourceStem="drum_stem",
                 ),

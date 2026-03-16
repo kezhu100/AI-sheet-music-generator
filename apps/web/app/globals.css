@@ -37,7 +37,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -172,6 +173,11 @@ input {
   background: rgba(255, 255, 255, 0.65);
 }
 
+.note-card.is-selected-card {
+  border-color: rgba(13, 110, 110, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(13, 110, 110, 0.18);
+}
+
 .status-bar {
   width: 100%;
   height: 10px;
@@ -283,6 +289,44 @@ code.inline {
 
 .piano-roll-note.drums {
   fill: rgba(214, 140, 69, 0.86);
+}
+
+.piano-roll-note.is-selected {
+  stroke: rgba(31, 36, 48, 0.9);
+  stroke-width: 2;
+}
+
+.editor-panel,
+.editor-grid,
+.editor-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.editor-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.editor-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .measure-grid {

@@ -1,5 +1,5 @@
 import type { NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
-import { absoluteBeatToBarBeat, secondsToBeats } from "./timing";
+import { absoluteBeatToBarBeat, secondsToBeats } from "./timing.js";
 
 const NATURAL_NOTE_INDEX_BY_PITCH_CLASS = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];

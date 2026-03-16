@@ -338,6 +338,91 @@ Tradeoffs:
 Follow-up:
 - Revisit whether backend setup should be further automated if the project later adds more contributors or CI-level environment bootstrap tooling.
 
+### 2026-03-16
+Decision:
+- Implement Phase 8 as a frontend-first editing draft layered on top of the completed normalized `JobResult`, with export override POST requests instead of backend edit persistence.
+
+Context:
+- Phase 7 preview was already complete and the docs explicitly scoped Phase 8 to manual correction without jumping into a larger DAW-style editor.
+- The current architecture already centered the frontend around normalized `JobResult` consumption and intentionally kept preview separate from editing.
+- Persisting edits in backend job state would have introduced new storage and lifecycle concerns that the current in-memory job model is not ready to support well.
+
+Chosen option:
+- Clone the completed backend result into a draft `JobResult` in the web app once a job completes.
+- Keep edit normalization logic in `packages/music-engine` so timing and note cleanup remain reusable and explicit.
+- Add narrow POST export endpoints that accept an optional `resultOverride`, allowing MIDI and MusicXML generation from the current draft without mutating the original job record.
+- Leave GET export endpoints intact so unedited flows continue to behave exactly as before.
+
+Alternatives considered:
+- Persisting edited notes back into the backend job store immediately.
+- Introducing dedicated edit-session models or saved projects during Phase 8.
+- Building client-side MIDI or MusicXML export instead of reusing the backend exporters.
+
+Tradeoffs:
+- The chosen path keeps Phase 8 cohesive and low-risk, but edits are currently lost on refresh or when loading a different job.
+- Reusing backend exporters preserves format consistency, but it required a small API contract extension for override-based export.
+- Deferring persistence avoids larger architectural churn now, but saved editing sessions remain a future concern.
+
+Follow-up:
+- Revisit saved draft persistence when the project is ready for longer-lived jobs or user projects.
+- Consider richer drum editing only after the current draft workflow proves stable and useful.
+
+### 2026-03-16
+Decision:
+- Harden the Phase 8 editing architecture with stable draft note ids, centralized editing helpers, normalization-before-export, and stricter backend override validation.
+
+Context:
+- The initial Phase 8 MVP worked, but note operations still depended too much on page-local orchestration and the backend override path trusted edited payloads more than was ideal.
+- Future phases will build on the editing layer, so the current draft boundary needed to become more explicit and less fragile before adding more features.
+
+Chosen option:
+- Attach stable `draftNoteId` values when cloning backend results into the frontend draft and use those ids for selection, drag, delete, and edit flows.
+- Move note-editing rules into `packages/music-engine/src/editing.ts` so timing updates, pitch edits, add/delete, drum defaults, and normalization are shared and immutable.
+- Normalize edited drafts before export on the frontend.
+- Add backend schema validation for edited override notes, tracks, and result structure before running MIDI or MusicXML export.
+
+Alternatives considered:
+- Leaving note identity tied to the backend `id` field alone without a draft-layer id.
+- Continuing to keep edit rules mostly inside `apps/web/app/page.tsx`.
+- Trusting the typed frontend payload without backend-side validation.
+
+Tradeoffs:
+- The hardening adds a little more shared helper surface area, but it reduces long-term fragility and keeps editing rules out of React event handlers.
+- Backend validation may reject malformed draft payloads that earlier versions would have silently coerced, but that is safer for export stability.
+- The system is still intentionally draft-only and non-persistent; this pass improves safety, not persistence.
+
+Follow-up:
+- Revisit draft persistence separately from editing-rule hardening.
+- Consider moving more editing-specific UI state into smaller hooks only if future phases make the page orchestration meaningfully more complex.
+
+### 2026-03-16
+Decision:
+- Finish the Phase 8 wrap-up with a lightweight validation-focused pass instead of adding new framework churn.
+
+Context:
+- The editing layer and hardening pass were already complete, but local validation still had two weak points: backend tests depended on an undocumented missing `httpx` package, and the shared editing logic had no direct automated coverage.
+- The frontend lint path was also not reliably runnable because the repo still lacked a completed ESLint setup.
+
+Chosen option:
+- Add `apps/api/requirements-dev.txt` for the minimal backend test-only dependency.
+- Add focused `packages/music-engine` tests for the editing helpers using a compiled TypeScript assertion script instead of introducing a new test framework.
+- Add root validation scripts that reflect the commands that actually run successfully today.
+- Keep lint documented as an honest current limitation instead of adding half-configured ESLint churn during a stabilization pass.
+
+Alternatives considered:
+- Folding `httpx` into production backend requirements.
+- Adding Jest, Vitest, or another framework just for the shared editing helpers.
+- Forcing an ESLint migration during this pass even though the repo currently lacks the necessary config and package setup.
+
+Tradeoffs:
+- The validation path is clearer and more reproducible now, but frontend lint still remains an explicit setup gap.
+- The simple assertion-based test runner is intentionally minimal, but it keeps the current repo lightweight and works reliably in the current environment.
+- Keeping backend test dependencies separate avoids inflating runtime requirements, but contributors need to install one extra requirements file when they want full API test coverage.
+
+Follow-up:
+- Complete the ESLint migration when the project is ready to adopt a real lint configuration instead of `next lint`'s deprecated setup flow.
+- Expand shared editing coverage as future phases introduce richer editing behavior.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

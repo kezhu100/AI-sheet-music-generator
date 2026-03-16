@@ -120,6 +120,23 @@ Phase 7 preview boundary:
 - preview math helpers live in `packages/music-engine/src/preview.ts`
 - the backend remains unchanged and still returns the same normalized `JobResult`
 
+Phase 8 editing boundary:
+- the web app keeps a frontend-only draft `JobResult` cloned from the completed backend result
+- editing state and normalization helpers live in `packages/music-engine/src/editing.ts`
+- note selection now uses stable per-draft `draftNoteId` values attached during draft cloning
+- note updates, add/delete behavior, drum-note defaults, and edited-result normalization are centralized in `packages/music-engine/src/editing.ts`
+- `apps/web/app/hooks/useEditableJobResult.ts` now owns most draft-state orchestration (`isDraftDirty`, reset-to-original, note selection, and export override wiring)
+- `apps/web/app/page.tsx` stays focused on upload/job flow plus UI composition
+- piano-roll interaction remains in `apps/web/app/components/PianoRollPreview.tsx`
+- edited export uses narrow POST overrides to the existing jobs export endpoints instead of mutating backend job state
+- backend override validation lives in `apps/api/app/models/schemas.py` and is rechecked in `apps/api/app/api/jobs.py` before exporter execution
+
+Validation boundary after the Phase 8 wrap-up:
+- backend unittest discovery runs through `scripts/test-api.mjs` and the project venv
+- focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests`
+- `npm run validate` is the reliable current repo-wide validation command
+- frontend lint remains outside the reliable path until the repo adopts a real ESLint configuration and dependency set
+
 ## Design Principles
 
 - provider-based model integrations
@@ -129,3 +146,4 @@ Phase 7 preview boundary:
 - frontend should consume normalized results only
 - post-processing should stay lightweight until later export or notation phases demand richer timing models
 - preview rendering should stay decoupled from editing behavior and avoid forcing backend contract changes before Phase 8
+- Phase 8 editing should stay draft-oriented and avoid introducing persistence until the product explicitly needs saved edits

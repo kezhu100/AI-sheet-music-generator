@@ -4,15 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildPreviewTracks,
   formatEventTiming,
+  getNoteDurationSec,
+  getTrackKey,
   getVisibleTracks,
-  summarizeJobResult
+  summarizeJobResult,
+  updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
 import { createJob, downloadMidiExport, downloadMusicXmlExport, getJob, uploadAudio } from "../lib/api";
 import { DrumNotationPreview } from "./components/DrumNotationPreview";
+import { NoteEditorPanel } from "./components/NoteEditorPanel";
 import { PianoRollPreview } from "./components/PianoRollPreview";
 import { PianoScorePreview } from "./components/PianoScorePreview";
 import { TrackVisibilityControls } from "./components/TrackVisibilityControls";
+import { useEditableJobResult } from "./hooks/useEditableJobResult";
 
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
@@ -32,6 +37,31 @@ export default function HomePage() {
   const [isExportingMidi, setIsExportingMidi] = useState(false);
   const [isExportingMusicXml, setIsExportingMusicXml] = useState(false);
   const [visibleTrackKeys, setVisibleTrackKeys] = useState<string[]>([]);
+  const [addTrackKey, setAddTrackKey] = useState("");
+  const [addOnsetSec, setAddOnsetSec] = useState(0);
+  const [addDurationSec, setAddDurationSec] = useState(0.5);
+  const [addPitch, setAddPitch] = useState(60);
+  const [addDrumLabel, setAddDrumLabel] = useState("snare");
+  const [addDrumMidiNote, setAddDrumMidiNote] = useState(38);
+  const {
+    draftResult,
+    activeResult,
+    isDraftDirty,
+    selectedDraftNoteId,
+    selectedTrack,
+    selectedNote,
+    selectedTrackKey,
+    setSelectedDraftNoteId,
+    clearEditableState,
+    updateSelectedNote,
+    addDraftNote,
+    deleteSelectedNote,
+    moveNote,
+    changeSelectedDuration,
+    changeSelectedPitch,
+    resetDraftFromOriginalResult,
+    getExportResultOverride
+  } = useEditableJobResult(job?.result ?? null);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -50,17 +80,26 @@ export default function HomePage() {
     return () => window.clearInterval(intervalId);
   }, [job]);
 
+  useEffect(() => {
+    if (!activeResult) {
+      setAddTrackKey("");
+      return;
+    }
+
+    setAddTrackKey((currentTrackKey) => currentTrackKey || (activeResult.tracks[0] ? getTrackKey(activeResult.tracks[0]) : ""));
+  }, [activeResult]);
+
   const trackSummaries = useMemo(() => {
-    if (!job?.result) {
+    if (!activeResult) {
       return [];
     }
 
-    return summarizeJobResult(job.result);
-  }, [job]);
+    return summarizeJobResult(activeResult);
+  }, [activeResult]);
 
   const previewTracks = useMemo(() => {
-    return job?.result ? buildPreviewTracks(job.result.tracks) : [];
-  }, [job]);
+    return activeResult ? buildPreviewTracks(activeResult.tracks) : [];
+  }, [activeResult]);
 
   useEffect(() => {
     if (!previewTracks.length) {
@@ -81,8 +120,8 @@ export default function HomePage() {
   }, [previewTracks]);
 
   const visibleTracks = useMemo(() => {
-    return job?.result ? getVisibleTracks(job.result.tracks, visibleTrackKeys) : [];
-  }, [job, visibleTrackKeys]);
+    return activeResult ? getVisibleTracks(activeResult.tracks, visibleTrackKeys) : [];
+  }, [activeResult, visibleTrackKeys]);
 
   const pianoTrack = useMemo(() => {
     return visibleTracks.find((track) => track.instrument === "piano") ?? null;
@@ -91,6 +130,38 @@ export default function HomePage() {
   const drumTrack = useMemo(() => {
     return visibleTracks.find((track) => track.instrument === "drums") ?? null;
   }, [visibleTracks]);
+
+  useEffect(() => {
+    if (!selectedNote) {
+      return;
+    }
+
+    setAddOnsetSec(selectedNote.onsetSec);
+    setAddDurationSec(getNoteDurationSec(selectedNote, activeResult?.bpm ?? 120));
+    if (selectedTrackKey) {
+      setAddTrackKey(selectedTrackKey);
+    }
+    if (selectedNote.pitch != null) {
+      setAddPitch(selectedNote.pitch);
+    }
+    if (selectedNote.drumLabel) {
+      setAddDrumLabel(selectedNote.drumLabel);
+    }
+    if (selectedNote.midiNote != null) {
+      setAddDrumMidiNote(selectedNote.midiNote);
+    }
+  }, [activeResult?.bpm, selectedNote, selectedTrackKey]);
+
+  useEffect(() => {
+    if (!activeResult || activeResult.tracks.length === 0) {
+      return;
+    }
+
+    const validTrackKeys = new Set(activeResult.tracks.map((track) => getTrackKey(track)));
+    if (!validTrackKeys.has(addTrackKey)) {
+      setAddTrackKey(getTrackKey(activeResult.tracks[0]));
+    }
+  }, [activeResult, addTrackKey]);
 
   async function handleUploadAndCreateJob(): Promise<void> {
     if (!selectedFile) {
@@ -102,6 +173,7 @@ export default function HomePage() {
     setIsUploading(true);
     setUpload(null);
     setJob(null);
+    clearEditableState();
 
     try {
       const uploadResponse = await uploadAudio(selectedFile);
@@ -128,11 +200,11 @@ export default function HomePage() {
     setIsExportingMidi(true);
 
     try {
-      const midiBlob = await downloadMidiExport(job.id);
+      const midiBlob = await downloadMidiExport(job.id, getExportResultOverride());
       const url = window.URL.createObjectURL(midiBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${job.result.projectName || "ai-sheet-music-generator"}.mid`;
+      anchor.download = `${(draftResult ?? job.result).projectName || "ai-sheet-music-generator"}.mid`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -154,11 +226,11 @@ export default function HomePage() {
     setIsExportingMusicXml(true);
 
     try {
-      const musicXmlBlob = await downloadMusicXmlExport(job.id);
+      const musicXmlBlob = await downloadMusicXmlExport(job.id, getExportResultOverride());
       const url = window.URL.createObjectURL(musicXmlBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${job.result.projectName || "ai-sheet-music-generator"}.musicxml`;
+      anchor.download = `${(draftResult ?? job.result).projectName || "ai-sheet-music-generator"}.musicxml`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -176,6 +248,41 @@ export default function HomePage() {
     );
   }
 
+  function handleSelectNote(_trackKey: string, draftNoteId: string): void {
+    setSelectedDraftNoteId(draftNoteId);
+  }
+
+  function handleMoveNote(_trackKey: string, draftNoteId: string, onsetSec: number): void {
+    moveNote(draftNoteId, onsetSec);
+  }
+
+  function handleDeleteSelectedNote(): void {
+    deleteSelectedNote();
+  }
+
+  function handleAddNote(): void {
+    if (!draftResult) {
+      return;
+    }
+
+    const track = draftResult.tracks.find((candidate) => getTrackKey(candidate) === addTrackKey);
+    if (!track) {
+      setError("Choose a track before adding a note.");
+      return;
+    }
+
+    addDraftNote({
+      trackKey: addTrackKey,
+      instrument: track.instrument,
+      sourceStem: track.sourceStem,
+      onsetSec: addOnsetSec,
+      durationSec: addDurationSec,
+      pitch: addPitch,
+      drumLabel: addDrumLabel,
+      midiNote: addDrumMidiNote
+    });
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -184,12 +291,13 @@ export default function HomePage() {
             <h1>AI Sheet Music Generator</h1>
             <p>
               Upload a song or stem, create a job, inspect the normalized result, and preview piano-roll, piano score,
-              and drum notation views before exporting a draft MIDI or MusicXML file.
+              and drum notation views, then make simple Phase 8 draft edits before exporting MIDI or MusicXML.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 7 score preview</span>
+              <span className="pill">Phase 8 editing MVP</span>
+              <span className="pill">Drag timing edits</span>
+              <span className="pill">Draft-only editing state</span>
               <span className="pill">Track visibility toggles</span>
-              <span className="pill">Real heuristic PCM WAV providers</span>
               <span className="pill">Warnings stay explicit</span>
             </div>
           </div>
@@ -197,8 +305,8 @@ export default function HomePage() {
             <h3>Current API contract</h3>
             <p className="muted">
               Frontend calls <code className="inline">/api/v1/uploads</code>, then
-              <code className="inline"> /api/v1/jobs</code>, and polls
-              <code className="inline"> /api/v1/jobs/:id</code>.
+              <code className="inline"> /api/v1/jobs</code>, polls
+              <code className="inline"> /api/v1/jobs/:id</code>, and can post an edited result override when exporting.
             </p>
           </div>
         </div>
@@ -235,6 +343,7 @@ export default function HomePage() {
                   setSelectedFile(null);
                   setUpload(null);
                   setJob(null);
+                  clearEditableState();
                   setError(null);
                 }}
               >
@@ -257,6 +366,13 @@ export default function HomePage() {
                 {isExportingMusicXml ? "Exporting MusicXML..." : "Download MusicXML"}
               </button>
             </div>
+            {job?.result ? (
+              <p className="muted">
+                {isDraftDirty
+                  ? "Exports will use the current edited draft result."
+                  : "Exports currently use the generated normalized result."}
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="error">{error}</p> : null}
@@ -310,9 +426,9 @@ export default function HomePage() {
       <section className="content-grid">
         <div className="panel">
           <h2>Track Summary</h2>
-          {job?.result ? (
+          {activeResult ? (
             <>
-              <p className="muted">Estimated tempo: {job.result.bpm} BPM</p>
+              <p className="muted">Estimated tempo: {activeResult.bpm} BPM</p>
               <div className="track-list">
                 {trackSummaries.map((track) => (
                   <article className="track-card" key={`${track.instrument}-${track.sourceStem}`}>
@@ -333,9 +449,9 @@ export default function HomePage() {
 
         <div className="panel">
           <h2>Generated Stems</h2>
-          {job?.result ? (
+          {activeResult ? (
             <div className="track-list">
-              {job.result.stems.map((stem) => (
+              {activeResult.stems.map((stem) => (
                 <article className="track-card" key={stem.stemName}>
                   <strong>
                     {stem.instrumentHint} - {stem.stemName}
@@ -369,17 +485,80 @@ export default function HomePage() {
 
         <div className="panel">
           <h2>Piano-Roll Preview</h2>
-          {job?.result ? <PianoRollPreview tracks={visibleTracks} /> : <p className="muted">Visible track notes will render here after the job completes.</p>}
+          {activeResult ? (
+            <>
+              <p className="muted">Select notes here and drag horizontally to move timing.</p>
+              <PianoRollPreview
+                bpm={activeResult.bpm}
+                onMoveNote={handleMoveNote}
+                onSelectNote={handleSelectNote}
+                selectedNoteId={selectedDraftNoteId}
+                selectedTrackKey={selectedTrackKey}
+                tracks={visibleTracks}
+              />
+            </>
+          ) : (
+            <p className="muted">Visible track notes will render here after the job completes.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <div className="panel">
+          <h2>Editing Draft</h2>
+          <NoteEditorPanel
+            addDrumLabel={addDrumLabel}
+            addDrumMidiNote={addDrumMidiNote}
+            addDurationSec={addDurationSec}
+            addOnsetSec={addOnsetSec}
+            addPitch={addPitch}
+            addTrackKey={addTrackKey}
+            draftResult={activeResult}
+            hasDraftChanges={isDraftDirty}
+            onAddNote={handleAddNote}
+            onChangeAddDrumLabel={setAddDrumLabel}
+            onChangeAddDrumMidiNote={setAddDrumMidiNote}
+            onChangeAddDurationSec={setAddDurationSec}
+            onChangeAddOnsetSec={setAddOnsetSec}
+            onChangeAddPitch={setAddPitch}
+            onChangeSelectedDurationSec={changeSelectedDuration}
+            onChangeSelectedOnsetSec={(value) =>
+              updateSelectedNote((draft, draftNoteId) => updateNoteTiming(draft, draftNoteId, value))
+            }
+            onChangeSelectedPitch={changeSelectedPitch}
+            onDeleteSelectedNote={handleDeleteSelectedNote}
+            onRevertDraft={resetDraftFromOriginalResult}
+            onSelectAddTrack={setAddTrackKey}
+            selectedNote={selectedNote}
+            selectedTrack={selectedTrack}
+          />
+        </div>
+        <div className="panel">
+          <h2>Editing Scope</h2>
+          <div className="note-list">
+            <article className="note-card">
+              <strong>Implemented in Phase 8 MVP</strong>
+              <div className="muted">Note selection, horizontal drag timing moves, piano pitch edits, add/delete, and edited MIDI/MusicXML export.</div>
+            </article>
+            <article className="note-card">
+              <strong>Current limitation</strong>
+              <div className="muted">Drum notes can be moved, added, and deleted, but drum-lane reassignment is not included in this phase.</div>
+            </article>
+            <article className="note-card">
+              <strong>Persistence boundary</strong>
+              <div className="muted">Edits stay in a frontend draft layer and do not overwrite the original completed job on the backend.</div>
+            </article>
+          </div>
         </div>
       </section>
 
       <section className="content-grid preview-layout">
         <div className="panel">
           <h2>Piano Score Preview</h2>
-          {job?.result ? (
+          {activeResult ? (
             <>
               <p className="muted">Simplified grand-staff preview for the first visible piano track and the first 8 bars.</p>
-              <PianoScorePreview bpm={job.result.bpm} track={pianoTrack} />
+              <PianoScorePreview bpm={activeResult.bpm} track={pianoTrack} />
             </>
           ) : (
             <p className="muted">A simple piano score preview will appear here once the job completes.</p>
@@ -388,10 +567,10 @@ export default function HomePage() {
 
         <div className="panel">
           <h2>Drum Notation Preview</h2>
-          {job?.result ? (
+          {activeResult ? (
             <>
               <p className="muted">Lane-based drum hit grid for the first visible drum track and the first 8 bars.</p>
-              <DrumNotationPreview bpm={job.result.bpm} track={drumTrack} />
+              <DrumNotationPreview bpm={activeResult.bpm} track={drumTrack} />
             </>
           ) : (
             <p className="muted">A simple drum notation view will appear here once the job completes.</p>
@@ -406,7 +585,11 @@ export default function HomePage() {
             <div className="note-list">
               {pianoTrack.notes.length > 0 ? (
                 pianoTrack.notes.slice(0, 8).map((note) => (
-                  <article className="note-card" key={note.id}>
+                  <article
+                    className={`note-card ${selectedDraftNoteId === note.draftNoteId ? "is-selected-card" : ""}`}
+                    key={note.draftNoteId ?? note.id}
+                    onClick={() => note.draftNoteId && handleSelectNote(getTrackKey(pianoTrack), note.draftNoteId)}
+                  >
                     <strong>{formatNote(note)}</strong>
                     <div>{formatEventTiming(note)}</div>
                     <div className="muted">
@@ -434,7 +617,11 @@ export default function HomePage() {
             <div className="note-list">
               {drumTrack.notes.length > 0 ? (
                 drumTrack.notes.slice(0, 12).map((note) => (
-                  <article className="note-card" key={note.id}>
+                  <article
+                    className={`note-card ${selectedDraftNoteId === note.draftNoteId ? "is-selected-card" : ""}`}
+                    key={note.draftNoteId ?? note.id}
+                    onClick={() => note.draftNoteId && handleSelectNote(getTrackKey(drumTrack), note.draftNoteId)}
+                  >
                     <strong>{formatNote(note)}</strong>
                     <div>{formatEventTiming(note)}</div>
                     <div className="muted">
@@ -461,9 +648,9 @@ export default function HomePage() {
       <section className="content-grid">
         <div className="panel">
           <h2>Warnings</h2>
-          {job?.result ? (
+          {activeResult ? (
             <div className="note-list">
-              {job.result.warnings.map((warning) => (
+              {activeResult.warnings.map((warning) => (
                 <article className="note-card" key={warning}>
                   <div>{warning}</div>
                 </article>

@@ -143,6 +143,42 @@ Current Phase 7 runtime behavior:
 - drum notation preview is intentionally lane/grid based rather than full engraved percussion notation and renders only the first visible drum track plus the first 8 bars
 - Phase 7 adds visual inspection only; there is still no note editing, correction, or drag interaction
 
+### Phase 8 - Editing
+Completed.
+
+Implemented features:
+- frontend draft editing layer cloned from the completed normalized `JobResult`
+- note selection from the piano-roll preview and event detail lists
+- horizontal drag interaction in the piano-roll preview for timing edits
+- manual onset and duration adjustment controls for the selected note
+- manual pitch adjustment controls for piano notes
+- add note and delete note controls for the selected or chosen track
+- MIDI and MusicXML re-export using the edited draft result instead of only the original backend-stored result
+
+Current Phase 8 runtime behavior:
+- editing is frontend-first and does not persist back into backend job state
+- preview panes, event details, and export actions all read from the current draft result after edits
+- draft note operations use stable `draftNoteId` values instead of array position or onset/pitch heuristics
+- piano notes support timing, duration, pitch, add, and delete
+- drum notes support timing move, add, and delete
+- editing rules are centralized in `packages/music-engine/src/editing.ts`, and the frontend now treats components as action emitters plus state wiring
+- edited results are normalized before export and backend override payloads are validated before export generation
+- drum-lane reassignment is intentionally not included in this MVP and remains a documented limitation
+
+### Phase 8 - Engineering Wrap-Up
+Completed.
+
+Implemented improvements:
+- backend test setup now has a dedicated `apps/api/requirements-dev.txt` for `httpx`-backed `TestClient` coverage
+- focused automated tests now cover the shared editing helpers in `packages/music-engine/src/editing.ts`
+- draft-state orchestration in `apps/web/app/page.tsx` is reduced through `apps/web/app/hooks/useEditableJobResult.ts`
+- root validation scripts now make the supported local checks explicit
+
+Current wrap-up runtime behavior:
+- `npm run validate` is the clearest supported local validation command for the current repo state
+- backend tests now run from the project venv when the dev requirements are installed
+- frontend lint is still not part of the reliable non-interactive validation path because ESLint setup is incomplete in the repo
+
 ---
 
 # Current Pipeline
@@ -161,7 +197,11 @@ run heuristic WAV drum transcription on the persisted drum stem when the stem is
 ->
 run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
 ->
-generate MIDI or MusicXML on demand from the completed normalized result when requested
+clone the completed normalized result into a frontend editing draft when the user opens a completed job
+->
+allow manual note corrections against the draft in the web UI
+->
+generate MIDI or MusicXML on demand from either the completed normalized result or the current draft override
 ->
 return normalized stems + tracks + warnings
 ->
@@ -225,15 +265,16 @@ Current UI supports:
 - simplified piano score preview display
 - simplified drum notation preview display
 - track visibility toggles
+- note selection and editing draft controls
+- add/delete note controls
 - piano note detail display
 - drum hit detail display
 - warning display
 
 Future UI features:
 - waveform view
-- timeline editor
-- export controls
-- editing tools
+- saved edit sessions
+- richer drum and notation editing tools
 
 ---
 
@@ -266,14 +307,14 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 8 - Editing
+## Phase 9 - Next Candidate
 
 Goal:
-Start manual correction on top of the current normalized and previewable result pipeline.
+Build on the current editing MVP with stronger persistence and richer instrument-specific editing behavior.
 
 Scope reminder:
-- Phase 7 preview is complete
-- editing work is still not implemented in the current runtime
+- Phase 8 editing is now complete in a frontend-first draft workflow
+- saved edits, deeper drum editing, and richer notation editing are still future work
 
 ---
 
@@ -290,13 +331,15 @@ Current runtime limitations:
 - piano score preview currently uses a simplified grand-staff approximation rather than full engraving or MusicXML-quality notation layout
 - drum preview currently uses a notation-oriented lane/grid renderer rather than full percussion staff engraving
 - preview panes currently focus on the first visible piano track and first visible drum track for notation-style rendering
+- Phase 8 editing is draft-only and is lost if the page is refreshed or a new job is loaded
+- drum-lane reassignment is not yet implemented
 - job state is still in-memory and is lost when the API restarts
 
 Phase 7
 Completed: score preview UI with piano-roll, simplified piano score, simplified drum notation, and track visibility toggles.
 
 Phase 8
-Editing tools.
+Completed: frontend draft editing with note selection, drag timing moves, piano pitch adjustment, add/delete note controls, and edited export override support.
 
 ---
 

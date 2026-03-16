@@ -63,8 +63,8 @@
 - [x] track visibility toggles
 
 ## Phase 8 - Editing
-- [ ] note selection
-- [ ] drag to move note timing
-- [ ] adjust pitch
-- [ ] delete/add notes
-- [ ] re-export edited score
+- [x] note selection
+- [x] drag to move note timing
+- [x] adjust pitch
+- [x] delete/add notes
+- [x] re-export edited score
