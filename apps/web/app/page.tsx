@@ -54,6 +54,10 @@ export default function HomePage() {
     return job?.result?.tracks.find((track) => track.instrument === "piano") ?? null;
   }, [job]);
 
+  const drumTrack = useMemo(() => {
+    return job?.result?.tracks.find((track) => track.instrument === "drums") ?? null;
+  }, [job]);
+
   async function handleUploadAndCreateJob(): Promise<void> {
     if (!selectedFile) {
       setError("Choose an audio file first.");
@@ -87,13 +91,13 @@ export default function HomePage() {
           <div>
             <h1>AI Sheet Music Generator</h1>
             <p>
-              Upload a song or stem, create a job, and inspect a Phase 3 pipeline with heuristic WAV piano
-              transcription, persisted stems, and mocked drum output.
+              Upload a song or stem, create a job, and inspect a Phase 4 pipeline with heuristic WAV piano and
+              drum transcription, persisted stems, and normalized event previews.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 3 piano transcription</span>
-              <span className="pill">Heuristic PCM WAV provider</span>
-              <span className="pill">Drums still mocked</span>
+              <span className="pill">Phase 4 drum transcription</span>
+              <span className="pill">Real heuristic PCM WAV providers</span>
+              <span className="pill">Warnings stay explicit</span>
             </div>
           </div>
           <div className="panel">
@@ -271,6 +275,40 @@ export default function HomePage() {
           )}
         </div>
 
+        <div className="panel">
+          <h2>Drum Hit Preview</h2>
+          {drumTrack ? (
+            <div className="note-list">
+              {drumTrack.notes.length > 0 ? (
+                drumTrack.notes.slice(0, 12).map((note) => (
+                  <article className="note-card" key={note.id}>
+                    <strong>{formatNote(note)}</strong>
+                    <div>
+                      {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
+                    </div>
+                    <div className="muted">
+                      provider {drumTrack.provider} | stem {note.sourceStem ?? "unknown"} | beat {note.beat ?? "n/a"} |
+                      confidence {note.confidence ?? 0}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <article className="note-card">
+                  <strong>No drum hits detected</strong>
+                  <div className="muted">
+                    Phase 4 drum transcription is real but heuristic and currently works best for clear PCM WAV
+                    percussive onsets.
+                  </div>
+                </article>
+              )}
+            </div>
+          ) : (
+            <p className="muted">Detected drum hits will appear here once the job completes.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid">
         <div className="panel">
           <h2>Warnings</h2>
           {job?.result ? (

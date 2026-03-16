@@ -51,7 +51,7 @@ Responsibilities:
 3. route audio through the source separation provider
 4. persist stems
 5. run heuristic piano transcription on the persisted piano stem when supported
-6. run mocked drum transcription on the drum stem
+6. run heuristic drum transcription on the persisted drum stem when supported
 7. normalize to the common event schema
 8. merge into a job result
 9. return normalized result assets to the frontend
@@ -59,7 +59,7 @@ Responsibilities:
 Current runtime note:
 - step 3 is implemented with a local development separation backend that copies the uploaded file into per-job stems
 - step 5 is implemented with a stdlib-only heuristic piano provider for uncompressed PCM `.wav` stems
-- step 6 still uses the mocked drum provider
+- step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
 
 ## Provider Design
 
@@ -76,8 +76,10 @@ Current runtime note:
 - current provider is intentionally heuristic and optimized for simple note output rather than dense polyphonic accuracy
 
 ### Drum Transcription Providers
-- provider abstraction remains in place
-- runtime output is still mocked in Phase 3
+- backend contract lives under `apps/api/app/pipeline/interfaces.py`
+- current implementation lives in `apps/api/app/pipeline/drum_transcription.py`
+- current provider uses only the Python standard library and returns normalized drum `NoteEvent` values
+- current provider is intentionally heuristic and optimized for simple onset-focused drum hit detection rather than full kit accuracy
 
 ## Shared Result Shape
 

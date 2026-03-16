@@ -134,6 +134,36 @@ Follow-up:
 - Revisit format support after real source separation is in place.
 - Start Phase 4 by replacing the mocked drum stage with a real drum transcription provider.
 
+### 2026-03-16
+Decision:
+- Implement Phase 4 with a stdlib-only `HeuristicWavDrumTranscriptionProvider` and rename `mock_pipeline.py` to `development_pipeline.py`.
+
+Context:
+- Phase 4 needed the first real drum transcription stage without collapsing the existing provider-based backend.
+- The repository runtime still favors lightweight, runnable implementations over heavier DSP or ML dependencies.
+- The previous pipeline module name had become inaccurate after Phase 3 because the same pipeline now mixed real and placeholder stages.
+
+Chosen option:
+- Keep the existing `DrumTranscriptionProvider` abstraction and add a real provider under `apps/api/app/pipeline/drum_transcription.py`.
+- Limit the first real drum path to uncompressed PCM `.wav` stems and use only the Python standard library for WAV decoding, onset detection, and simple kick/snare/hi-hat classification.
+- Preserve the current `JobResult` and `NoteEvent` contract and express limitations through warnings rather than expanding the schema.
+- Rename `apps/api/app/pipeline/mock_pipeline.py` to `apps/api/app/pipeline/development_pipeline.py` and update imports, tests, and docs to match the runtime semantics.
+
+Alternatives considered:
+- Keeping drum transcription mocked for another phase.
+- Adding `numpy`, `librosa`, or a dedicated drum transcription stack for stronger detection.
+- Redesigning the pipeline module layout while doing the rename.
+
+Tradeoffs:
+- The heuristic provider is honest and runnable in the current repo, but it is intentionally limited and may miss or misclassify dense drum arrangements.
+- Reusing the existing result contract keeps the frontend stable, but richer drum metadata is deferred to later phases.
+- The rename improves clarity with minimal churn, but the development pipeline still intentionally contains placeholder source separation.
+
+Follow-up:
+- Improve onset classification and beat alignment after better source separation or post-processing is available.
+- Reassess richer drum label coverage when heavier dependencies become acceptable.
+- Start Phase 5 with post-processing work instead of export or notation rendering.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

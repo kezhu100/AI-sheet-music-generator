@@ -30,11 +30,11 @@
 - [x] basic validation on a sample clip
 
 ## Phase 4 - Drum Transcription
-- [ ] define drum transcription provider interface
-- [ ] add first drum provider
-- [ ] map drum labels to MIDI notes
-- [ ] preview drum hits in UI
-- [ ] basic validation on a sample clip
+- [x] define drum transcription provider interface
+- [x] add first drum provider
+- [x] map drum labels to MIDI notes
+- [x] preview drum hits in UI
+- [x] basic validation on a sample clip
 
 ## Phase 5 - Post Processing
 - [ ] tempo estimation integration

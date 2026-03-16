@@ -2,75 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.models.schemas import JobResult, NoteEvent, TrackResult
+from app.models.schemas import JobResult, TrackResult
 from app.pipeline.interfaces import (
     DrumTranscriptionProvider,
     PianoTranscriptionProvider,
     ProcessingPipeline,
     SourceSeparationProvider,
-    SourceStem,
     TranscriptionResult,
 )
+from app.pipeline.drum_transcription import HeuristicWavDrumTranscriptionProvider
 from app.pipeline.piano_transcription import HeuristicWavPianoTranscriptionProvider
 from app.pipeline.source_separation import LocalDevelopmentSourceSeparationProvider
-
-
-class MockDrumTranscriptionProvider:
-    provider_name = "mock-drum-provider"
-
-    def transcribe(self, stem: SourceStem) -> TranscriptionResult:
-        notes = [
-            NoteEvent(
-                id=f"{stem.stem_name}-d1",
-                instrument="drums",
-                drumLabel="kick",
-                midiNote=36,
-                onsetSec=0.0,
-                offsetSec=0.05,
-                velocity=110,
-                confidence=0.91,
-                channel=9,
-                bar=1,
-                beat=1.0,
-                sourceStem=stem.stem_name,
-            ),
-            NoteEvent(
-                id=f"{stem.stem_name}-d2",
-                instrument="drums",
-                drumLabel="snare",
-                midiNote=38,
-                onsetSec=0.5,
-                offsetSec=0.55,
-                velocity=104,
-                confidence=0.88,
-                channel=9,
-                bar=1,
-                beat=2.0,
-                sourceStem=stem.stem_name,
-            ),
-            NoteEvent(
-                id=f"{stem.stem_name}-d3",
-                instrument="drums",
-                drumLabel="hi-hat",
-                midiNote=42,
-                onsetSec=1.0,
-                offsetSec=1.05,
-                velocity=82,
-                confidence=0.86,
-                channel=9,
-                bar=1,
-                beat=3.0,
-                sourceStem=stem.stem_name,
-            ),
-        ]
-
-        return TranscriptionResult(
-            provider_name=self.provider_name,
-            instrument="drums",
-            source_stem=stem.stem_name,
-            notes=notes,
-            warnings=["Drum transcription remains mocked in Phase 3 and has not been replaced with a real provider yet."],
-        )
 
 
 class DevelopmentProcessingPipeline:
@@ -122,9 +64,9 @@ class DevelopmentProcessingPipeline:
         )
 
 
-def build_mock_pipeline() -> ProcessingPipeline:
+def build_development_pipeline() -> ProcessingPipeline:
     return DevelopmentProcessingPipeline(
         separation_provider=LocalDevelopmentSourceSeparationProvider(),
         piano_provider=HeuristicWavPianoTranscriptionProvider(),
-        drum_provider=MockDrumTranscriptionProvider(),
+        drum_provider=HeuristicWavDrumTranscriptionProvider(),
     )

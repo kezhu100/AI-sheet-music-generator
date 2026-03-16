@@ -21,13 +21,14 @@ Current milestone:
 - Phase 1 completed: audio upload, job creation, job status polling, and UI integration
 - Phase 2 completed: source separation interface, first backend, persisted stems, and stem result display
 - Phase 3 completed: first real piano transcription provider, normalized piano note events, and piano note preview UI
+- Phase 4 completed: first real drum transcription provider, normalized drum hit events, pipeline cleanup rename, and drum preview UI
 
 Current behavior:
 
 - The repository demonstrates the full `upload -> job -> result` pipeline
 - Source separation still runs through a local development backend that copies the uploaded file into per-job stem files
 - Piano transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
-- Drum transcription remains mocked
+- Drum transcription is now real for uncompressed PCM `.wav` stems through a heuristic stdlib-only provider
 - Export, score rendering, and editing phases have not started yet
 
 ## Environment Requirements
@@ -37,7 +38,7 @@ Current behavior:
 - Current scaffold tested on Python 3.9.13
 - Recommended environment for future ML integrations: Python 3.11+
 - Backend stack: FastAPI
-- No new heavy DSP or ML dependencies were introduced for Phase 3
+- No new heavy DSP or ML dependencies were introduced for Phase 4
 
 ### Frontend environment
 
@@ -65,25 +66,27 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 
-## Running Phase 3 Locally
+## Running Phase 4 Locally
 
 1. Start the API with `py -m uvicorn app.main:app --reload --app-dir apps/api`.
 2. Start the frontend with `npm run dev:web`.
 3. Upload an audio file from the UI.
-4. Wait for the job to complete and inspect the returned stems, piano notes, track summaries, and warnings.
+4. Wait for the job to complete and inspect the returned stems, piano notes, drum hits, track summaries, and warnings.
 
-Current Phase 3 real piano transcription support:
+Current real transcription support:
 
 - uncompressed PCM `.wav` stems
 - 8-bit, 16-bit, or 32-bit PCM WAV sample widths
-- simple monophonic or lightly overlapping piano phrases work best
+- simple monophonic or lightly overlapping piano phrases work best for piano
+- simple onset-heavy percussive material works best for drums
 
-Current Phase 3 limitations:
+Current limitations:
 
 - the separation backend is still a placeholder development backend, so uploaded audio is copied into `piano_stem` and `drum_stem` rather than truly separated
 - real piano transcription currently runs only on uncompressed PCM `.wav` stems
+- real drum transcription currently runs only on uncompressed PCM `.wav` stems
 - the heuristic piano provider is intentionally lightweight and may simplify or miss dense polyphonic passages
-- drum note events are still mocked
+- the heuristic drum provider is intentionally lightweight and may simplify or misclassify dense drum-kit material
 - there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
 - job state is still in-memory and is lost when the API restarts
 
@@ -92,12 +95,10 @@ Current Phase 3 limitations:
 - backend pipeline test with a generated PCM WAV sample clip
 - backend startup/import sanity check
 - frontend TypeScript typecheck
-- manual pipeline run against a real local WAV already present under `apps/api/data/uploads`
 
 ## What Is Not Implemented Yet
 
 - validated ML source separation quality
-- drum transcription backends
 - MIDI export
 - MusicXML export
 - score rendering and editing

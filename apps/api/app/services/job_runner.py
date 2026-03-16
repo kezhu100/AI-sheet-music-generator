@@ -4,7 +4,7 @@ from threading import Thread
 from time import sleep
 
 from app.models.schemas import UploadedFileDescriptor
-from app.pipeline.mock_pipeline import build_mock_pipeline
+from app.pipeline.development_pipeline import build_development_pipeline
 from app.services.job_store import job_store
 from app.services.storage import resolve_upload_path
 
@@ -39,11 +39,11 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             status="processing",
             stage="transcription",
             percent=75,
-            message="Running heuristic piano transcription and mocked drum transcription.",
+            message="Running heuristic piano and drum transcription on the persisted stems.",
         )
         sleep(0.6)
 
-        pipeline = build_mock_pipeline()
+        pipeline = build_development_pipeline()
         result = pipeline.run(resolve_upload_path(upload.stored_path), upload.file_name, job_id)
         job_store.complete(job_id, result)
     except Exception as exc:
