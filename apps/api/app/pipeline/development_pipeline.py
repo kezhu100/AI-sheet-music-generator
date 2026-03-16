@@ -11,6 +11,7 @@ from app.pipeline.interfaces import (
     TranscriptionResult,
 )
 from app.pipeline.drum_transcription import HeuristicWavDrumTranscriptionProvider
+from app.pipeline.post_processing import LightweightPostProcessor
 from app.pipeline.piano_transcription import HeuristicWavPianoTranscriptionProvider
 from app.pipeline.source_separation import LocalDevelopmentSourceSeparationProvider
 
@@ -21,10 +22,12 @@ class DevelopmentProcessingPipeline:
         separation_provider: SourceSeparationProvider,
         piano_provider: PianoTranscriptionProvider,
         drum_provider: DrumTranscriptionProvider,
+        post_processor: LightweightPostProcessor,
     ) -> None:
         self._separation_provider = separation_provider
         self._piano_provider = piano_provider
         self._drum_provider = drum_provider
+        self._post_processor = post_processor
 
     def run(self, audio_path: Path, original_file_name: str, job_id: str) -> JobResult:
         stems = self._separation_provider.separate(audio_path, job_id)
@@ -44,7 +47,7 @@ class DevelopmentProcessingPipeline:
                 if warning not in warnings:
                     warnings.append(warning)
 
-        tracks = [
+        raw_tracks = [
             TrackResult(
                 instrument=transcription.instrument,
                 sourceStem=transcription.source_stem,
@@ -54,13 +57,14 @@ class DevelopmentProcessingPipeline:
             )
             for transcription in transcriptions
         ]
+        post_processing_result = self._post_processor.process(raw_tracks, warnings)
 
         return JobResult(
             projectName=Path(original_file_name).stem,
-            bpm=120,
+            bpm=post_processing_result.bpm,
             stems=[stem.stem_asset for stem in stems],
-            tracks=tracks,
-            warnings=warnings,
+            tracks=post_processing_result.tracks,
+            warnings=post_processing_result.warnings,
         )
 
 
@@ -69,4 +73,5 @@ def build_development_pipeline() -> ProcessingPipeline:
         separation_provider=LocalDevelopmentSourceSeparationProvider(),
         piano_provider=HeuristicWavPianoTranscriptionProvider(),
         drum_provider=HeuristicWavDrumTranscriptionProvider(),
+        post_processor=LightweightPostProcessor(),
     )

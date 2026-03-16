@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
+import { formatBeatPosition, summarizeJobResult } from "@ai-sheet-music-generator/music-engine";
 import type { JobRecord, NoteEvent, UploadResponse } from "@ai-sheet-music-generator/shared-types";
 import { createJob, getJob, uploadAudio } from "../lib/api";
 
@@ -91,11 +91,11 @@ export default function HomePage() {
           <div>
             <h1>AI Sheet Music Generator</h1>
             <p>
-              Upload a song or stem, create a job, and inspect a Phase 4 pipeline with heuristic WAV piano and
-              drum transcription, persisted stems, and normalized event previews.
+              Upload a song or stem, create a job, and inspect a Phase 5 pipeline with persisted stems, heuristic WAV
+              transcription, lightweight tempo estimation, quantization, and aligned event previews.
             </p>
             <div className="pill-row">
-              <span className="pill">Phase 4 drum transcription</span>
+              <span className="pill">Phase 5 post-processing</span>
               <span className="pill">Real heuristic PCM WAV providers</span>
               <span className="pill">Warnings stay explicit</span>
             </div>
@@ -202,18 +202,21 @@ export default function HomePage() {
         <div className="panel">
           <h2>Track Summary</h2>
           {job?.result ? (
-            <div className="track-list">
-              {trackSummaries.map((track) => (
-                <article className="track-card" key={`${track.instrument}-${track.sourceStem}`}>
-                  <strong>
-                    {track.instrument} | {track.sourceStem}
-                  </strong>
-                  <div className="muted">Provider: {track.provider}</div>
-                  <div>{track.eventCount} note events</div>
-                  <div>Average confidence: {track.avgConfidence}</div>
-                </article>
-              ))}
-            </div>
+            <>
+              <p className="muted">Estimated tempo: {job.result.bpm} BPM</p>
+              <div className="track-list">
+                {trackSummaries.map((track) => (
+                  <article className="track-card" key={`${track.instrument}-${track.sourceStem}`}>
+                    <strong>
+                      {track.instrument} | {track.sourceStem}
+                    </strong>
+                    <div className="muted">Provider: {track.provider}</div>
+                    <div>{track.eventCount} note events</div>
+                    <div>Average confidence: {track.avgConfidence}</div>
+                  </article>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="muted">Track output will appear here once the job completes.</p>
           )}
@@ -256,8 +259,8 @@ export default function HomePage() {
                       {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
                     </div>
                     <div className="muted">
-                      provider {pianoTrack.provider} | stem {note.sourceStem ?? "unknown"} | confidence{" "}
-                      {note.confidence ?? 0}
+                      provider {pianoTrack.provider} | stem {note.sourceStem ?? "unknown"} | {formatBeatPosition(note)} |
+                      confidence {note.confidence ?? 0}
                     </div>
                   </article>
                 ))
@@ -287,7 +290,7 @@ export default function HomePage() {
                       {formatSeconds(note.onsetSec)} to {formatSeconds(note.offsetSec ?? note.onsetSec)}
                     </div>
                     <div className="muted">
-                      provider {drumTrack.provider} | stem {note.sourceStem ?? "unknown"} | beat {note.beat ?? "n/a"} |
+                      provider {drumTrack.provider} | stem {note.sourceStem ?? "unknown"} | {formatBeatPosition(note)} |
                       confidence {note.confidence ?? 0}
                     </div>
                   </article>

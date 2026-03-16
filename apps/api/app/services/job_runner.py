@@ -43,6 +43,15 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
         )
         sleep(0.6)
 
+        job_store.update_progress(
+            job_id,
+            status="processing",
+            stage="post_processing",
+            percent=90,
+            message="Estimating tempo, quantizing events, aligning beats and bars, and filtering low-confidence notes.",
+        )
+        sleep(0.4)
+
         pipeline = build_development_pipeline()
         result = pipeline.run(resolve_upload_path(upload.stored_path), upload.file_name, job_id)
         job_store.complete(job_id, result)

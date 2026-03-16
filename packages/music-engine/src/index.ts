@@ -31,3 +31,10 @@ export function sortEventsByTime(events: NoteEvent[]): NoteEvent[] {
   return [...events].sort((left, right) => left.onsetSec - right.onsetSec);
 }
 
+export function formatBeatPosition(note: NoteEvent): string {
+  if (note.bar == null || note.beat == null) {
+    return "bar n/a beat n/a";
+  }
+
+  return `bar ${note.bar} beat ${note.beat}`;
+}

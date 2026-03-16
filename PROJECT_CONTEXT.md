@@ -82,6 +82,22 @@ Implemented features:
 - frontend result view now surfaces drum hits from the real provider
 - pipeline module renamed from `mock_pipeline.py` to `development_pipeline.py` to reflect mixed real and placeholder stages
 
+### Phase 5 - Post Processing
+Completed.
+
+Implemented features:
+- lightweight post-processing stage added after transcription and before final `JobResult` assembly
+- tempo estimation now derives the returned `bpm` from filtered note-event onsets when possible
+- note events are quantized to a sixteenth-note grid using the estimated or fallback tempo
+- piano and drum events now receive aligned `bar` and `beat` values through the shared `NoteEvent` fields
+- low-confidence events are filtered before tempo estimation and final result delivery
+- track merge logic now consolidates duplicate `(instrument, source stem)` track groups before final output
+
+Current Phase 5 runtime behavior:
+- tempo estimation is heuristic and falls back to 120 BPM when the event set is too sparse or unstable
+- quantization is intentionally lightweight and assumes a simple 4/4 beat grid
+- the result schema remains largely stable; Phase 5 reuses the existing `bpm`, `bar`, and `beat` fields
+
 ---
 
 # Current Pipeline
@@ -97,6 +113,8 @@ persist placeholder stems through the source separation provider
 run heuristic WAV piano transcription on the persisted piano stem when the stem is an uncompressed PCM `.wav`
 ->
 run heuristic WAV drum transcription on the persisted drum stem when the stem is an uncompressed PCM `.wav`
+->
+run lightweight post-processing for tempo estimation, confidence filtering, quantization, track merge, and beat/bar alignment
 ->
 return normalized stems + tracks + warnings
 ->
@@ -120,6 +138,7 @@ pipeline/
 - source_separation.py
 - piano_transcription.py
 - drum_transcription.py
+- post_processing.py
 
 Current providers:
 - source separation provider: local development stem persistence backend
@@ -177,20 +196,19 @@ npm workspaces used for monorepo.
 
 # Next Development Phase
 
-## Phase 5 - Post Processing
+## Phase 6 - Export
 
 Goal:
-Add lightweight post-processing helpers on top of the normalized event pipeline.
+Start export work on top of the normalized and post-processed event pipeline.
 
 Tasks:
-- tempo estimation integration
-- quantization helpers
-- bar and beat alignment improvements
-- track merge logic
-- confidence-based filtering
+- MIDI export
+- MusicXML export
+- file download endpoints
+- export controls in the UI
 
 Scope limitation:
-- do not start export or score rendering work in this phase
+- do not start score rendering or editing work in this phase
 
 ---
 
@@ -201,16 +219,17 @@ Current runtime limitations:
 - the real piano provider currently runs only on uncompressed PCM `.wav` stems
 - the real drum provider currently runs only on uncompressed PCM `.wav` stems
 - the drum provider is heuristic and best suited to clear isolated percussive onsets, not dense production-grade kit transcription
+- post-processing currently assumes a simple 4/4 grid and does not support tempo changes
 - job state is still in-memory and is lost when the API restarts
 
 Phase 6
-MIDI export.
+MIDI export and MusicXML export.
 
 Phase 7
-MusicXML export.
+Score rendering UI.
 
 Phase 8
-Score rendering UI.
+Editing tools.
 
 ---
 

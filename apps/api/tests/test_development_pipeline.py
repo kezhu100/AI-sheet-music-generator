@@ -9,7 +9,9 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.models.schemas import NoteEvent, TrackResult
 from app.pipeline.development_pipeline import build_development_pipeline
+from app.pipeline.post_processing import LightweightPostProcessor
 
 
 class DevelopmentPipelineTests(unittest.TestCase):
@@ -23,6 +25,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
             result = build_development_pipeline().run(audio_path, "demo.wav", "job-test")
 
         self.assertEqual(result.project_name, "demo")
+        self.assertEqual(result.bpm, 120)
         self.assertEqual(len(result.stems), 2)
         self.assertEqual(len(result.tracks), 2)
         self.assertEqual({stem.instrument_hint for stem in result.stems}, {"piano", "drums"})
@@ -36,21 +39,70 @@ class DevelopmentPipelineTests(unittest.TestCase):
         piano_track = next(track for track in result.tracks if track.instrument == "piano")
         self.assertEqual(piano_track.provider, "heuristic-wav-piano-provider")
         self.assertGreaterEqual(len(piano_track.notes), 3)
+        self.assertTrue(all(note.bar is not None for note in piano_track.notes))
+        self.assertTrue(all(note.beat is not None for note in piano_track.notes))
 
         detected_pitches = [note.pitch for note in piano_track.notes if note.pitch is not None]
         self.assertIn(60, detected_pitches)
         self.assertIn(64, detected_pitches)
         self.assertIn(67, detected_pitches)
+        self.assertTrue(all(self._is_sixteenth_aligned(note.onset_sec, result.bpm) for note in piano_track.notes))
 
         drum_track = next(track for track in result.tracks if track.instrument == "drums")
         self.assertEqual(drum_track.provider, "heuristic-wav-drum-provider")
         self.assertGreaterEqual(len(drum_track.notes), 3)
+        self.assertTrue(all(note.bar is not None for note in drum_track.notes))
+        self.assertTrue(all(note.beat is not None for note in drum_track.notes))
 
         later_drum_notes = [note for note in drum_track.notes if note.onset_sec >= 1.5]
         detected_labels = {note.drum_label for note in later_drum_notes if note.drum_label is not None}
         self.assertIn("kick", detected_labels)
         self.assertIn("snare", detected_labels)
         self.assertIn("hi-hat", detected_labels)
+
+    def test_pipeline_filters_low_confidence_events_during_post_processing(self) -> None:
+        processor = LightweightPostProcessor()
+        input_track = TrackResult(
+            instrument="drums",
+            sourceStem="drum_stem",
+            provider="test-provider",
+            eventCount=2,
+            notes=[
+                NoteEvent(
+                    id="low-confidence",
+                    instrument="drums",
+                    drumLabel="snare",
+                    midiNote=38,
+                    onsetSec=0.24,
+                    offsetSec=0.29,
+                    confidence=0.2,
+                    sourceStem="drum_stem",
+                ),
+                NoteEvent(
+                    id="strong-hit",
+                    instrument="drums",
+                    drumLabel="kick",
+                    midiNote=36,
+                    onsetSec=0.51,
+                    offsetSec=0.58,
+                    confidence=0.81,
+                    sourceStem="drum_stem",
+                ),
+            ],
+        )
+
+        result = processor.process([input_track], warnings=[])
+
+        self.assertEqual(result.bpm, 120)
+        self.assertIn(
+            "Phase 5 post-processing filtered 1 low-confidence note events before returning the normalized result.",
+            result.warnings,
+        )
+        self.assertEqual(len(result.tracks), 1)
+        self.assertEqual(result.tracks[0].event_count, 1)
+        self.assertEqual(result.tracks[0].notes[0].id, "strong-hit")
+        self.assertEqual(result.tracks[0].notes[0].bar, 1)
+        self.assertEqual(result.tracks[0].notes[0].beat, 2.0)
 
     def _write_test_clip(self, target_path: Path) -> None:
         sample_rate = 44100
@@ -133,6 +185,11 @@ class DevelopmentPipelineTests(unittest.TestCase):
             output.append(int(amplitude * decay * value))
 
         return output
+
+    def _is_sixteenth_aligned(self, onset_sec: float, bpm: int) -> bool:
+        grid = (60.0 / bpm) / 4.0
+        remainder = round(onset_sec / grid, 6)
+        return abs(remainder - round(remainder)) <= 1e-6
 
 
 if __name__ == "__main__":

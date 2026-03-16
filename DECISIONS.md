@@ -164,6 +164,36 @@ Follow-up:
 - Reassess richer drum label coverage when heavier dependencies become acceptable.
 - Start Phase 5 with post-processing work instead of export or notation rendering.
 
+### 2026-03-16
+Decision:
+- Implement Phase 5 as a lightweight backend post-processing stage inserted after transcription and before final `JobResult` assembly.
+
+Context:
+- The repository already had a working upload -> stems -> transcription -> normalized result flow.
+- Project docs explicitly scoped Phase 5 to tempo estimation, quantization, beat/bar alignment, track merge logic, and confidence-based filtering.
+- The current schema already exposed `JobResult.bpm` plus `NoteEvent.bar` and `NoteEvent.beat`, so Phase 5 could stay backward compatible without a broad contract redesign.
+
+Chosen option:
+- Add `apps/api/app/pipeline/post_processing.py` with a lightweight post-processor that merges duplicate track groups, filters low-confidence events, estimates a single project BPM, quantizes events to a simple sixteenth-note grid, and assigns bar/beat values.
+- Reuse the existing `JobResult` and `NoteEvent` fields instead of introducing a new tempo map or notation-specific schema.
+- Surface fallback behavior and filtering through result warnings rather than hiding limitations.
+- Keep frontend changes small by exposing the improved BPM and beat/bar output through the existing result view.
+
+Alternatives considered:
+- Delaying Phase 5 until export or notation rendering introduced richer timing requirements.
+- Adding heavier DSP or music-theory dependencies for stronger beat tracking.
+- Expanding the shared schema immediately with tempo maps, meter data, or dedicated post-processing metadata.
+
+Tradeoffs:
+- The lightweight approach is easy to reason about and fits the current MVP, but it assumes a simple 4/4 grid and a single tempo estimate.
+- Reusing existing schema fields avoids churn across frontend and backend, but richer timing models are deferred to later phases.
+- Filtering low-confidence events before tempo estimation improves stability, but some borderline events may be dropped from sparse results.
+
+Follow-up:
+- Reassess tempo-map and meter support when MIDI export or score rendering needs finer timing control.
+- Improve beat tracking after source separation quality improves.
+- Start Phase 6 with export work rather than adding notation or editing behavior early.
+
 ## Template
 ### YYYY-MM-DD
 Decision:

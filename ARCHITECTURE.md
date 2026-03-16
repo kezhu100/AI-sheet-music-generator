@@ -40,6 +40,7 @@ Responsibilities:
 
 Responsibilities:
 - reusable result summarization helpers
+- frontend-facing timing display helpers
 - later quantization helpers
 - later note event transforms
 - later beat/bar alignment logic
@@ -52,14 +53,16 @@ Responsibilities:
 4. persist stems
 5. run heuristic piano transcription on the persisted piano stem when supported
 6. run heuristic drum transcription on the persisted drum stem when supported
-7. normalize to the common event schema
-8. merge into a job result
-9. return normalized result assets to the frontend
+7. run lightweight post-processing for confidence filtering, tempo estimation, quantization, track merge, and beat/bar alignment
+8. normalize to the common event schema
+9. merge into a job result
+10. return normalized result assets to the frontend
 
 Current runtime note:
 - step 3 is implemented with a local development separation backend that copies the uploaded file into per-job stems
 - step 5 is implemented with a stdlib-only heuristic piano provider for uncompressed PCM `.wav` stems
 - step 6 is implemented with a stdlib-only heuristic drum provider for uncompressed PCM `.wav` stems
+- step 7 is implemented with a lightweight backend post-processing stage that reuses the existing `bpm`, `bar`, and `beat` fields
 
 ## Provider Design
 
@@ -86,6 +89,7 @@ Current runtime note:
 `JobResult` currently includes:
 
 - project metadata
+- `bpm`: the current project-wide tempo estimate
 - `stems`: normalized stem metadata for persisted outputs
 - `tracks`: normalized track results used by the frontend
 - `warnings`: explicit limitations and runtime caveats
@@ -99,3 +103,4 @@ This keeps the frontend consuming normalized backend results rather than backend
 - minimal cohesive changes per phase
 - export logic should remain independent from ML providers
 - frontend should consume normalized results only
+- post-processing should stay lightweight until later export or notation phases demand richer timing models

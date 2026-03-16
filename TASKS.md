@@ -37,11 +37,11 @@
 - [x] basic validation on a sample clip
 
 ## Phase 5 - Post Processing
-- [ ] tempo estimation integration
-- [ ] quantization helpers
-- [ ] bar and beat alignment
-- [ ] track merge logic
-- [ ] confidence-based filtering
+- [x] tempo estimation integration
+- [x] quantization helpers
+- [x] bar and beat alignment
+- [x] track merge logic
+- [x] confidence-based filtering
 
 ## Phase 6 - Export
 - [ ] MIDI export
