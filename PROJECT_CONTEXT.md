@@ -3,6 +3,28 @@
 ## Project Name
 AI Sheet Music Generator
 
+## Executive Summary
+
+This repository now delivers a full local draft-notation workflow for piano and drums:
+- upload audio
+- run provider-based source separation and transcription
+- inspect the normalized result
+- edit the draft in the browser
+- save the latest draft separately from the original completed result
+- export MIDI or MusicXML
+- re-transcribe selected regions
+- analyze the draft for heuristic correction suggestions
+- reopen completed work from a local project library
+
+Current milestone:
+- Phase 12 MVP is in place for local project productization
+
+Still deferred:
+- accounts and authentication
+- public sharing and permissions
+- database/cloud storage
+- background job recovery after restart
+
 ## Project Goal
 Build a web application that converts uploaded audio into editable draft sheet music.
 
@@ -20,6 +42,12 @@ audio -> instrument separation -> instrument-specific transcription -> normalize
 ---
 
 # Current Project Status
+
+Quick read:
+- the repo is complete through Phase 11F and now has a shipped Phase 12 local productization MVP
+- the current product is still local-first and draft-first
+- the original completed result, saved latest draft, and current in-session draft remain separate artifacts
+- project-library reopen behavior is persisted; background job execution is still not restart-resilient
 
 ## Completed Phases
 
@@ -480,7 +508,7 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 12 - MVP In Progress
+## Phase 12 - Local Productization MVP
 
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
@@ -489,7 +517,7 @@ Current status:
 - Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
 - Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
 - Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
-- Phase 12 MVP is now partially complete with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
+- Phase 12 MVP is now implemented with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
 
 Scope reminder:
 - keep accounts, auth, public sharing, and job recovery explicitly deferred until storage and ownership rules are defined

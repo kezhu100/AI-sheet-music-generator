@@ -2,6 +2,14 @@
 
 ## High-Level Architecture
 
+## Phase 12 Summary
+
+Phase 12 adds a small project-facing persistence layer on top of the existing pipeline:
+- a filesystem-backed project manifest is now the source of truth for the local project library
+- the completed backend result is persisted once as an immutable `original-result.json`
+- the saved latest draft remains in the separate draft store
+- project reopen routes use persisted project state only and do not resume background execution
+
 ### Frontend
 `apps/web`
 

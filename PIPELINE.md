@@ -85,3 +85,8 @@ Phase 12 productization update:
 - the frontend now includes `/projects` for the local library and `/projects/{projectId}` for reopening persisted project state
 - the project route opens the editor workflow only when `originalResult` exists; incomplete or failed projects intentionally render metadata/status only
 - current shareable links are stable local route patterns only and do not implement public publishing, permissions, or background job recovery
+
+Phase 12 summary:
+- project manifests are now the persisted source of truth for the local library
+- immutable completed originals and separate saved drafts preserve the existing original-result versus draft boundary
+- project reopen behavior is persisted, but live background execution is still not restart-resilient

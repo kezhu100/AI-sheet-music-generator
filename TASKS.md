@@ -100,8 +100,8 @@
 
 ## Phase 12 - Productization
 - [x] add a project library view
-- [x] persist saved audio and drafts as user-facing project assets
+- [x] surface persisted upload metadata and saved drafts as user-facing project assets
 - [ ] introduce user accounts when storage and ownership rules are defined
-- [x] support shareable score links
+- [x] support stable local project routes that are shareable on the same deployment
 - [x] improve first-run onboarding and guidance
 - [x] document hosted deployment targets and operational assumptions

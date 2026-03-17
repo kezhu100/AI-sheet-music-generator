@@ -2,6 +2,26 @@
 
 AI Sheet Music Generator is a modular monorepo for turning uploaded audio into editable draft sheet music, starting with piano and drums.
 
+## What Works Today
+
+- upload audio and create a processing job
+- run provider-based source separation, piano transcription, drum transcription, and backend post-processing
+- inspect normalized stems, tracks, warnings, piano-roll preview, simplified piano score preview, and simplified drum notation preview
+- edit the generated draft in the browser with selection, drag timing, quantization, undo/redo, drum lane reassignment, and add/delete note controls
+- save the latest edited draft separately from the original completed backend result
+- export either the original result or the current draft as MIDI or MusicXML
+- re-transcribe a selected piano or drum region from persisted stems
+- analyze the current editable draft and apply heuristic correction suggestions
+- reopen persisted projects from a local filesystem-backed project library
+
+## Current Local MVP Limits
+
+- results are editable drafts, not guaranteed final notation
+- project library, saved drafts, and share routes are local/deployment-scoped and do not provide accounts, ownership, or public publishing
+- job execution is still in-memory and is not recoverable after API restart
+- source separation and transcription quality remain bounded by the configured providers and their documented fallbacks
+- engraving, tempo-map support, and advanced notation fidelity are still intentionally limited
+
 ## Project Overview
 
 The repository is organized to support an incremental build-out of the full pipeline:
@@ -36,6 +56,7 @@ Current milestone:
 - Phase 11D completed: backend post-processing is now more robust, with stronger tempo estimation, confidence-aware cleanup, adaptive quantization, duplicate removal, overlap cleanup, and steadier merged track output while preserving the normalized `JobResult` contract
 - Phase 11E completed: region re-transcription now reuses persisted stems, the configured transcription providers, and backend post-processing to replace a selected draft time range without recomputing the whole job
 - Phase 11F completed: AI-assisted correction now analyzes the current editable draft, returns heuristic suggestion objects for likely note issues, highlights suggested notes in the editor, and lets users apply each suggestion as one undoable draft edit without changing the normalized `JobResult`
+- Phase 12 MVP completed: a local project library, manifest-backed project asset summaries, immutable completed original-result persistence, stable local project routes, and lightweight onboarding improvements are now implemented without adding accounts or public sharing
 
 Current behavior:
 
@@ -189,7 +210,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running the Current Phase 11F Build Locally
+## Running the Current Phase 12 MVP Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
@@ -197,7 +218,8 @@ If the API venv is missing, the root dev script exits with a clear message inste
 4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, saved-draft status, and original/draft MIDI/MusicXML export actions.
 5. Select notes from the piano roll or event lists, use Ctrl/Cmd-click for additive selection, or drag a selection box in the piano roll to select multiple notes.
 6. Drag the current selection horizontally to move timing, quantize selected notes or the whole draft, reassign selected drum hits to a different lane, draw a box over a piano-only or drum-only time region when you want to re-transcribe that section, run `Analyze draft` to fetch heuristic correction suggestions, apply any suggestion you want to accept, use keyboard shortcuts such as `Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, `Delete`, arrow keys, and `Q`, then click `Save draft`.
-7. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads separately from the original completed result.
+7. Open `/projects` and confirm the completed job now appears in the local project library.
+8. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads separately from the original completed result.
 
 To try the optional stronger separation backend locally, set environment variables before starting the API or `npm run dev`. Example PowerShell:
 
