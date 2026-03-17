@@ -31,7 +31,7 @@ export {
   updateNotePitch,
   updateNoteVelocity,
   updateNoteTiming
-} from "./editing.js";
+} from "./editing";
 export type {
   AddDraftNoteInput,
   AddDraftNoteResult,
@@ -41,7 +41,7 @@ export type {
   ReplaceInstrumentRegionNotesInput,
   ReplaceInstrumentRegionNotesResult,
   SelectedDraftNote
-} from "./editing.js";
+} from "./editing";
 export {
   DEFAULT_BEATS_PER_BAR,
   DEFAULT_QUANTIZATION_SUBDIVISION,
@@ -53,7 +53,7 @@ export {
   quantizeBeat,
   quantizeSeconds,
   secondsToBeats
-} from "./timing.js";
+} from "./timing";
 export {
   buildPreviewTracks,
   getDrumLanes,
@@ -66,8 +66,8 @@ export {
   groupNotesByBar,
   midiToNoteName,
   resolveBarBeat
-} from "./preview.js";
-export type { DrumLane, PreviewMeasure, PreviewTimeBounds, PreviewTrack, ResolvedBarBeat, StaffPlacement } from "./preview.js";
+} from "./preview";
+export type { DrumLane, PreviewMeasure, PreviewTimeBounds, PreviewTrack, ResolvedBarBeat, StaffPlacement } from "./preview";
 
 export interface TrackSummary {
   instrument: InstrumentType;

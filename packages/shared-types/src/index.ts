@@ -126,6 +126,47 @@ export interface JobDraftResponse {
   draft: JobDraftRecord;
 }
 
+export type ExportFormat = "midi" | "musicxml";
+
+export interface ProjectAssetAvailability {
+  hasSourceUpload: boolean;
+  hasStems: boolean;
+  hasOriginalResult: boolean;
+  availableExports: ExportFormat[];
+}
+
+export interface ProjectSummary {
+  projectId: string;
+  jobId: string;
+  projectName: string;
+  createdAt: string;
+  updatedAt: string;
+  status: JobStatus;
+  hasSavedDraft: boolean;
+  draftVersion?: number | null;
+  assets: ProjectAssetAvailability;
+  sharePath: string;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  upload?: UploadedFileDescriptor | null;
+  originalResult?: JobResult | null;
+  savedDraft?: JobDraftRecord | null;
+  currentStage?: string | null;
+  statusMessage?: string | null;
+  error?: string | null;
+}
+
+export interface ProjectListResponse {
+  status: "ok";
+  projects: ProjectSummary[];
+}
+
+export interface ProjectDetailResponse {
+  status: "ok";
+  project: ProjectDetail;
+}
+
 export interface JobProgress {
   stage: string;
   percent: number;

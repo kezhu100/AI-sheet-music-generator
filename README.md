@@ -90,6 +90,15 @@ The frontend expects the API at `http://127.0.0.1:8000` by default. Override wit
 Uploaded files are stored locally in `apps/api/data/uploads`.
 Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 Saved edited drafts are stored locally in `apps/api/data/drafts/<job-id>.json`.
+Phase 12 project manifests are stored locally in `apps/api/data/projects/<project-id>/manifest.json`.
+Phase 12 immutable completed originals are stored locally in `apps/api/data/projects/<project-id>/original-result.json`.
+
+Phase 12 MVP routes and endpoints:
+
+- web library route: `/projects`
+- web project route: `/projects/{projectId}`
+- API list route: `GET /api/v1/projects`
+- API detail route: `GET /api/v1/projects/{projectId}`
 
 Optional source separation configuration:
 
@@ -260,7 +269,12 @@ Current limitations:
 - preview panes currently limit notation-style rendering to the first 8 bars for readability
 - there are no stem download endpoints yet; the UI currently exposes metadata and storage paths only
 - job state is still in-memory and is lost when the API restarts
-- saved drafts are local-development files only and are not yet tied to accounts, project libraries, or cross-device sync
+- saved drafts are local-development files only and are not yet tied to accounts, cross-device sync, or public ownership rules
+- the Phase 12 project library is filesystem-driven from local manifests and does not depend on the in-memory `job_store` for persisted project listing/detail
+- `original-result.json` is written once when a job completes and is not overwritten by draft saves, re-transcription, or in-session edits
+- `/projects/{projectId}` is a stable local route for reopening persisted project state, not a resume/recovery path for background jobs
+- shareable project links are local deployment routes only; they are not public internet-safe share tokens and do not add auth, permissions, or anonymous publishing
+- current hosted assumptions remain single-instance plus persistent disk/volume mounted under `apps/api/data`; multi-instance coordination and job recovery are deferred
 
 ## Validation Performed
 
@@ -283,8 +297,12 @@ Current validation reality:
 - production-validated piano transcription quality tuning across multiple real-world audio sets
 - production-validated drum transcription quality tuning across multiple real-world audio sets
 - persisted multi-revision edit history or saved projects
+- user accounts or authentication
+- database-backed ownership rules
+- real public sharing or permission systems
+- background job recovery after API restart
 
 ## Future Roadmap
 
 - Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, Phase 11C drum-provider upgrades, Phase 11D post-processing upgrades, Phase 11E region re-transcription, and Phase 11F AI-assisted correction are now in place while keeping the normalized pipeline stable
-- Phase 12: productization work including project libraries, saved audio and drafts, user accounts, shareable score links, onboarding improvements, and hosted deployment
+- Phase 12 MVP: local project library routes and manifests, project-oriented asset summaries, stable local share-route structure, onboarding improvements, and documented single-instance hosting assumptions are now in place while accounts, public sharing, and cloud storage remain deferred

@@ -1,6 +1,6 @@
 import type { CorrectionSuggestedChange, InstrumentType, JobResult, NoteEvent, TrackResult } from "@ai-sheet-music-generator/shared-types";
-import { absoluteBeatToBarBeat, beatsToSeconds, quantizeSeconds, secondsToBeats } from "./timing.js";
-import { getTrackKey } from "./preview.js";
+import { absoluteBeatToBarBeat, beatsToSeconds, quantizeSeconds, secondsToBeats } from "./timing";
+import { getTrackKey } from "./preview";
 
 export const DEFAULT_DRUM_DURATION_BEATS = 0.25;
 export const DEFAULT_DRUM_MIDI_NOTE = 38;

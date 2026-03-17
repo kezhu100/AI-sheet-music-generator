@@ -480,7 +480,7 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 11 - In Progress
+## Phase 12 - MVP In Progress
 
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
@@ -489,15 +489,10 @@ Current status:
 - Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
 - Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
 - Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
+- Phase 12 MVP is now partially complete with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
 
 Scope reminder:
-- Phase 10 editing UX improvements are complete
-- Phase 11A source separation work is complete
-- Phase 11B piano transcription work is complete
-- Phase 11C drum transcription work is complete
-- Phase 11D post-processing work is complete
-- Phase 11E region re-transcription work is complete
-- Phase 11F correction assistance work is complete
+- keep accounts, auth, public sharing, and job recovery explicitly deferred until storage and ownership rules are defined
 
 ---
 
@@ -586,13 +581,21 @@ Architecture note:
 Goal:
 Turn the current technical workflow into a fuller application built around saved work and repeat usage.
 
-Possible capabilities:
-- project library
-- saved audio and drafts
+Current MVP status:
+- a local filesystem-backed project library is now implemented through `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}`
+- each created job now gets a project manifest under `apps/api/data/projects/<project-id>/manifest.json`
+- each completed job now writes an immutable `original-result.json` once under `apps/api/data/projects/<project-id>/original-result.json`
+- the local project route `/projects/{projectId}` can reopen persisted project state when `originalResult` exists
+- incomplete or failed project routes intentionally show status/metadata only and do not attempt job recovery or resumption
+- onboarding now includes a library entry point plus explicit draft/export/share limitations
+
+Explicitly deferred:
 - user accounts
-- shareable score links
-- improved onboarding
-- hosted deployment
+- authentication or ownership rules
+- database-backed storage
+- public sharing or permission systems
+- multi-instance coordination
+- background job recovery
 
 Motivation:
 - productization becomes more coherent after draft persistence exists and editing workflows are less ephemeral

@@ -4,6 +4,36 @@
 
 ### 2026-03-17
 Decision:
+- Implement Phase 12 MVP productization as a filesystem-backed project manifest layer plus stable local project routes, while explicitly deferring accounts, public sharing, and job recovery.
+
+Context:
+- By the end of Phase 11F, the repository already had uploads, completed normalized results, saved drafts, editing, export, region re-transcription, and draft analysis, but it still lacked a user-facing project library.
+- The architecture intentionally kept the original completed backend result, the latest saved draft, and the current in-session editable draft as separate artifacts.
+- The current backend still keeps live jobs in memory, so Phase 12 needed to improve reopenable project state without pretending to solve multi-user storage or process-restart recovery.
+
+Chosen option:
+- Add a filesystem-backed `ProjectStore` under `apps/api/app/services/project_store.py`.
+- Create one project directory per job under `apps/api/data/projects/<project-id>/`.
+- Persist `manifest.json` as the project-library source of truth and persist `original-result.json` once when a job completes.
+- Expose `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}` from project manifests rather than depending on the in-memory `job_store`.
+- Add `/projects` and `/projects/{projectId}` in the web app, where project detail reopens the editor only when a persisted original result exists and otherwise shows status/metadata only.
+
+Alternatives considered:
+- Reusing only the in-memory `job_store` for the library.
+- Introducing a database, auth model, and ownership rules during the same phase.
+- Letting saved drafts overwrite or replace the persisted original completed result.
+
+Tradeoffs:
+- Filesystem-backed manifests keep the Phase 12 MVP small and honest, but they do not solve multi-instance coordination or public sharing.
+- Writing `original-result.json` once preserves the original-versus-draft boundary, but it means later edits must continue to use the separate saved-draft store.
+- Stable local project routes are useful for reopening work on the same deployment, but they are not secure public share links and must be documented that way.
+
+Follow-up:
+- Revisit accounts, ownership, and public sharing only after storage and permission rules are explicitly designed.
+- Revisit background job recovery only when the product is ready to move beyond the current in-memory execution model.
+
+### 2026-03-17
+Decision:
 - Implement Phase 11F AI-assisted correction as a draft-analysis suggestion layer that returns heuristic recommendations instead of automatically mutating the editable draft.
 
 Context:

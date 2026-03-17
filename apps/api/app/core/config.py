@@ -16,6 +16,7 @@ class Settings(BaseModel):
     uploads_dir: Path = Path(__file__).resolve().parents[2] / "data" / "uploads"
     stems_dir: Path = Path(__file__).resolve().parents[2] / "data" / "stems"
     drafts_dir: Path = Path(__file__).resolve().parents[2] / "data" / "drafts"
+    projects_dir: Path = Path(__file__).resolve().parents[2] / "data" / "projects"
     cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     source_separation_provider: str = "development-copy"
     source_separation_fallback_provider: Optional[str] = None
@@ -57,4 +58,5 @@ def get_settings() -> Settings:
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)
     settings.stems_dir.mkdir(parents=True, exist_ok=True)
     settings.drafts_dir.mkdir(parents=True, exist_ok=True)
+    settings.projects_dir.mkdir(parents=True, exist_ok=True)
     return settings

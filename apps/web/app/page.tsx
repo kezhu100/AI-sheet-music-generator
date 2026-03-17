@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   areJobResultsEqual,
@@ -674,6 +675,15 @@ export default function HomePage() {
               <code className="inline"> /api/v1/jobs/:id/retranscribe-region</code> and
               <code className="inline"> /api/v1/jobs/:id/analyze-draft</code>, and can save or export a validated edited result payload separately from the original job result.
             </p>
+            <p className="muted">
+              Phase 12 MVP adds a local project library and stable project routes while keeping the original completed result,
+              saved draft, and in-session editable draft as separate states.
+            </p>
+            <div className="actions">
+              <Link className="button secondary" href="/projects">
+                Open local project library
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -720,6 +730,9 @@ export default function HomePage() {
               >
                 Reset
               </button>
+              <Link className="button secondary" href="/projects">
+                Browse local library
+              </Link>
               <button
                 className="button secondary"
                 type="button"

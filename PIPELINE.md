@@ -76,3 +76,12 @@ Phase 11F AI-assisted correction update:
 - suggestion types currently include pitch, timing, velocity, and conservative drum-pattern anomalies, while same-pitch overlap cleanup is surfaced through `timing` suggestions to keep the contract small
 - the frontend highlights notes with suggestions and lets the user apply a suggestion as one undoable draft edit through the existing editing helpers
 - the draft remains the single editable state, saved drafts still store only edited `JobResult` data, and the normalized `JobResult` schema remains unchanged
+
+Phase 12 productization update:
+- job creation now also creates a filesystem-backed project manifest so the local project library can outlive API process memory
+- job progress, completion, failure, and draft-save events now update that project manifest rather than depending on the in-memory `job_store` for persisted project listing/detail
+- completed jobs now write an immutable `original-result.json` once under `apps/api/data/projects/<project-id>/`
+- saved drafts remain in the existing draft store and are surfaced in the project manifest as a separate latest-snapshot asset
+- the frontend now includes `/projects` for the local library and `/projects/{projectId}` for reopening persisted project state
+- the project route opens the editor workflow only when `originalResult` exists; incomplete or failed projects intentionally render metadata/status only
+- current shareable links are stable local route patterns only and do not implement public publishing, permissions, or background job recovery

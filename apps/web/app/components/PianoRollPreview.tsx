@@ -91,15 +91,30 @@ export function PianoRollPreview({
       ),
     [bpm, tracks]
   );
-  const allNotes = [...pianoNotes, ...drumNotes];
-
-  if (allNotes.length === 0) {
-    return <p className="muted">No visible note events are available for the piano-roll preview yet.</p>;
-  }
-
-  const timeBounds = getPreviewTimeBounds(allNotes);
-  const pitchRange = getPianoPitchRange(pianoNotes);
-  const drumLanes = getDrumLanes(drumNotes);
+  const allNotes = useMemo(() => [...pianoNotes, ...drumNotes], [drumNotes, pianoNotes]);
+  const hasVisibleNotes = allNotes.length > 0;
+  const timeBounds = useMemo(
+    () =>
+      hasVisibleNotes
+        ? getPreviewTimeBounds(allNotes)
+        : {
+            startSec: 0,
+            endSec: 1,
+            durationSec: 1
+          },
+    [allNotes, hasVisibleNotes]
+  );
+  const pitchRange = useMemo(
+    () =>
+      pianoNotes.length > 0
+        ? getPianoPitchRange(pianoNotes)
+        : {
+            minPitch: 60,
+            maxPitch: 72
+          },
+    [pianoNotes]
+  );
+  const drumLanes = useMemo(() => (drumNotes.length > 0 ? getDrumLanes(drumNotes) : []), [drumNotes]);
   const rowHeight = 18;
   const pianoRowCount = pianoNotes.length > 0 ? pitchRange.maxPitch - pitchRange.minPitch + 1 : 0;
   const drumRowCount = drumLanes.length;
@@ -223,6 +238,10 @@ export function PianoRollPreview({
       window.removeEventListener("pointerup", handlePointerUp);
     };
   }, [drumHeight, durationSec, gridWidth, height, interactionState, labelWidth, noteLayouts, onBoxSelect, onClearSelection, onMoveNote, onSelectRegion, pianoHeight, timeBounds, width]);
+
+  if (!hasVisibleNotes) {
+    return <p className="muted">No visible note events are available for the piano-roll preview yet.</p>;
+  }
 
   return (
     <div className="preview-scroll">

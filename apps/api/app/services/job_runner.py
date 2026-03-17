@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.models.schemas import UploadedFileDescriptor
 from app.pipeline.development_pipeline import build_processing_pipeline
 from app.services.job_store import job_store
+from app.services.project_store import project_store
 from app.services.storage import resolve_upload_path
 
 
@@ -25,6 +26,9 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             percent=15,
             message="Preparing uploaded audio for pipeline execution.",
         )
+        job = job_store.get(job_id)
+        if job is not None:
+            project_store.sync_job(job)
         sleep(0.6)
 
         job_store.update_progress(
@@ -34,6 +38,9 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             percent=45,
             message=f"Routing audio through the configured source separation provider ({settings.source_separation_provider}).",
         )
+        job = job_store.get(job_id)
+        if job is not None:
+            project_store.sync_job(job)
         sleep(0.6)
 
         job_store.update_progress(
@@ -46,6 +53,9 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
                 f"and configured drum transcription ({settings.drum_transcription_provider}) on the persisted stems."
             ),
         )
+        job = job_store.get(job_id)
+        if job is not None:
+            project_store.sync_job(job)
         sleep(0.6)
 
         job_store.update_progress(
@@ -55,10 +65,15 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor) -> None:
             percent=90,
             message="Cleaning events, estimating a stable project tempo, quantizing timing, aligning beats and bars, and merging normalized tracks.",
         )
+        job = job_store.get(job_id)
+        if job is not None:
+            project_store.sync_job(job)
         sleep(0.4)
 
         pipeline = build_processing_pipeline(settings)
         result = pipeline.run(resolve_upload_path(upload.stored_path), upload.file_name, job_id)
-        job_store.complete(job_id, result)
+        completed_job = job_store.complete(job_id, result)
+        project_store.mark_completed(completed_job, result)
     except Exception as exc:
-        job_store.fail(job_id, str(exc))
+        failed_job = job_store.fail(job_id, str(exc))
+        project_store.mark_failed(failed_job)

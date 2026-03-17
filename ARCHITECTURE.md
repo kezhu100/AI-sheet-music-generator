@@ -85,6 +85,9 @@ Current runtime note:
 - step 8 is implemented through small timing helper modules rather than page-local or pipeline-local ad hoc calculations
 - step 11 is currently implemented with a local file-backed draft store under `apps/api/data/drafts`
 - step 12 is currently implemented with stdlib-only backend MIDI and MusicXML exporters that use either the completed `JobResult` or a validated override payload
+- Phase 12 MVP now adds a filesystem-backed project manifest layer under `apps/api/data/projects/<project-id>/manifest.json`
+- completed jobs now also persist an immutable `original-result.json` once under the same project directory
+- project listing/detail routes read project manifests first and do not require the in-memory `job_store` for reopening persisted completed projects
 
 ## Provider Design
 
@@ -214,6 +217,15 @@ Phase 10 editing UX boundary:
 - original completed backend results, saved latest draft snapshots, and current in-session editable draft state remain distinct artifacts
 - export still consumes validated normalized `JobResult` payloads and does not introduce a separate Phase 10 export schema
 
+Phase 12 productization boundary:
+- backend project metadata persistence lives in `apps/api/app/services/project_store.py`
+- local project manifests are stored under `apps/api/data/projects/<project-id>/manifest.json`
+- immutable completed originals are stored under `apps/api/data/projects/<project-id>/original-result.json` and are written only once on completion
+- saved drafts remain in the existing `apps/api/data/drafts/<job-id>.json` store and do not overwrite the persisted original result
+- the projects API now exposes `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}` from filesystem-backed manifests
+- `/projects/{projectId}` in the web app is for reopening persisted project state only; it does not resume or recover background job execution after restart
+- current hosted assumptions are single backend instance plus persistent local/shared disk; accounts, public sharing, multi-instance coordination, and job recovery remain deferred
+
 Validation boundary after Phase 10:
 - backend unittest discovery runs through `scripts/test-api.mjs` and the project venv
 - focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests` and now includes richer bulk-editing helpers
@@ -232,3 +244,4 @@ Validation boundary after Phase 10:
 - Phase 8 editing should stay draft-oriented and avoid introducing persistence until the product explicitly needs saved edits
 - Phase 9 draft persistence should extend the existing draft model rather than collapsing edited state into the original job result
 - Phase 10 editing UX should extend the same normalized draft model and keep UI gesture logic separate from reusable editing rules
+- Phase 12 productization should add project-facing persistence and routes on top of the existing original-result versus saved-draft boundary rather than collapsing them into one model

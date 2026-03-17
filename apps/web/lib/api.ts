@@ -3,6 +3,8 @@ import type {
   AnalyzeDraftResponse,
   CreateJobRequest,
   JobDraftResponse,
+  ProjectDetailResponse,
+  ProjectListResponse,
   JobExportRequest,
   JobResponse,
   JobResult,
@@ -64,6 +66,24 @@ export async function getJob(jobId: string): Promise<JobResponse> {
   });
 
   return parseJson<JobResponse>(response);
+}
+
+export async function getProjects(): Promise<ProjectListResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  return parseJson<ProjectListResponse>(response);
+}
+
+export async function getProjectDetail(projectId: string): Promise<ProjectDetailResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  return parseJson<ProjectDetailResponse>(response);
 }
 
 export async function getJobDraft(jobId: string): Promise<JobDraftResponse> {

@@ -11,6 +11,7 @@ RetranscriptionInstrumentType = Literal["piano", "drums"]
 CorrectionInstrumentType = Literal["piano", "drums"]
 CorrectionSuggestionType = Literal["pitch", "timing", "velocity", "drum-pattern"]
 JobStatus = Literal["queued", "processing", "failed", "completed"]
+ExportFormat = Literal["midi", "musicxml"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
 MAX_MIDI_NOTE = 127
@@ -355,3 +356,70 @@ class JobResponse(BaseModel):
 class JobDraftResponse(BaseModel):
     status: Literal["ok"] = "ok"
     draft: JobDraftRecord
+
+
+class ProjectAssetAvailability(BaseModel):
+    has_source_upload: bool = Field(alias="hasSourceUpload")
+    has_stems: bool = Field(alias="hasStems")
+    has_original_result: bool = Field(alias="hasOriginalResult")
+    available_exports: List[ExportFormat] = Field(alias="availableExports")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectSummary(BaseModel):
+    project_id: str = Field(alias="projectId")
+    job_id: str = Field(alias="jobId")
+    project_name: str = Field(alias="projectName")
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    status: JobStatus
+    has_saved_draft: bool = Field(alias="hasSavedDraft")
+    draft_version: Optional[int] = Field(default=None, alias="draftVersion")
+    assets: ProjectAssetAvailability
+    share_path: str = Field(alias="sharePath")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("project_id", "job_id", "project_name", "share_path")
+    @classmethod
+    def validate_summary_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Project summary text fields must not be empty.")
+        return value
+
+
+class ProjectDetail(ProjectSummary):
+    upload: Optional[UploadedFileDescriptor] = None
+    original_result: Optional[JobResult] = Field(default=None, alias="originalResult")
+    saved_draft: Optional[JobDraftRecord] = Field(default=None, alias="savedDraft")
+    current_stage: Optional[str] = Field(default=None, alias="currentStage")
+    status_message: Optional[str] = Field(default=None, alias="statusMessage")
+    error: Optional[str] = None
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectManifestRecord(BaseModel):
+    summary: ProjectSummary
+    upload: Optional[UploadedFileDescriptor] = None
+    current_stage: Optional[str] = Field(default=None, alias="currentStage")
+    status_message: Optional[str] = Field(default=None, alias="statusMessage")
+    error: Optional[str] = None
+    draft_saved_at: Optional[datetime] = Field(default=None, alias="draftSavedAt")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectListResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    projects: List[ProjectSummary]
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectDetailResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    project: ProjectDetail
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}

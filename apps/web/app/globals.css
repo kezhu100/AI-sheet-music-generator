@@ -32,8 +32,17 @@ body {
   padding: 24px;
 }
 
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
 a {
   color: inherit;
+  text-decoration: none;
 }
 
 button,
@@ -104,6 +113,14 @@ select {
   padding: 22px;
 }
 
+.panel.inset-panel {
+  padding: 18px;
+}
+
+.panel-full {
+  grid-column: 1 / -1;
+}
+
 .panel h2,
 .panel h3 {
   margin-top: 0;
@@ -171,6 +188,12 @@ select {
   border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.65);
+}
+
+.project-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .note-card.is-selected-card {

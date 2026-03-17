@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
 
 from app.api.jobs import router as jobs_router
+from app.api.projects import router as projects_router
 from app.api.uploads import router as uploads_router
 from app.core.config import get_settings
 
@@ -28,3 +29,4 @@ async def healthcheck() -> Dict[str, str]:
 
 app.include_router(uploads_router, prefix=settings.api_prefix)
 app.include_router(jobs_router, prefix=settings.api_prefix)
+app.include_router(projects_router, prefix=settings.api_prefix)

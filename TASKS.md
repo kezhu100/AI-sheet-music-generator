@@ -99,9 +99,9 @@
 - [x] document quality expectations and fallback behavior for upgraded providers
 
 ## Phase 12 - Productization
-- [ ] add a project library view
-- [ ] persist saved audio and drafts as user-facing project assets
+- [x] add a project library view
+- [x] persist saved audio and drafts as user-facing project assets
 - [ ] introduce user accounts when storage and ownership rules are defined
-- [ ] support shareable score links
-- [ ] improve first-run onboarding and guidance
-- [ ] document hosted deployment targets and operational assumptions
+- [x] support shareable score links
+- [x] improve first-run onboarding and guidance
+- [x] document hosted deployment targets and operational assumptions

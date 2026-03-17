@@ -23,6 +23,7 @@ from app.services.musicxml_export import MusicXmlExportError, build_musicxml_fil
 from app.services.region_retranscription import RegionRetranscriptionService
 from app.services.job_runner import start_job
 from app.services.job_store import job_store
+from app.services.project_store import project_store
 from app.services.upload_registry import upload_registry
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -35,6 +36,7 @@ async def create_job(payload: CreateJobRequest) -> JobResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found.")
 
     job = job_store.create(payload.upload_id)
+    project_store.create_project(job, upload)
     start_job(job.id, upload)
     return JobResponse(job=job)
 
@@ -70,6 +72,7 @@ async def save_job_draft(job_id: str, payload: SaveJobDraftRequest) -> JobDraftR
     except ValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
+    project_store.record_draft_saved(draft)
     return JobDraftResponse(draft=draft)
 
 
