@@ -2,11 +2,14 @@ import type {
   AnalyzeDraftRequest,
   AnalyzeDraftResponse,
   CreateJobRequest,
+  DuplicateProjectRequest,
   JobDraftResponse,
   ProjectDetailResponse,
+  ProjectDeleteResponse,
   ProjectListResponse,
   JobExportRequest,
   JobResponse,
+  RenameProjectRequest,
   JobResult,
   RegionRetranscriptionRequest,
   RegionRetranscriptionResponse,
@@ -14,7 +17,21 @@ import type {
   UploadResponse
 } from "@ai-sheet-music-generator/shared-types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+function resolveApiBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+    const hostname = window.location.hostname === "localhost" ? "localhost" : "127.0.0.1";
+    return `${protocol}//${hostname}:8000`;
+  }
+
+  return "http://127.0.0.1:8000";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -84,6 +101,38 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
   });
 
   return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function renameProject(projectId: string, projectName: string): Promise<ProjectDetailResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ projectName } satisfies RenameProjectRequest)
+  });
+
+  return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function duplicateProject(projectId: string, projectName?: string): Promise<ProjectDetailResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/duplicate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ projectName } satisfies DuplicateProjectRequest)
+  });
+
+  return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function deleteProject(projectId: string): Promise<ProjectDeleteResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
+    method: "DELETE"
+  });
+
+  return parseJson<ProjectDeleteResponse>(response);
 }
 
 export async function getJobDraft(jobId: string): Promise<JobDraftResponse> {

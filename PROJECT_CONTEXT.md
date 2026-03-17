@@ -19,7 +19,7 @@ This repository now delivers a full local draft-notation workflow for piano and 
 - reopen completed work from a local project library
 
 Current milestone:
-- Phase 12 MVP is in place for local project productization
+- Phase 12.5 is in place for local project product polish and management
 
 Still deferred:
 - accounts and authentication
@@ -46,7 +46,7 @@ audio -> instrument separation -> instrument-specific transcription -> normalize
 # Current Project Status
 
 Quick read:
-- the repo is complete through Phase 11F and now has a shipped Phase 12 local productization MVP
+- the repo is complete through Phase 11F, Phase 12 MVP, and Phase 12.5
 - the current product is still local-first and draft-first
 - the original completed result, saved latest draft, and current in-session draft remain separate artifacts
 - project-library reopen behavior is persisted; background job execution is still not restart-resilient
@@ -510,7 +510,7 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 12.5 - Product Polish + Project Management
+## Phase 13L - Local Project System
 
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
@@ -520,15 +520,15 @@ Current status:
 - Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
 - Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 - Phase 12 MVP is now implemented with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
+- Phase 12.5 is now implemented with project rename/delete/duplicate actions, duplicated draft-id isolation, clearer project metadata, stronger unsaved-change indication, locale-ready project copy structure, and cleaner project settings/workspace boundaries
 
 Planned scope:
-- project rename / delete / duplicate operations
-- regenerate or namespace draft-level identifiers during duplication so duplicated projects have isolated identifier space from source projects
-- clearer project metadata and project list UX
-- unsaved changes indication in editor/library flows
-- onboarding and empty-state improvements
-- bilingual UI preparation and copy-structure hardening
-- UI structure cleanup across sidebar, workspace, and settings
+- user-facing local project folder model
+- open / save / import / export project workflows
+- zip-based project packaging for handoff and backup
+- project path handling rules and manifest strategy hardening
+- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+- strict preservation of original-result vs saved-draft separation through import/export boundaries
 
 ---
 

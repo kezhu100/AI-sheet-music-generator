@@ -4,6 +4,35 @@
 
 ### 2026-03-17
 Decision:
+- Implement Phase 12.5 project rename/delete/duplicate as manifest-backed project-management actions while preserving immutable `original-result.json` and isolating duplicated draft identifier space.
+
+Context:
+- Phase 12 MVP already persisted a manifest-backed local project library, immutable completed originals, and separate saved drafts, but it did not yet let users manage projects after creation.
+- The roadmap still required the original completed result, saved latest draft, and current in-session draft to stay separate artifacts rather than collapsing into one mutable project model.
+- Duplicated projects needed honest independence at the draft layer so source and duplicate would not silently share `draftNoteId` space.
+
+Chosen option:
+- Keep project rename as a manifest-backed display-label change only; do not rewrite the immutable persisted `original-result.json`.
+- Implement duplicate by creating a new local project/job identity, copying the persisted original result plus latest saved draft when present, and namespacing duplicated draft note ids to the new project id.
+- Let completed persisted projects fall back to filesystem-backed project data for draft/export/analyze/retranscribe flows when no in-memory job record exists.
+- Treat delete as immediate manifest-level removal from library/detail routes, with local file cleanup attempted best-effort in the same filesystem.
+
+Alternatives considered:
+- Rewriting `original-result.json` during rename so every artifact carried the same updated `projectName`.
+- Keeping duplicated projects on the source `jobId`, which would have shared saved-draft storage and draft identifiers.
+- Blocking project actions on any completed project that no longer had an in-memory `job_store` entry.
+
+Tradeoffs:
+- Manifest-only rename preserves original-result immutability, but export payload `projectName` remains the stored result name unless a later phase chooses a broader project-metadata model.
+- New duplicate identities plus draft-id namespacing keep source and duplicate honest, but duplication currently reuses the same underlying upload/stem file paths rather than copying raw assets.
+- Persisted-project fallback makes reopen flows more durable without a database, but it still does not solve background job recovery or full project import/export packaging.
+
+Follow-up:
+- Keep Phase 13L focused on explicit local project-folder import/export rules instead of stretching Phase 12.5 into packaging.
+- Revisit whether project rename should ever propagate into exported payload metadata only when the product intentionally redesigns project-level metadata ownership.
+
+### 2026-03-17
+Decision:
 - Change Phase 14 from a mandatory desktop application direction to local deployment and one-click startup, with desktop packaging moved to an optional later Phase 15.
 
 Context:

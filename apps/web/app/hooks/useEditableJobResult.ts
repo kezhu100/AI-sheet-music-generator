@@ -101,8 +101,8 @@ export interface EditableJobResultState {
   applySuggestion: (suggestion: CorrectionSuggestion) => void;
 }
 
-function hydrateDraftResult(result: JobResult): JobResult {
-  return normalizeEditedResult(cloneJobResult(result));
+function hydrateDraftResult(result: JobResult, draftIdNamespace?: string | null): JobResult {
+  return normalizeEditedResult(cloneJobResult(result, { draftIdNamespace: draftIdNamespace ?? undefined }));
 }
 
 function sanitizeSelectionState(
@@ -153,7 +153,9 @@ export function useEditableJobResult(
       return;
     }
 
-    const nextDraftResult = savedDraft ? hydrateDraftResult(savedDraft.result) : resetDraftFromOriginal(result);
+    const nextDraftResult = savedDraft
+      ? hydrateDraftResult(savedDraft.result, jobId)
+      : resetDraftFromOriginal(result, { draftIdNamespace: jobId ?? undefined });
     setOriginalResult(result);
     setSavedDraftRecord(savedDraft);
     setSavedDraftResult(savedDraft ? nextDraftResult : null);
@@ -164,7 +166,7 @@ export function useEditableJobResult(
     setRedoStack([]);
     setRetranscriptionRegion(null);
     setIsRetranscribingRegion(false);
-  }, [result, savedDraft]);
+  }, [jobId, result, savedDraft]);
 
   const activeResult = draftResult ?? result ?? null;
   const baselineDraftResult = savedDraftResult ?? (originalResult ? resetDraftFromOriginal(originalResult) : null);
@@ -459,7 +461,7 @@ export function useEditableJobResult(
       return;
     }
 
-    commitDraftResult(resetDraftFromOriginal(originalResult), [], null);
+    commitDraftResult(resetDraftFromOriginal(originalResult, { draftIdNamespace: jobId ?? undefined }), [], null);
   }
 
   function restoreSavedDraft(): void {
@@ -467,7 +469,7 @@ export function useEditableJobResult(
       return;
     }
 
-    commitDraftResult(hydrateDraftResult(savedDraftResult), [], null);
+    commitDraftResult(hydrateDraftResult(savedDraftResult, jobId), [], null);
   }
 
   function getCurrentDraftResult(): JobResult | undefined {

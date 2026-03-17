@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ProjectDetail } from "@ai-sheet-music-generator/shared-types";
 import { getProjectDetail } from "../../../lib/api";
+import { getUiCopy } from "../../../lib/uiCopy";
 import { ProjectWorkspace } from "../../components/ProjectWorkspace";
 export default function ProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
@@ -17,6 +18,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const copy = getUiCopy();
 
   useEffect(() => {
     if (!projectId) {
@@ -72,7 +74,7 @@ export default function ProjectDetailPage() {
           <p className="error">{error ?? "Project not found."}</p>
           <div className="actions">
             <Link className="button secondary" href="/projects">
-              Back to library
+              {copy.project.libraryTitle}
             </Link>
           </div>
         </section>

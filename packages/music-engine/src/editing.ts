@@ -66,7 +66,11 @@ export interface ApplyCorrectionSuggestionInput {
   suggestedChange: CorrectionSuggestedChange;
 }
 
-export function cloneJobResult(result: JobResult): JobResult {
+export interface CloneJobResultOptions {
+  draftIdNamespace?: string;
+}
+
+export function cloneJobResult(result: JobResult, options?: CloneJobResultOptions): JobResult {
   return {
     ...result,
     stems: result.stems.map((stem) => ({ ...stem })),
@@ -76,7 +80,9 @@ export function cloneJobResult(result: JobResult): JobResult {
         ...track,
         notes: track.notes.map((note) => ({
           ...note,
-          draftNoteId: note.draftNoteId ?? buildDraftNoteId(trackKey, note.id)
+          draftNoteId: options?.draftIdNamespace
+            ? buildDraftNoteId(trackKey, note.id, options.draftIdNamespace)
+            : note.draftNoteId ?? buildDraftNoteId(trackKey, note.id)
         }))
       };
     }),
@@ -384,8 +390,8 @@ export function replaceInstrumentRegionNotes(
   };
 }
 
-export function resetDraftFromOriginal(originalResult: JobResult): JobResult {
-  return normalizeEditedResult(cloneJobResult(originalResult));
+export function resetDraftFromOriginal(originalResult: JobResult, options?: CloneJobResultOptions): JobResult {
+  return normalizeEditedResult(cloneJobResult(originalResult, options));
 }
 
 export function areJobResultsEqual(left: JobResult | null | undefined, right: JobResult | null | undefined): boolean {
@@ -494,8 +500,8 @@ export function transposeNotes(result: JobResult, draftNoteIds: string[], semito
   });
 }
 
-export function buildDraftNoteId(trackKey: string, noteId: string): string {
-  return `draft:${trackKey}:${noteId}`;
+export function buildDraftNoteId(trackKey: string, noteId: string, namespace?: string): string {
+  return namespace ? `draft:${namespace}:${trackKey}:${noteId}` : `draft:${trackKey}:${noteId}`;
 }
 
 export function generateDraftNoteId(): string {

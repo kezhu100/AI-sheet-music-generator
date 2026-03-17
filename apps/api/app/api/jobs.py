@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+from urllib.parse import quote
+
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 from pydantic import ValidationError
@@ -122,7 +125,7 @@ async def export_job_midi(job_id: str) -> Response:
     return Response(
         content=midi_bytes,
         media_type="audio/midi",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _build_content_disposition(filename)},
     )
 
 
@@ -139,7 +142,7 @@ async def export_job_midi_override(job_id: str, payload: JobExportRequest) -> Re
     return Response(
         content=midi_bytes,
         media_type="audio/midi",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _build_content_disposition(filename)},
     )
 
 
@@ -156,7 +159,7 @@ async def export_job_musicxml(job_id: str) -> Response:
     return Response(
         content=musicxml_bytes,
         media_type="application/vnd.recordare.musicxml+xml",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _build_content_disposition(filename)},
     )
 
 
@@ -173,7 +176,7 @@ async def export_job_musicxml_override(job_id: str, payload: JobExportRequest) -
     return Response(
         content=musicxml_bytes,
         media_type="application/vnd.recordare.musicxml+xml",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _build_content_disposition(filename)},
     )
 
 
@@ -192,7 +195,27 @@ def _get_export_result(job_id: str, payload: JobExportRequest | None = None) -> 
 def _get_completed_job(job_id: str, *, allow_processing_result: bool = False):
     job = job_store.get(job_id)
     if job is None:
+        job = project_store.get_completed_job_record(job_id)
+    if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
     if not allow_processing_result and (job.status != "completed" or job.result is None):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available yet.")
     return job
+
+
+def _build_content_disposition(filename: str) -> str:
+    ascii_filename = _make_ascii_fallback_filename(filename)
+    utf8_filename = quote(filename, safe="")
+    return f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{utf8_filename}'
+
+
+def _make_ascii_fallback_filename(filename: str) -> str:
+    suffix = Path(filename).suffix
+    stem = Path(filename).stem or "download"
+    safe_stem = "".join(character if character.isascii() and character.isalnum() else "_" for character in stem).strip("_")
+    if not safe_stem:
+        safe_stem = "download"
+    safe_suffix = "".join(character if character.isascii() and (character.isalnum() or character == ".") else "" for character in suffix)
+    if safe_suffix and not safe_suffix.startswith("."):
+        safe_suffix = f".{safe_suffix}"
+    return f"{safe_stem}{safe_suffix or ''}"

@@ -214,6 +214,91 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(persisted_result.project_name, "phase12-original-stable")
         self.assertEqual(persisted_result.tracks[0].notes[0].pitch, 60)
 
+    def test_rename_project_updates_manifest_summary_name_only(self) -> None:
+        project_id = "phase125-project-rename"
+        upload = build_upload(project_id, "phase125-rename.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase125-original-name")
+        self.created_project_ids.append(project_id)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+
+        response = TestClient(app).patch(f"/api/v1/projects/{project_id}", json={"projectName": "phase125-renamed"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["project"]
+        self.assertEqual(payload["projectName"], "phase125-renamed")
+        persisted_result = self._read_original_result_payload(project_id)
+        self.assertEqual(persisted_result.project_name, "phase125-original-name")
+
+    def test_delete_project_hides_project_from_library_and_detail_routes(self) -> None:
+        project_id = "phase125-project-delete"
+        upload = build_upload(project_id, "phase125-delete.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase125-delete")
+        self.created_project_ids.append(project_id)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+        client = TestClient(app)
+        client.put(
+            f"/api/v1/jobs/{project_id}/draft",
+            json={"draftResult": build_result("phase125-delete", first_pitch=72).model_dump(mode="json", by_alias=True)},
+        )
+
+        response = client.delete(f"/api/v1/projects/{project_id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client.get(f"/api/v1/projects/{project_id}").status_code, 404)
+        listed_ids = [project["projectId"] for project in client.get("/api/v1/projects").json()["projects"]]
+        self.assertNotIn(project_id, listed_ids)
+
+    def test_duplicate_project_creates_isolated_saved_draft_and_persisted_fallback_job(self) -> None:
+        project_id = "phase125-project-duplicate"
+        upload = build_upload(project_id, "phase125-duplicate.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        original_result = build_result("phase125-source", first_pitch=60)
+        edited_result = build_result("phase125-source", first_pitch=72)
+        self.created_project_ids.append(project_id)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, original_result)
+        client = TestClient(app)
+        client.put(
+            f"/api/v1/jobs/{project_id}/draft",
+            json={"draftResult": edited_result.model_dump(mode="json", by_alias=True)},
+        )
+
+        duplicate_response = client.post(
+            f"/api/v1/projects/{project_id}/duplicate",
+            json={"projectName": "phase125-duplicate-copy"},
+        )
+
+        self.assertEqual(duplicate_response.status_code, 201)
+        duplicate_project = duplicate_response.json()["project"]
+        duplicate_project_id = duplicate_project["projectId"]
+        self.created_project_ids.append(duplicate_project_id)
+        self.assertNotEqual(duplicate_project_id, project_id)
+        self.assertEqual(duplicate_project["projectName"], "phase125-duplicate-copy")
+        self.assertTrue(duplicate_project["hasSavedDraft"])
+
+        source_draft = client.get(f"/api/v1/jobs/{project_id}/draft").json()["draft"]
+        duplicate_draft = client.get(f"/api/v1/jobs/{duplicate_project_id}/draft").json()["draft"]
+        self.assertEqual(duplicate_draft["version"], 1)
+        self.assertNotEqual(
+            source_draft["result"]["tracks"][0]["notes"][0]["draftNoteId"],
+            duplicate_draft["result"]["tracks"][0]["notes"][0]["draftNoteId"],
+        )
+        self.assertTrue(duplicate_draft["result"]["tracks"][0]["notes"][0]["draftNoteId"].startswith(f"draft:{duplicate_project_id}:"))
+
+        save_duplicate_response = client.put(
+            f"/api/v1/jobs/{duplicate_project_id}/draft",
+            json={"draftResult": build_result("phase125-source", first_pitch=84).model_dump(mode="json", by_alias=True)},
+        )
+        self.assertEqual(save_duplicate_response.status_code, 200)
+
+        export_response = client.get(f"/api/v1/jobs/{duplicate_project_id}/exports/midi")
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response.headers["content-type"], "audio/midi")
+
 
 if __name__ == "__main__":
     unittest.main()

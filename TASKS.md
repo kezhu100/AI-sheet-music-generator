@@ -106,15 +106,15 @@
 - [x] document hosted deployment targets and operational assumptions
 
 ## Phase 12.5 - Product Polish + Project Management
-- [ ] add project rename action
-- [ ] add project delete action
-- [ ] add project duplicate action
-- [ ] regenerate or namespace draft-level identifiers during duplication so duplicated projects do not share identifier space with source projects
-- [ ] improve project list metadata and status clarity
-- [ ] add unsaved draft-change indication in key UI surfaces
-- [ ] improve onboarding and empty states
-- [ ] prepare bilingual UI copy structure and locale-ready labels
-- [ ] clean up sidebar / workspace / settings layout boundaries
+- [x] add project rename action
+- [x] add project delete action
+- [x] add project duplicate action
+- [x] regenerate or namespace draft-level identifiers during duplication so duplicated projects do not share identifier space with source projects
+- [x] improve project list metadata and status clarity
+- [x] add unsaved draft-change indication in key UI surfaces
+- [x] improve onboarding and empty states
+- [x] prepare bilingual UI copy structure and locale-ready labels
+- [x] clean up sidebar / workspace / settings layout boundaries
 
 ## Phase 13L - Local Project System
 - [ ] define user-facing local project folder model

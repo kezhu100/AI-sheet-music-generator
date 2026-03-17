@@ -12,9 +12,10 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
+    "check:workspace-imports": "node scripts/check-workspace-imports.mjs",
     "dev:web": "npm run dev --workspace @ai-sheet-music-generator/web",
     "test:music-engine": "npm run test --workspace @ai-sheet-music-generator/music-engine",
     "test:api": "node scripts/test-api.mjs",
-    "validate": "npm run typecheck && npm run test:music-engine && npm run test:api"
+    "validate": "npm run check:workspace-imports && npm run typecheck && npm run test:music-engine && npm run test:api"
   }
 }

@@ -103,6 +103,15 @@ select {
   font-size: 0.95rem;
 }
 
+.pill-warning {
+  background: rgba(214, 140, 69, 0.18);
+  color: #8a4e12;
+}
+
+.pill-success {
+  background: rgba(13, 110, 110, 0.16);
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
@@ -168,6 +177,10 @@ select {
 .button.secondary {
   background: rgba(31, 36, 48, 0.08);
   color: var(--ink);
+}
+
+.danger-button {
+  color: var(--danger);
 }
 
 .meta-list,
@@ -344,6 +357,14 @@ code.inline {
 }
 
 .editor-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.workspace-banner {
   display: flex;
   justify-content: space-between;
   gap: 16px;

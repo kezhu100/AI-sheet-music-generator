@@ -50,6 +50,9 @@ The currently implemented local MVP supports:
 - region re-transcription
 - AI-assisted draft correction suggestions
 - local project-library reopen flow
+- project rename / delete / duplicate actions
+- clearer project metadata plus unsaved draft-state indication in library/workspace surfaces
+- locale-ready project/library labels through a small bilingual copy structure
 
 ## Success Criteria
 A successful local MVP:
@@ -66,10 +69,10 @@ A successful local MVP:
 - drum notation may require heuristic mapping
 - tempo changes and expressive timing may reduce quantization accuracy
 - project-library and project-route behavior is local/deployment-scoped only in Phase 12
+- project delete currently prioritizes hiding deleted projects from the library/detail routes immediately; local file cleanup is still best-effort in the same filesystem
 - the current product does not implement accounts, public sharing, or background job recovery
 
 ## Near-Term Product Roadmap (Local-First)
-- Phase 12.5 - Product polish and project-management UX improvements
 - Phase 13L - User-facing local project folder open/save/import/export model with zip packaging
 - Phase 14L - Local deployment and one-click startup for the browser UI plus local services, with runtime checks and clearer setup flow
 - Phase 15L - Optional desktop application packaging (Electron, Tauri, or equivalent) for OS-level integration later

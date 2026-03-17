@@ -376,8 +376,14 @@ class ProjectSummary(BaseModel):
     status: JobStatus
     has_saved_draft: bool = Field(alias="hasSavedDraft")
     draft_version: Optional[int] = Field(default=None, alias="draftVersion")
+    draft_saved_at: Optional[datetime] = Field(default=None, alias="draftSavedAt")
     assets: ProjectAssetAvailability
     share_path: str = Field(alias="sharePath")
+    current_stage: Optional[str] = Field(default=None, alias="currentStage")
+    status_message: Optional[str] = Field(default=None, alias="statusMessage")
+    error: Optional[str] = None
+    stem_count: Optional[int] = Field(default=None, alias="stemCount")
+    track_count: Optional[int] = Field(default=None, alias="trackCount")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -393,9 +399,6 @@ class ProjectDetail(ProjectSummary):
     upload: Optional[UploadedFileDescriptor] = None
     original_result: Optional[JobResult] = Field(default=None, alias="originalResult")
     saved_draft: Optional[JobDraftRecord] = Field(default=None, alias="savedDraft")
-    current_stage: Optional[str] = Field(default=None, alias="currentStage")
-    status_message: Optional[str] = Field(default=None, alias="statusMessage")
-    error: Optional[str] = None
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -407,6 +410,7 @@ class ProjectManifestRecord(BaseModel):
     status_message: Optional[str] = Field(default=None, alias="statusMessage")
     error: Optional[str] = None
     draft_saved_at: Optional[datetime] = Field(default=None, alias="draftSavedAt")
+    deleted_at: Optional[datetime] = Field(default=None, alias="deletedAt")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -421,5 +425,40 @@ class ProjectListResponse(BaseModel):
 class ProjectDetailResponse(BaseModel):
     status: Literal["ok"] = "ok"
     project: ProjectDetail
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectRenameRequest(BaseModel):
+    project_name: str = Field(alias="projectName")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("project_name")
+    @classmethod
+    def validate_project_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("projectName must not be empty.")
+        return value.strip()
+
+
+class ProjectDuplicateRequest(BaseModel):
+    project_name: Optional[str] = Field(default=None, alias="projectName")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("project_name")
+    @classmethod
+    def validate_optional_project_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("projectName must not be empty when provided.")
+        return trimmed
+
+
+class ProjectDeleteResponse(BaseModel):
+    status: Literal["ok"] = "ok"
 
     model_config = {"populate_by_name": True, "extra": "forbid"}

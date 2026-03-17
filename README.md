@@ -15,6 +15,7 @@ The current product direction is local-first: the app runs as local backend serv
 - re-transcribe a selected piano or drum region from persisted stems
 - analyze the current editable draft and apply heuristic correction suggestions
 - reopen persisted projects from a local filesystem-backed project library
+- rename, duplicate, and delete local projects from the library and project workspace
 
 ## Current Local MVP Limits
 
@@ -59,6 +60,7 @@ Current milestone:
 - Phase 11E completed: region re-transcription now reuses persisted stems, the configured transcription providers, and backend post-processing to replace a selected draft time range without recomputing the whole job
 - Phase 11F completed: AI-assisted correction now analyzes the current editable draft, returns heuristic suggestion objects for likely note issues, highlights suggested notes in the editor, and lets users apply each suggestion as one undoable draft edit without changing the normalized `JobResult`
 - Phase 12 MVP completed: a local project library, manifest-backed project asset summaries, immutable completed original-result persistence, stable local project routes, and lightweight onboarding improvements are now implemented without adding accounts or public sharing
+- Phase 12.5 completed: project rename/delete/duplicate, duplicated draft-id isolation, clearer library metadata/status messaging, unsaved draft indicators, locale-ready project copy structure, and sidebar/workspace/settings cleanup are now implemented on top of the Phase 12 MVP
 
 Current behavior:
 
@@ -77,6 +79,9 @@ Current behavior:
 - Phase 11E now adds draft-only region re-transcription for piano or drums, letting the editor request replacement notes for a selected time range without mutating the original completed backend result
 - the region re-transcription endpoint now reports which backend actually produced the returned region notes through `providerUsed`, including fallback cases
 - Phase 11F now adds a draft-only correction-analysis endpoint plus editor suggestion markers and apply actions; analysis stays heuristic, suggestion-based, and does not mutate the stored completed result or the `JobResult` contract
+- project rename now updates manifest-backed project labels without mutating the immutable persisted `original-result.json`
+- project duplication now creates a new local project/job identity, copies the persisted original result plus latest saved draft when present, and namespaces duplicated draft note ids so source and duplicate do not share draft identifier space
+- persisted completed projects can now continue using draft save/load, export, analysis, and region re-transcription flows through filesystem-backed project fallback even when no in-memory job record is available
 
 ## Environment Requirements
 
@@ -214,7 +219,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
-## Running the Current Phase 12 MVP Locally
+## Running the Current Phase 12.5 Build Locally
 
 1. Run `npm run dev` from the repository root.
 2. Open `http://127.0.0.1:3000`.
@@ -299,6 +304,7 @@ Current limitations:
 - the Phase 12 project library is filesystem-driven from local manifests and does not depend on the in-memory `job_store` for persisted project listing/detail
 - `original-result.json` is written once when a job completes and is not overwritten by draft saves, re-transcription, or in-session edits
 - `/projects/{projectId}` is a stable local route for reopening persisted project state, not a resume/recovery path for background jobs
+- deleted projects are hidden from library/detail routes immediately; local file cleanup is attempted best-effort in the same local filesystem
 - shareable project links are local deployment routes only; they are not public internet-safe share tokens and do not add auth, permissions, or anonymous publishing
 - current hosted assumptions remain single-instance plus persistent disk/volume mounted under `apps/api/data`; multi-instance coordination and job recovery are deferred
 
@@ -325,7 +331,7 @@ Current validation reality:
 - persisted multi-revision edit history or saved projects
 - user-facing local project import/export packaging
 - desktop packaging and installer workflows
-- bilingual UI copy coverage and language switching UX
+- full bilingual UI copy coverage and language switching UX
 - user accounts or authentication
 - database-backed ownership rules
 - real public sharing or permission systems
@@ -334,15 +340,7 @@ Current validation reality:
 
 ## Future Roadmap
 
-- Completed baseline: Phase 11A through Phase 11F and Phase 12 MVP are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
-- Phase 12.5 - Product Polish + Project Management:
-  - project rename / delete / duplicate
-  - regenerate or namespace draft-level identifiers (for example `draftNoteId`) during duplication so duplicated projects do not share identifier space with the source
-  - clearer project metadata and list UX
-  - unsaved draft-change indication
-  - onboarding and empty-state improvements
-  - bilingual UI preparation
-  - UI structure cleanup across sidebar, workspace, and settings
+- Completed baseline: Phase 11A through Phase 11F, Phase 12 MVP, and Phase 12.5 are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
 - Phase 13L - Local Project System:
   - user-facing local project folder model
   - open / save / import / export project flows

@@ -144,17 +144,20 @@ export interface ProjectSummary {
   status: JobStatus;
   hasSavedDraft: boolean;
   draftVersion?: number | null;
+  draftSavedAt?: string | null;
   assets: ProjectAssetAvailability;
   sharePath: string;
+  currentStage?: string | null;
+  statusMessage?: string | null;
+  error?: string | null;
+  stemCount?: number | null;
+  trackCount?: number | null;
 }
 
 export interface ProjectDetail extends ProjectSummary {
   upload?: UploadedFileDescriptor | null;
   originalResult?: JobResult | null;
   savedDraft?: JobDraftRecord | null;
-  currentStage?: string | null;
-  statusMessage?: string | null;
-  error?: string | null;
 }
 
 export interface ProjectListResponse {
@@ -165,6 +168,18 @@ export interface ProjectListResponse {
 export interface ProjectDetailResponse {
   status: "ok";
   project: ProjectDetail;
+}
+
+export interface RenameProjectRequest {
+  projectName: string;
+}
+
+export interface DuplicateProjectRequest {
+  projectName?: string;
+}
+
+export interface ProjectDeleteResponse {
+  status: "ok";
 }
 
 export interface JobProgress {

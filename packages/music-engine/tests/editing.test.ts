@@ -20,8 +20,8 @@ import {
   updateNotePitch,
   updateNoteVelocity,
   updateNoteTiming
-} from "../src/index.js";
-import { getTrackKey } from "../src/preview.js";
+} from "../src/index";
+import { getTrackKey } from "../src/preview";
 
 function createOriginalResult(): JobResult {
   return {
@@ -88,6 +88,16 @@ runTest("resetDraftFromOriginal assigns stable draft note ids", () => {
 
   assert.equal(pianoTrack.notes[0].draftNoteId, expectedDraftNoteId);
   assert.equal(resetDraftFromOriginal(original).tracks[0].notes[0].draftNoteId, expectedDraftNoteId);
+});
+
+runTest("resetDraftFromOriginal can namespace draft note ids for duplicated projects", () => {
+  const original = createOriginalResult();
+  const draft = resetDraftFromOriginal(original, { draftIdNamespace: "duplicate-project" });
+
+  assert.equal(
+    draft.tracks[0].notes[0].draftNoteId,
+    buildDraftNoteId(getTrackKey(draft.tracks[0]), "piano-a", "duplicate-project")
+  );
 });
 
 runTest("selectNote finds notes by draftNoteId", () => {

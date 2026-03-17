@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import gc
+import os
+import stat
+import time
 from pathlib import Path
 from threading import Lock
 from typing import Optional
@@ -33,6 +37,24 @@ class DraftStore:
             )
             self._build_path(job_id).write_text(draft.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
             return draft
+
+    def save_record(self, draft: JobDraftRecord) -> JobDraftRecord:
+        with self._lock:
+            self._build_path(draft.job_id).write_text(draft.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
+            return draft
+
+    def delete(self, job_id: str) -> None:
+        with self._lock:
+            draft_path = self._build_path(job_id)
+            if draft_path.exists():
+                for attempt in range(3):
+                    try:
+                        os.chmod(draft_path, stat.S_IWRITE)
+                        draft_path.unlink()
+                        break
+                    except PermissionError:
+                        gc.collect()
+                        time.sleep(0.02 * (attempt + 1))
 
     def _read_without_lock(self, job_id: str) -> Optional[JobDraftRecord]:
         draft_path = self._build_path(job_id)

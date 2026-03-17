@@ -90,3 +90,9 @@ Phase 12 summary:
 - project manifests are now the persisted source of truth for the local library
 - immutable completed originals and separate saved drafts preserve the existing original-result versus draft boundary
 - project reopen behavior is persisted, but live background execution is still not restart-resilient
+
+Phase 12.5 project-management update:
+- rename now changes manifest-backed project labels without mutating the immutable persisted original result
+- duplicate now creates a new local project/job identity, copies the persisted original result plus latest saved draft when present, and namespaces duplicated draft note ids
+- delete now removes projects from the library/detail routes immediately while local file cleanup remains best-effort in the same filesystem
+- persisted completed projects can now fall back to filesystem-backed project data for draft save/load, export, analysis, and region re-transcription flows when the in-memory job record is gone

@@ -111,6 +111,9 @@ For drums, allow `pitch` to represent drum MIDI mapping or use:
 - Do not mix UI logic with music-processing logic.
 - Do not hardcode sample assets into production code.
 - Write clear comments only where the code is non-obvious.
+- In workspace package TypeScript source files, use extensionless relative imports/exports such as `./editing`.
+- Do not use `.js` suffixes in workspace package source files unless a specific runtime reason is already documented.
+- If a Node ESM test/runtime path needs explicit `.js` specifiers, handle that in compiled artifacts or runtime/test tooling rather than by changing workspace source conventions.
 
 ## API Design Rules
 - Keep API contracts versionable.

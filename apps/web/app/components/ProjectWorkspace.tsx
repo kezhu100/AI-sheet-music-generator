@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   areJobResultsEqual,
@@ -24,13 +25,17 @@ import type {
 import {
   analyzeDraft,
   createJob,
+  deleteProject,
   downloadMidiExport,
   downloadMusicXmlExport,
+  duplicateProject,
   getJob,
   getJobDraft,
   saveJobDraft,
+  renameProject,
   uploadAudio
 } from "../../lib/api";
+import { getUiCopy } from "../../lib/uiCopy";
 import { useEditableJobResult } from "../hooks/useEditableJobResult";
 import { DrumNotationPreview } from "./DrumNotationPreview";
 import { NoteEditorPanel } from "./NoteEditorPanel";
@@ -95,10 +100,18 @@ function formatProjectAssetSummary(projectDetail: ProjectDetail): string {
   if (projectDetail.assets.availableExports.length > 0) {
     labels.push(projectDetail.assets.availableExports.join(" + "));
   }
+  if (projectDetail.trackCount != null) {
+    labels.push(`${projectDetail.trackCount} tracks`);
+  }
+  if (projectDetail.stemCount != null) {
+    labels.push(`${projectDetail.stemCount} stems`);
+  }
   return labels.length > 0 ? labels.join(" | ") : "No persisted project assets yet.";
 }
 
 export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectWorkspaceProps) {
+  const router = useRouter();
+  const copy = getUiCopy();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [upload, setUpload] = useState<UploadResponse | null>(null);
   const [job, setJob] = useState<JobRecord | null>(() => buildJobFromProjectDetail(initialProjectDetail));
@@ -126,6 +139,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [addDrumMidiNote, setAddDrumMidiNote] = useState(38);
   const [reassignDrumLabel, setReassignDrumLabel] = useState("snare");
   const [reassignDrumMidiNote, setReassignDrumMidiNote] = useState(38);
+  const [isRenamingProject, setIsRenamingProject] = useState(false);
+  const [isDuplicatingProject, setIsDuplicatingProject] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
   const lastDraftJobIdRef = useRef<string | null>(null);
 
   const {
@@ -340,6 +356,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const draftMatchesOriginal = useMemo(() => {
     return areJobResultsEqual(activeResult, job?.result ?? null);
   }, [activeResult, job?.result]);
+  const downloadBaseName =
+    projectDetail?.projectName ?? activeResult?.projectName ?? job?.result?.projectName ?? "ai-sheet-music-generator";
 
   useEffect(() => {
     if (!activeResult) {
@@ -535,7 +553,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       const url = window.URL.createObjectURL(midiBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${(modeName === "draft" ? activeResult : job.result)?.projectName || "ai-sheet-music-generator"}-${modeName}.mid`;
+      anchor.download = `${downloadBaseName}-${modeName}.mid`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -574,7 +592,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       const url = window.URL.createObjectURL(musicXmlBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${(modeName === "draft" ? activeResult : job.result)?.projectName || "ai-sheet-music-generator"}-${modeName}.musicxml`;
+      anchor.download = `${downloadBaseName}-${modeName}.musicxml`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -614,7 +632,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               ...currentProject,
               hasSavedDraft: true,
               draftVersion: response.draft.version,
-              savedDraft: response.draft
+              draftSavedAt: response.draft.savedAt,
+              savedDraft: response.draft,
+              updatedAt: response.draft.savedAt
             }
           : currentProject
       );
@@ -736,6 +756,73 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
   }
 
+  async function handleRenameProject(): Promise<void> {
+    if (!projectDetail) {
+      return;
+    }
+
+    const nextName = window.prompt("Rename project", projectDetail.projectName)?.trim();
+    if (!nextName || nextName === projectDetail.projectName) {
+      return;
+    }
+
+    setIsRenamingProject(true);
+    setError(null);
+    try {
+      const response = await renameProject(projectDetail.projectId, nextName);
+      setProjectDetail(response.project);
+      setJob(buildJobFromProjectDetail(response.project));
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : "Failed to rename the project.");
+    } finally {
+      setIsRenamingProject(false);
+    }
+  }
+
+  async function handleDuplicateProject(): Promise<void> {
+    if (!projectDetail) {
+      return;
+    }
+
+    const nextName = window.prompt("Duplicate project as", `${projectDetail.projectName} copy`)?.trim();
+    if (nextName === "") {
+      return;
+    }
+
+    setIsDuplicatingProject(true);
+    setError(null);
+    try {
+      const response = await duplicateProject(projectDetail.projectId, nextName || undefined);
+      router.push(response.project.sharePath);
+    } catch (duplicateError) {
+      setError(duplicateError instanceof Error ? duplicateError.message : "Failed to duplicate the project.");
+    } finally {
+      setIsDuplicatingProject(false);
+    }
+  }
+
+  async function handleDeleteProject(): Promise<void> {
+    if (!projectDetail) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete "${projectDetail.projectName}" and its saved draft?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingProject(true);
+    setError(null);
+    try {
+      await deleteProject(projectDetail.projectId);
+      router.push("/projects");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete the project.");
+    } finally {
+      setIsDeletingProject(false);
+    }
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -761,6 +848,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <span className="pill">Region re-transcription</span>
               <span className="pill">Draft analysis suggestions</span>
               <span className="pill">Stable local project routes</span>
+              {mode === "project" ? (
+                <span className={`pill ${isDraftDirty ? "pill-warning" : "pill-success"}`}>
+                  {isDraftDirty ? copy.project.unsavedChanges : copy.project.savedDraft}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="panel inset-panel">
@@ -907,6 +999,19 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   <div>{formatProjectAssetSummary(projectDetail)}</div>
                   <div className="muted">Share route: {projectDetail.sharePath}</div>
                 </div>
+                <div className="meta-item">
+                  <strong>Draft baseline</strong>
+                  <div>
+                    {projectDetail.hasSavedDraft
+                      ? `Saved draft v${projectDetail.draftVersion ?? 1}${projectDetail.draftSavedAt ? ` on ${new Date(projectDetail.draftSavedAt).toLocaleString()}` : ""}`
+                      : "No saved draft yet"}
+                  </div>
+                  <div className="muted">
+                    {isDraftDirty
+                      ? "Current in-session changes are not saved yet."
+                      : "Current editor state matches the last saved baseline or the original result."}
+                  </div>
+                </div>
                 {projectDetail.upload ? (
                   <div className="meta-item">
                     <strong>Source upload</strong>
@@ -920,19 +1025,43 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             )}
           </div>
           <div className="panel">
-            <h2>Local Share Link</h2>
+            <h2>{copy.project.projectSettings}</h2>
             {projectDetail ? (
               <>
-                <p className="muted">
-                  This is a stable local route, not a public internet-safe share token. It only works on the same deployed instance with the same persisted project files.
-                </p>
+                <p className="muted">{copy.project.localRouteNotice}</p>
                 <div className="actions">
                   <button className="button secondary" type="button" onClick={() => void handleCopyProjectLink()}>
-                    Copy local share link
+                    {copy.project.copyLinkAction}
                   </button>
                   <Link className="button secondary" href={projectDetail.sharePath}>
                     Open stable route
                   </Link>
+                </div>
+                <div className="actions">
+                  <button
+                    className="button secondary"
+                    disabled={isRenamingProject || isDuplicatingProject || isDeletingProject}
+                    onClick={() => void handleRenameProject()}
+                    type="button"
+                  >
+                    {copy.project.renameAction}
+                  </button>
+                  <button
+                    className="button secondary"
+                    disabled={isRenamingProject || isDuplicatingProject || isDeletingProject}
+                    onClick={() => void handleDuplicateProject()}
+                    type="button"
+                  >
+                    {copy.project.duplicateAction}
+                  </button>
+                  <button
+                    className="button secondary danger-button"
+                    disabled={isRenamingProject || isDuplicatingProject || isDeletingProject}
+                    onClick={() => void handleDeleteProject()}
+                    type="button"
+                  >
+                    {copy.project.deleteAction}
+                  </button>
                 </div>
               </>
             ) : (
@@ -945,6 +1074,28 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       {error ? <p className="error">{error}</p> : null}
       {activeResult ? (
         <>
+          <section className="panel workspace-banner">
+            <div>
+              <strong>{isDraftDirty ? copy.project.unsavedChanges : copy.project.savedDraft}</strong>
+              <div className="muted">
+                {draftMatchesOriginal
+                  ? "The current draft still matches the original completed result."
+                  : isDraftDirty
+                    ? "The current draft differs from the last saved baseline. Save draft when you want these edits persisted."
+                    : "The current draft matches the latest saved draft and stays separate from the immutable original result."}
+              </div>
+            </div>
+            <div className="actions">
+              <button className="button" type="button" disabled={!activeResult || isSavingDraft} onClick={() => void handleSaveDraft()}>
+                {isSavingDraft ? "Saving draft..." : "Save draft"}
+              </button>
+              {mode === "project" ? (
+                <button className="button secondary" type="button" onClick={() => void handleRenameProject()}>
+                  {copy.project.renameAction}
+                </button>
+              ) : null}
+            </div>
+          </section>
           <section className="content-grid">
             <div className="panel">
               <h2>Track Summary</h2>

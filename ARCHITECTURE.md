@@ -16,14 +16,22 @@ Phase 12 adds a small project-facing persistence layer on top of the existing pi
 - the saved latest draft remains in the separate draft store
 - project reopen routes use persisted project state only and do not resume background execution
 
+## Phase 12.5 Summary
+
+Phase 12.5 extends the same project-facing layer without changing the core result model:
+- project rename, delete, and duplicate actions are manifest-backed project-management operations
+- duplication creates a new local project/job identity and namespaces duplicated draft-level note ids
+- persisted completed projects can now fall back to filesystem-backed project data for draft/export workflows when no in-memory job is present
+- project list/detail UIs now consume clearer manifest status metadata and locale-ready labels without introducing accounts or cloud assumptions
+
 ## Roadmap Direction (Post-Phase 12)
 
 Strategic direction:
 - local-first, installable, browser-based local application with optional future desktop packaging
 
 Near-term architecture priorities:
-- local product polish and project/file management ergonomics
-- bilingual UI readiness
+- local project/file management ergonomics
+- broader bilingual UI coverage beyond the new locale-ready project labels
 - local deployment and one-click startup
 - local environment/runtime configuration and checks
 - onboarding and demo workflows
@@ -256,11 +264,14 @@ Phase 12 productization boundary:
 - immutable completed originals are stored under `apps/api/data/projects/<project-id>/original-result.json` and are written only once on completion
 - saved drafts remain in the existing `apps/api/data/drafts/<job-id>.json` store and do not overwrite the persisted original result
 - the projects API now exposes `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}` from filesystem-backed manifests
+- the projects API now also exposes rename, duplicate, and delete actions for local project management
 - `/projects/{projectId}` in the web app is for reopening persisted project state only; it does not resume or recover background job execution after restart
 - current hosted assumptions are single backend instance plus persistent local/shared disk; accounts, public sharing, multi-instance coordination, and job recovery remain deferred
+- deleted projects are hidden at the manifest layer immediately, while local file cleanup remains best-effort in the same filesystem
+- project rename updates manifest-backed display metadata only; it does not mutate the immutable persisted `original-result.json`
+- duplication copies persisted original-result and saved-draft artifacts into a new local project/job namespace while preserving the original-result versus saved-draft split
 
 Future roadmap boundaries:
-- Phase 12.5 will focus on UI structure cleanup, project management actions, unsaved-change indication, onboarding/empty states, and bilingual-ready UI copy structure, while keeping duplicated projects identifier-isolated (including draft-level ids)
 - Phase 13L will add user-facing local project folder open/save/import/export behavior with zip packaging while preserving the original-result vs saved-draft split, and will always assign a new local `projectId` on import
 - Phase 14L will add a clean local deployment mode with one-command or one-script startup for local backend services plus browser UI, environment/runtime checks, automatic browser open where appropriate, and clearer local configuration guidance while keeping the architecture local-first and browser-based
 - Phase 15L will optionally wrap the same local app in a desktop shell such as Electron or Tauri, adding a desktop bridge only if packaging needs one and improving OS-level integration without changing core product viability

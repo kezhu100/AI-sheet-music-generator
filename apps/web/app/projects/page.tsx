@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ProjectSummary } from "@ai-sheet-music-generator/shared-types";
-import { getProjects } from "../../lib/api";
+import { deleteProject, duplicateProject, getProjects, renameProject } from "../../lib/api";
+import { getUiCopy } from "../../lib/uiCopy";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  const copy = getUiCopy();
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +40,74 @@ export default function ProjectsPage() {
     };
   }, []);
 
+  async function handleRenameProject(project: ProjectSummary): Promise<void> {
+    const nextName = window.prompt("Rename project", project.projectName)?.trim();
+    if (!nextName || nextName === project.projectName) {
+      return;
+    }
+
+    setBusyProjectId(project.projectId);
+    setError(null);
+    try {
+      const response = await renameProject(project.projectId, nextName);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.projectId === project.projectId ? response.project : currentProject
+        )
+      );
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to rename the project.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  }
+
+  async function handleDuplicateProject(project: ProjectSummary): Promise<void> {
+    const nextName = window.prompt("Duplicate project as", `${project.projectName} copy`)?.trim();
+    if (nextName === "") {
+      return;
+    }
+
+    setBusyProjectId(project.projectId);
+    setError(null);
+    try {
+      const response = await duplicateProject(project.projectId, nextName || undefined);
+      setProjects((currentProjects) => [response.project, ...currentProjects]);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to duplicate the project.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  }
+
+  async function handleDeleteProject(project: ProjectSummary): Promise<void> {
+    const confirmed = window.confirm(`Delete "${project.projectName}" and its saved draft?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyProjectId(project.projectId);
+    setError(null);
+    try {
+      await deleteProject(project.projectId);
+      setProjects((currentProjects) =>
+        currentProjects.filter((currentProject) => currentProject.projectId !== project.projectId)
+      );
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to delete the project.");
+    } finally {
+      setBusyProjectId(null);
+    }
+  }
+
+  function formatProjectStatus(project: ProjectSummary): string {
+    if (project.error) {
+      return `Error: ${project.error}`;
+    }
+
+    return project.statusMessage ?? project.currentStage ?? project.status;
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -47,7 +118,7 @@ export default function ProjectsPage() {
         </div>
         <div className="hero-grid">
           <div>
-            <h1>Project Library</h1>
+            <h1>{copy.project.libraryTitle}</h1>
             <p>
               Reopen local persisted projects from filesystem-backed manifests. Share routes are stable inside the same deployment,
               but they are not public publishing links and do not bypass missing auth or storage rules.
@@ -87,8 +158,8 @@ export default function ProjectsPage() {
           {!isLoading && !error && projects.length === 0 ? (
             <div className="note-list">
               <article className="note-card">
-                <strong>No projects yet</strong>
-                <div className="muted">Create a job from the upload page, then come back here to reopen it from its stable local project route.</div>
+                <strong>{copy.project.libraryEmptyTitle}</strong>
+                <div className="muted">{copy.project.libraryEmptyBody}</div>
               </article>
             </div>
           ) : null}
@@ -98,7 +169,13 @@ export default function ProjectsPage() {
                 <article className="track-card" key={project.projectId}>
                   <strong>{project.projectName}</strong>
                   <div className="muted">Status: {project.status}</div>
+                  <div className="muted">Stage: {formatProjectStatus(project)}</div>
                   <div className="muted">Updated: {new Date(project.updatedAt).toLocaleString()}</div>
+                  <div className="muted">
+                    {project.trackCount != null || project.stemCount != null
+                      ? `Tracks: ${project.trackCount ?? 0} | Stems: ${project.stemCount ?? 0}`
+                      : "Tracks and stems appear after a completed result is persisted."}
+                  </div>
                   <div>
                     Assets:
                     {" "}
@@ -111,11 +188,42 @@ export default function ProjectsPage() {
                       .filter(Boolean)
                       .join(" | ") || "none"}
                   </div>
+                  <div>
+                    Draft state:
+                    {" "}
+                    {project.hasSavedDraft
+                      ? `saved v${project.draftVersion ?? 1}${project.draftSavedAt ? ` on ${new Date(project.draftSavedAt).toLocaleString()}` : ""}`
+                      : "no saved draft"}
+                  </div>
                   <div>Exports: {project.assets.availableExports.join(", ") || "not available yet"}</div>
                   <div className="actions">
                     <Link className="button secondary" href={project.sharePath}>
-                      Open project
+                      {copy.project.openAction}
                     </Link>
+                    <button
+                      className="button secondary"
+                      disabled={busyProjectId === project.projectId}
+                      onClick={() => void handleRenameProject(project)}
+                      type="button"
+                    >
+                      {copy.project.renameAction}
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={busyProjectId === project.projectId}
+                      onClick={() => void handleDuplicateProject(project)}
+                      type="button"
+                    >
+                      {copy.project.duplicateAction}
+                    </button>
+                    <button
+                      className="button secondary danger-button"
+                      disabled={busyProjectId === project.projectId}
+                      onClick={() => void handleDeleteProject(project)}
+                      type="button"
+                    >
+                      {copy.project.deleteAction}
+                    </button>
                   </div>
                 </article>
               ))}
