@@ -4,6 +4,63 @@
 
 ### 2026-03-17
 Decision:
+- Change Phase 14 from a mandatory desktop application direction to local deployment and one-click startup, with desktop packaging moved to an optional later Phase 15.
+
+Context:
+- The current architecture already runs as local backend services plus a browser UI with local filesystem persistence.
+- Requiring a desktop shell in Phase 14 adds complexity before the local-first deployment flow is fully hardened.
+- The product direction should improve developer-to-user transition without implying cloud, accounts, or SaaS assumptions.
+
+Chosen option:
+- Define Phase 14L as Local Deployment & One-Click Startup.
+- Keep the system browser-based and local-first, with one-command or one-script startup, automatic browser open where appropriate, and clear environment/runtime checks.
+- Define Phase 15L as optional future desktop application packaging using Electron, Tauri, or equivalent only if later packaging needs justify it.
+
+Alternatives considered:
+- Keeping Electron or Tauri desktop packaging as a mandatory Phase 14 deliverable.
+
+Tradeoffs:
+- Pros: simpler roadmap, faster iteration, lower maintenance burden, and stronger alignment with the existing local-first architecture.
+- Cons: Phase 14 delivers less native desktop feel and fewer OS-level integrations than a packaged shell.
+
+Impact:
+- simplifies Phase 14 implementation
+- aligns with the current local-first runtime
+- improves contributor onboarding
+
+Follow-up:
+- Keep local deployment wording consistent across roadmap and architecture docs.
+- Revisit desktop bridge design only in the optional Phase 15 packaging work.
+
+### 2026-03-17
+Decision:
+- Shift the roadmap from a potential SaaS-oriented direction to a local-first, installable, open-source tool direction.
+
+Context:
+- Phase 12 MVP already delivered local project manifests, immutable completed originals, and local project reopen routes while keeping jobs in memory.
+- The repository architecture is strongest when it keeps local draft workflows explicit, preserves normalized `JobResult` boundaries, and avoids claiming unsolved cloud/account behavior.
+- Near-term product risk is now usability and packaging friction in local workflows, not lack of SaaS infrastructure.
+
+Chosen option:
+- Prioritize post-Phase-12 work as: Phase 12.5 product polish/project management, Phase 13L local project system, Phase 14L local deployment and one-click startup, and optional future Phase 15L desktop application packaging.
+- Keep the original completed result, saved latest draft, and in-session draft as separate artifacts throughout future roadmap work.
+- Keep provider-based backend modules and normalized `JobResult` output as the stable integration boundary.
+
+Alternatives considered:
+- Continuing to prioritize accounts, permissions, cloud storage, and public sharing immediately after Phase 12.
+- Introducing database-backed SaaS ownership infrastructure before local project/file ergonomics and desktop readiness.
+
+Tradeoffs:
+- Local-first prioritization improves near-term product usability and installability, but SaaS-oriented collaboration and sharing remain deferred.
+- Deferring cloud/account systems keeps the roadmap realistic with the current runtime model, but cross-device and multi-user flows remain unavailable.
+- Preserving existing contracts avoids churn across preview/edit/export, but some advanced product features must wait for later architecture phases.
+
+Follow-up:
+- Keep SaaS-oriented features in a clearly deferred track until storage, ownership, and operational constraints are intentionally redesigned.
+- Keep documentation aligned on local-first scope to avoid mixed roadmap signals.
+
+### 2026-03-17
+Decision:
 - Implement Phase 12 MVP productization as a filesystem-backed project manifest layer plus stable local project routes, while explicitly deferring accounts, public sharing, and job recovery.
 
 Context:

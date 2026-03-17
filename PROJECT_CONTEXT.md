@@ -5,6 +5,8 @@ AI Sheet Music Generator
 
 ## Executive Summary
 
+This project is a local-first AI application that converts audio into editable draft sheet music.
+
 This repository now delivers a full local draft-notation workflow for piano and drums:
 - upload audio
 - run provider-based source separation and transcription
@@ -508,7 +510,7 @@ Local dev startup
 
 # Next Development Phase
 
-## Phase 12 - Local Productization MVP
+## Phase 12.5 - Product Polish + Project Management
 
 Current status:
 - Phase 11A is complete for stronger source separation provider selection and fallback
@@ -519,8 +521,14 @@ Current status:
 - Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
 - Phase 12 MVP is now implemented with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
 
-Scope reminder:
-- keep accounts, auth, public sharing, and job recovery explicitly deferred until storage and ownership rules are defined
+Planned scope:
+- project rename / delete / duplicate operations
+- regenerate or namespace draft-level identifiers during duplication so duplicated projects have isolated identifier space from source projects
+- clearer project metadata and project list UX
+- unsaved changes indication in editor/library flows
+- onboarding and empty-state improvements
+- bilingual UI preparation and copy-structure hardening
+- UI structure cleanup across sidebar, workspace, and settings
 
 ---
 
@@ -528,12 +536,19 @@ Scope reminder:
 
 ## Roadmap Overview
 
-The next roadmap should extend the current architecture in the same order the product is maturing:
+Roadmap direction is now explicitly local-first, installable, and open-source oriented.
 
-1. preserve user edits first
-2. make editing faster and more ergonomic
-3. improve model quality without breaking the normalized pipeline
-4. productize the workflow once longer-lived project state exists
+Product and architecture guardrails remain unchanged:
+- keep `JobResult` as the normalized core contract
+- keep original completed result, saved latest draft, and in-session editable draft as separate artifacts
+- keep provider-based modular backends
+- keep local-first assumptions explicit and honest
+
+The next roadmap extends the current architecture in this order:
+1. improve local UX and project ergonomics
+2. harden user-facing local project file workflows
+3. improve local deployment and one-click startup
+4. keep desktop packaging as an optional later extension
 
 This keeps the current `upload -> pipeline -> normalized JobResult -> editable draft -> validated export` design intact while moving the product toward a durable application.
 
@@ -557,77 +572,42 @@ Current runtime limitations:
 - undo/redo history is session-local and not stored as persistent revision history
 - job state is still in-memory and is lost when the API restarts
 
-Phase 7
-Completed: score preview UI with piano-roll, simplified piano score, simplified drum notation, and track visibility toggles.
+## Phase 13L - Local Project System
 
-Phase 8
-Completed: frontend draft editing with note selection, drag timing moves, piano pitch adjustment, add/delete note controls, and edited export override support.
+Planned scope:
+- user-facing local project folder model
+- open / save / import / export project workflows
+- zip-based project packaging for handoff and backup
+- project path handling rules and manifest strategy hardening
+- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+- strict preservation of original-result vs saved-draft separation through import/export boundaries
 
-## Phase 9 - Editing Persistence
+## Phase 14L - Local Deployment & One-Click Startup
 
-Completed:
-- save edited draft
-- reload saved draft
-- continue editing from an existing saved draft
-- export edited result versus original result
-- minimal version tracking for draft revisions
+Planned scope:
+- clean local deployment mode for end users
+- one-command or one-script startup for frontend plus backend
+- automatic browser open where appropriate
+- environment checks for Python runtime and optional ML providers, or clear missing-dependency guidance
+- preserve seamless local filesystem persistence in the deployed local workflow
+- improve the transition from developer setup to usable local app flow
+- settings UI and documentation for provider/runtime configuration where appropriate
+- explicit local-first constraints and unsupported-runtime messaging without introducing cloud or account assumptions
 
-## Phase 10 - Editing UX Improvements
+## Phase 15L - Desktop Application Packaging (Optional / Future)
 
-Completed:
-- undo / redo
-- multi-note selection
-- box selection
-- keyboard editing
-- quantization tools
-- drum lane reassignment
+Planned scope:
+- wrap the existing local app in a desktop shell such as Electron, Tauri, or equivalent
+- introduce a typed desktop bridge only if packaging requires one
+- improve OS-level integration such as native file dialogs, app menus, and windowing behavior
+- keep desktop packaging optional and not required for core product viability
 
-Notes:
-- Phase 8 established single-note editing and Phase 9 makes edits durable
-- Phase 10 should improve editor throughput rather than changing the pipeline contract
-- richer editing should continue to operate on the same normalized draft result shape whenever possible
-
-## Phase 11 - Result Quality & AI Improvements
-
-Goal:
-Improve transcription quality and add AI-assisted correction tools without breaking the current modular pipeline.
-
-Possible improvements:
-- stronger source separation
-- improved piano transcription models
-- improved drum transcription
-- smarter post-processing
-- region re-transcription
-- AI-assisted correction tools
-
-Architecture note:
-- model upgrades should remain behind the existing provider and post-processing boundaries
-- future quality gains should continue producing normalized `JobResult` output so preview, editing, persistence, and export do not need a redesign
-
-## Phase 12 - Productization
-
-Goal:
-Turn the current technical workflow into a fuller application built around saved work and repeat usage.
-
-Current MVP status:
-- a local filesystem-backed project library is now implemented through `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}`
-- each created job now gets a project manifest under `apps/api/data/projects/<project-id>/manifest.json`
-- each completed job now writes an immutable `original-result.json` once under `apps/api/data/projects/<project-id>/original-result.json`
-- the local project route `/projects/{projectId}` can reopen persisted project state when `originalResult` exists
-- incomplete or failed project routes intentionally show status/metadata only and do not attempt job recovery or resumption
-- onboarding now includes a library entry point plus explicit draft/export/share limitations
-
-Explicitly deferred:
-- user accounts
-- authentication or ownership rules
-- database-backed storage
-- public sharing or permission systems
-- multi-instance coordination
+Explicitly deferred (not near-term roadmap):
+- user accounts and authentication
+- cloud storage and database-backed ownership/permission systems
+- public sharing and permission controls
+- multi-device sync
 - background job recovery
-
-Motivation:
-- productization becomes more coherent after draft persistence exists and editing workflows are less ephemeral
-- these features should build on the earlier saved-draft architecture rather than bypassing it with separate product state
 
 ---
 

@@ -2,6 +2,12 @@
 
 ## High-Level Architecture
 
+## Runtime Model
+
+- The system runs as local backend services plus a browser-based frontend.
+- It behaves like a desktop-like local application without requiring a desktop shell.
+- Phase 14 focuses on local deployment and one-click startup, while Phase 15 keeps desktop packaging optional.
+
 ## Phase 12 Summary
 
 Phase 12 adds a small project-facing persistence layer on top of the existing pipeline:
@@ -9,6 +15,25 @@ Phase 12 adds a small project-facing persistence layer on top of the existing pi
 - the completed backend result is persisted once as an immutable `original-result.json`
 - the saved latest draft remains in the separate draft store
 - project reopen routes use persisted project state only and do not resume background execution
+
+## Roadmap Direction (Post-Phase 12)
+
+Strategic direction:
+- local-first, installable, browser-based local application with optional future desktop packaging
+
+Near-term architecture priorities:
+- local product polish and project/file management ergonomics
+- bilingual UI readiness
+- local deployment and one-click startup
+- local environment/runtime configuration and checks
+- onboarding and demo workflows
+
+De-prioritized to deferred track:
+- accounts and authentication
+- cloud/object storage ownership models
+- public sharing and permission systems
+- multi-device sync
+- SaaS-first infrastructure
 
 ### Frontend
 `apps/web`
@@ -234,6 +259,12 @@ Phase 12 productization boundary:
 - `/projects/{projectId}` in the web app is for reopening persisted project state only; it does not resume or recover background job execution after restart
 - current hosted assumptions are single backend instance plus persistent local/shared disk; accounts, public sharing, multi-instance coordination, and job recovery remain deferred
 
+Future roadmap boundaries:
+- Phase 12.5 will focus on UI structure cleanup, project management actions, unsaved-change indication, onboarding/empty states, and bilingual-ready UI copy structure, while keeping duplicated projects identifier-isolated (including draft-level ids)
+- Phase 13L will add user-facing local project folder open/save/import/export behavior with zip packaging while preserving the original-result vs saved-draft split, and will always assign a new local `projectId` on import
+- Phase 14L will add a clean local deployment mode with one-command or one-script startup for local backend services plus browser UI, environment/runtime checks, automatic browser open where appropriate, and clearer local configuration guidance while keeping the architecture local-first and browser-based
+- Phase 15L will optionally wrap the same local app in a desktop shell such as Electron or Tauri, adding a desktop bridge only if packaging needs one and improving OS-level integration without changing core product viability
+
 Validation boundary after Phase 10:
 - backend unittest discovery runs through `scripts/test-api.mjs` and the project venv
 - focused `packages/music-engine` editing coverage lives under `packages/music-engine/tests` and now includes richer bulk-editing helpers
@@ -253,3 +284,4 @@ Validation boundary after Phase 10:
 - Phase 9 draft persistence should extend the existing draft model rather than collapsing edited state into the original job result
 - Phase 10 editing UX should extend the same normalized draft model and keep UI gesture logic separate from reusable editing rules
 - Phase 12 productization should add project-facing persistence and routes on top of the existing original-result versus saved-draft boundary rather than collapsing them into one model
+- post-Phase-12 roadmap work should prioritize local deployment UX and project portability before any optional desktop shell work or SaaS-oriented ownership/cloud concerns

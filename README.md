@@ -1,6 +1,8 @@
 # AI Sheet Music Generator
 
-AI Sheet Music Generator is a modular monorepo for turning uploaded audio into editable draft sheet music, starting with piano and drums.
+AI Sheet Music Generator is a local-first AI tool that turns audio into editable draft sheet music for piano and drums.
+
+The current product direction is local-first: the app runs as local backend services plus a browser UI on your machine, with local filesystem persistence and no cloud, account, or SaaS assumptions.
 
 ## What Works Today
 
@@ -170,6 +172,8 @@ The root script does two things:
 - starts the FastAPI app with the Python interpreter from `apps/api/venv`
 - links both child processes so the local dev session shuts down together
 
+This is also the intended direction for user-facing local deployment: a browser-based UI backed by local services, aiming for a desktop-like local app experience without requiring a desktop shell.
+
 ### Prerequisites
 
 Before `npm run dev` will work, make sure:
@@ -319,12 +323,49 @@ Current validation reality:
 - production-validated piano transcription quality tuning across multiple real-world audio sets
 - production-validated drum transcription quality tuning across multiple real-world audio sets
 - persisted multi-revision edit history or saved projects
+- user-facing local project import/export packaging
+- desktop packaging and installer workflows
+- bilingual UI copy coverage and language switching UX
 - user accounts or authentication
 - database-backed ownership rules
 - real public sharing or permission systems
+- cloud storage and multi-device sync
 - background job recovery after API restart
 
 ## Future Roadmap
 
-- Phase 11: Phase 11A source separation upgrades, Phase 11B piano-provider upgrades, Phase 11C drum-provider upgrades, Phase 11D post-processing upgrades, Phase 11E region re-transcription, and Phase 11F AI-assisted correction are now in place while keeping the normalized pipeline stable
-- Phase 12 MVP: local project library routes and manifests, project-oriented asset summaries, stable local share-route structure, onboarding improvements, and documented single-instance hosting assumptions are now in place while accounts, public sharing, and cloud storage remain deferred
+- Completed baseline: Phase 11A through Phase 11F and Phase 12 MVP are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
+- Phase 12.5 - Product Polish + Project Management:
+  - project rename / delete / duplicate
+  - regenerate or namespace draft-level identifiers (for example `draftNoteId`) during duplication so duplicated projects do not share identifier space with the source
+  - clearer project metadata and list UX
+  - unsaved draft-change indication
+  - onboarding and empty-state improvements
+  - bilingual UI preparation
+  - UI structure cleanup across sidebar, workspace, and settings
+- Phase 13L - Local Project System:
+  - user-facing local project folder model
+  - open / save / import / export project flows
+  - zip-based project packaging
+  - project-path handling and manifest strategy hardening
+  - always generate a new local `projectId` on import and never reuse the bundled source `projectId`
+  - preserve original-result vs saved-draft separation across import/export
+- Phase 14L - Local Deployment & One-Click Startup:
+  - clean local deployment mode for end users
+  - one-command or one-script startup for backend plus frontend
+  - automatic browser open where appropriate
+  - environment checks and clear dependency/setup messaging
+  - seamless local filesystem persistence in the deployed local workflow
+  - settings and runtime guidance for local provider/runtime configuration
+  - explicit local-first runtime constraints and failure messaging without introducing cloud or account assumptions
+- Phase 15L - Desktop Application Packaging (Optional / Future):
+  - wrap the existing local app in a desktop shell such as Electron or Tauri
+  - add a desktop bridge interface only if packaging requires it
+  - improve OS-level integration such as native file dialogs or menus
+  - keep desktop packaging optional rather than required for core product viability
+- Explicitly deferred (not near-term):
+  - accounts and authentication
+  - cloud storage and database-backed ownership models
+  - public sharing and permission systems
+  - multi-device sync
+  - background job recovery

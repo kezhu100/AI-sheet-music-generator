@@ -101,7 +101,51 @@
 ## Phase 12 - Productization
 - [x] add a project library view
 - [x] surface persisted upload metadata and saved drafts as user-facing project assets
-- [ ] introduce user accounts when storage and ownership rules are defined
-- [x] support stable local project routes that are shareable on the same deployment
+- [x] support stable local project routes for reopening persisted local project state
 - [x] improve first-run onboarding and guidance
 - [x] document hosted deployment targets and operational assumptions
+
+## Phase 12.5 - Product Polish + Project Management
+- [ ] add project rename action
+- [ ] add project delete action
+- [ ] add project duplicate action
+- [ ] regenerate or namespace draft-level identifiers during duplication so duplicated projects do not share identifier space with source projects
+- [ ] improve project list metadata and status clarity
+- [ ] add unsaved draft-change indication in key UI surfaces
+- [ ] improve onboarding and empty states
+- [ ] prepare bilingual UI copy structure and locale-ready labels
+- [ ] clean up sidebar / workspace / settings layout boundaries
+
+## Phase 13L - Local Project System
+- [ ] define user-facing local project folder model
+- [ ] add open project flow from local path
+- [ ] add save/export project flow to local path
+- [ ] add import project flow from packaged file
+- [ ] always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+- [ ] add zip-based project packaging/unpackaging
+- [ ] harden project path handling and manifest consistency checks
+- [ ] preserve original-result vs saved-draft separation across import/export
+
+## Phase 14L - Local Deployment & One-Click Startup
+- [ ] provide a user-facing one-command startup for the local app (for example `npm run dev` or a packaged script)
+- [ ] ensure the backend and frontend start together in a coordinated local runtime
+- [ ] open the browser automatically where appropriate
+- [ ] add local runtime checks for Python and optional ML providers
+- [ ] provide clear missing-dependency and environment setup guidance
+- [ ] make local filesystem persistence work seamlessly in the deployed local flow
+- [ ] improve the user-facing local run/startup experience without requiring a desktop shell
+- [ ] document explicit local-first runtime constraints and unsupported cases
+
+## Phase 15L - Desktop Application Packaging (Optional / Future)
+- [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)
+- [ ] wrap the existing local app in a desktop shell if packaging is pursued
+- [ ] introduce a typed desktop bridge interface only if packaging requires it
+- [ ] add OS-level integration such as native file dialogs or menus where worthwhile
+- [ ] document desktop packaging as optional rather than required for core product viability
+
+## Deferred Track (Not Near-Term)
+- [ ] user accounts and authentication
+- [ ] cloud storage and database-backed ownership models
+- [ ] public sharing and permission systems
+- [ ] multi-device sync
+- [ ] background job recovery
