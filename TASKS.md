@@ -117,14 +117,16 @@
 - [x] clean up sidebar / workspace / settings layout boundaries
 
 ## Phase 13L - Local Project System
-- [ ] define user-facing local project folder model
-- [ ] add open project flow from local path
-- [ ] add save/export project flow to local path
-- [ ] add import project flow from packaged file
-- [ ] always generate a new local `projectId` on import and never reuse the source bundle `projectId`
-- [ ] add zip-based project packaging/unpackaging
-- [ ] harden project path handling and manifest consistency checks
-- [ ] preserve original-result vs saved-draft separation across import/export
+- [x] define user-facing local project folder model
+- [x] add open project flow from local path
+- [x] add save/export project flow to local path
+- [x] add import project flow from packaged file
+- [x] always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+- [x] add zip-based project packaging/unpackaging
+- [x] harden project path handling and manifest consistency checks
+- [x] preserve original-result vs saved-draft separation across import/export
+- [x] document that `open-local` is import-into-library in Phase 13L rather than open-in-place
+- [x] document package format version validation and additive/backward-compatible evolution expectations
 
 ## Phase 14L - Local Deployment & One-Click Startup
 - [ ] provide a user-facing one-command startup for the local app (for example `npm run dev` or a packaged script)

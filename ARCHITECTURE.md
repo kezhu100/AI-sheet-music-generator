@@ -24,6 +24,15 @@ Phase 12.5 extends the same project-facing layer without changing the core resul
 - persisted completed projects can now fall back to filesystem-backed project data for draft/export workflows when no in-memory job is present
 - project list/detail UIs now consume clearer manifest status metadata and locale-ready labels without introducing accounts or cloud assumptions
 
+## Phase 13L Summary
+
+Phase 13L adds explicit local project portability without replacing the current live storage model:
+- the managed local project library remains the live source of truth
+- live project directories stay lightweight: `manifest.json` plus immutable `original-result.json`
+- saved drafts remain in the separate draft store
+- portable project handoff and backup now use an explicit zip package format
+- package import always creates a new local project/job identity and re-namespaces imported draft note ids
+
 ## Roadmap Direction (Post-Phase 12)
 
 Strategic direction:
@@ -265,14 +274,22 @@ Phase 12 productization boundary:
 - saved drafts remain in the existing `apps/api/data/drafts/<job-id>.json` store and do not overwrite the persisted original result
 - the projects API now exposes `GET /api/v1/projects` and `GET /api/v1/projects/{projectId}` from filesystem-backed manifests
 - the projects API now also exposes rename, duplicate, and delete actions for local project management
+- the projects API now also exposes local-folder open, zip export-to-path, and zip import actions for local project packaging
 - `/projects/{projectId}` in the web app is for reopening persisted project state only; it does not resume or recover background job execution after restart
 - current hosted assumptions are single backend instance plus persistent local/shared disk; accounts, public sharing, multi-instance coordination, and job recovery remain deferred
 - deleted projects are hidden at the manifest layer immediately, while local file cleanup remains best-effort in the same filesystem
 - project rename updates manifest-backed display metadata only; it does not mutate the immutable persisted `original-result.json`
 - duplication copies persisted original-result and saved-draft artifacts into a new local project/job namespace while preserving the original-result versus saved-draft split
+- Phase 13L packaging lives in `apps/api/app/services/project_packaging.py`
+- package export aggregates the lightweight live project plus optional upload/stem assets into a zip bundle instead of redesigning live storage
+- package import restores local assets into the existing uploads/stems/drafts/projects stores and rewrites imported identities to a new local namespace
+- local-folder open imports an external project folder into the managed library rather than opening it in place
+- import validates the package format version, rejects unsafe archive paths, and enforces size limits before reading package content
+- export refuses to overwrite an existing target file; imported asset restoration writes into new project-scoped storage paths and avoids overwriting existing local files
+- the current `open-local` rule is intentionally import-into-library for Phase 13L, because local identity isolation and project-library consistency matter more here than path-coupled editing; a later phase may evolve this local opening model if needed
+- package evolution should stay backward-compatible where practical: unknown package versions fail clearly, new fields should preferably be additive, and active local runtime identity must never depend on source package identity
 
 Future roadmap boundaries:
-- Phase 13L will add user-facing local project folder open/save/import/export behavior with zip packaging while preserving the original-result vs saved-draft split, and will always assign a new local `projectId` on import
 - Phase 14L will add a clean local deployment mode with one-command or one-script startup for local backend services plus browser UI, environment/runtime checks, automatic browser open where appropriate, and clearer local configuration guidance while keeping the architecture local-first and browser-based
 - Phase 15L will optionally wrap the same local app in a desktop shell such as Electron or Tauri, adding a desktop bridge only if packaging needs one and improving OS-level integration without changing core product viability
 

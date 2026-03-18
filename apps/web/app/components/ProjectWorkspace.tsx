@@ -29,6 +29,7 @@ import {
   downloadMidiExport,
   downloadMusicXmlExport,
   duplicateProject,
+  exportProjectToPath,
   getJob,
   getJobDraft,
   saveJobDraft,
@@ -142,6 +143,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [isRenamingProject, setIsRenamingProject] = useState(false);
   const [isDuplicatingProject, setIsDuplicatingProject] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [isExportingProjectPackage, setIsExportingProjectPackage] = useState(false);
+  const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
   const lastDraftJobIdRef = useRef<string | null>(null);
 
   const {
@@ -823,6 +826,47 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
   }
 
+  async function handleExportProjectPackage(): Promise<void> {
+    if (!projectDetail) {
+      return;
+    }
+
+    const defaultTargetPath = `${projectDetail.projectName.replace(/[\\/:*?"<>|]+/g, "_") || "project"}.aismp.zip`;
+    const targetPath = window.prompt("Export project package to local path", defaultTargetPath)?.trim();
+    if (!targetPath) {
+      return;
+    }
+
+    setIsExportingProjectPackage(true);
+    setError(null);
+    setExportSuccessMessage(null);
+    try {
+      const response = await exportProjectToPath(projectDetail.projectId, targetPath);
+      setProjectDetail(response.project);
+      const savedPath = response.savedPath ?? targetPath;
+      setExportSuccessMessage(`Project exported successfully.\nSaved to: ${savedPath}`);
+    } catch (actionError) {
+      const message = actionError instanceof Error ? actionError.message : "Export failed. Please check the path and try again.";
+      setError(mapProjectExportError(message));
+    } finally {
+      setIsExportingProjectPackage(false);
+    }
+  }
+
+  function mapProjectExportError(message: string): string {
+    const normalizedMessage = message.toLowerCase();
+    if (normalizedMessage.includes("already exists")) {
+      return "File already exists. Please choose a different name.";
+    }
+    if (normalizedMessage.includes("target directory does not exist")) {
+      return "Target directory does not exist.";
+    }
+    if (normalizedMessage.includes("permission denied")) {
+      return "Permission denied. Cannot write to the specified path.";
+    }
+    return "Export failed. Please check the path and try again.";
+  }
+
   return (
     <main className="page">
       <section className="hero">
@@ -1040,6 +1084,14 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <div className="actions">
                   <button
                     className="button secondary"
+                    disabled={isRenamingProject || isDuplicatingProject || isDeletingProject || isExportingProjectPackage}
+                    onClick={() => void handleExportProjectPackage()}
+                    type="button"
+                  >
+                    {isExportingProjectPackage ? "Exporting package..." : "Export project package"}
+                  </button>
+                  <button
+                    className="button secondary"
                     disabled={isRenamingProject || isDuplicatingProject || isDeletingProject}
                     onClick={() => void handleRenameProject()}
                     type="button"
@@ -1072,6 +1124,12 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       )}
 
       {error ? <p className="error">{error}</p> : null}
+      {exportSuccessMessage ? (
+        <section className="panel">
+          <h2>Project Export</h2>
+          <p style={{ whiteSpace: "pre-wrap" }}>{exportSuccessMessage}</p>
+        </section>
+      ) : null}
       {activeResult ? (
         <>
           <section className="panel workspace-banner">
@@ -1138,6 +1196,16 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <div className="panel">
               <h2>Export and Draft Actions</h2>
               <div className="actions">
+                {mode === "project" ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={!projectDetail || isExportingProjectPackage}
+                    onClick={() => void handleExportProjectPackage()}
+                  >
+                    {isExportingProjectPackage ? "Exporting package..." : "Export project package"}
+                  </button>
+                ) : null}
                 <button
                   className="button secondary"
                   type="button"

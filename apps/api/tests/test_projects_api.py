@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import io
+import json
 import shutil
 import sys
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -14,6 +18,7 @@ from app.main import app
 from app.models.schemas import JobProgress, JobRecord, JobResult, UploadedFileDescriptor, utc_now
 from app.services.project_store import project_store
 from app.services.job_store import job_store
+from app.services import project_packaging
 
 
 def build_upload(upload_id: str, file_name: str) -> UploadedFileDescriptor:
@@ -83,6 +88,7 @@ class ProjectsApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = get_settings()
         self.created_project_ids: list[str] = []
+        self.created_file_paths: list[Path] = []
 
     def tearDown(self) -> None:
         for project_id in self.created_project_ids:
@@ -93,10 +99,32 @@ class ProjectsApiTests(unittest.TestCase):
                     draft_path.unlink()
                 except PermissionError:
                     pass
+        for file_path in self.created_file_paths:
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except PermissionError:
+                    pass
+        for stem_dir in {path.parent for path in self.created_file_paths if path.parent.name}:
+            if stem_dir.exists() and stem_dir.is_dir():
+                shutil.rmtree(stem_dir, ignore_errors=True)
 
     def _read_original_result_payload(self, project_id: str) -> JobResult:
         original_result_path = self.settings.projects_dir / project_id / "original-result.json"
         return JobResult.model_validate_json(original_result_path.read_text(encoding="utf-8"))
+
+    def _write_upload_asset(self, upload: UploadedFileDescriptor) -> None:
+        upload_path = self.settings.project_root / upload.stored_path
+        upload_path.parent.mkdir(parents=True, exist_ok=True)
+        upload_path.write_bytes(b"phase13l-upload")
+        self.created_file_paths.append(upload_path)
+
+    def _write_stem_assets(self, result: JobResult) -> None:
+        for stem in result.stems:
+            stem_path = self.settings.project_root / stem.stored_path
+            stem_path.parent.mkdir(parents=True, exist_ok=True)
+            stem_path.write_bytes(b"phase13l-stem")
+            self.created_file_paths.append(stem_path)
 
     def test_projects_endpoint_lists_manifest_backed_projects(self) -> None:
         project_id = "phase12-project-list"
@@ -298,6 +326,367 @@ class ProjectsApiTests(unittest.TestCase):
         export_response = client.get(f"/api/v1/jobs/{duplicate_project_id}/exports/midi")
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response.headers["content-type"], "audio/midi")
+
+    def test_export_project_writes_zip_bundle_with_required_files(self) -> None:
+        project_id = "phase13l-project-export"
+        upload = build_upload(project_id, "phase13l-export.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase13l-export")
+        self.created_project_ids.append(project_id)
+        self._write_upload_asset(upload)
+        self._write_stem_assets(result)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+        client = TestClient(app)
+        client.put(
+            f"/api/v1/jobs/{project_id}/draft",
+            json={"draftResult": build_result("phase13l-export", first_pitch=72).model_dump(mode="json", by_alias=True)},
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_path = str(Path(temp_dir) / "phase13l-export.aismp.zip")
+            response = client.post(f"/api/v1/projects/{project_id}/export", json={"targetPath": target_path})
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(Path(target_path).exists())
+            with zipfile.ZipFile(target_path, "r") as archive:
+                names = set(archive.namelist())
+                self.assertIn("project-package.json", names)
+                self.assertIn("manifest.json", names)
+                self.assertIn("original-result.json", names)
+                self.assertIn("saved-draft.json", names)
+                self.assertIn(f"assets/source-upload/{upload.file_name}", names)
+                self.assertIn("assets/stems/piano_stem/piano_stem.wav", names)
+
+    def test_export_project_fails_when_target_path_already_exists(self) -> None:
+        project_id = "phase13l-project-export-existing"
+        upload = build_upload(project_id, "phase13l-export-existing.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase13l-export-existing")
+        self.created_project_ids.append(project_id)
+        self._write_upload_asset(upload)
+        self._write_stem_assets(result)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_path = Path(temp_dir) / "existing.aismp.zip"
+            target_path.write_bytes(b"already-here")
+            response = TestClient(app).post(f"/api/v1/projects/{project_id}/export", json={"targetPath": str(target_path)})
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("already exists", response.json()["detail"])
+
+    def test_import_project_package_creates_new_local_project_identity_and_restores_assets(self) -> None:
+        source_project_id = "phase13l-import-source"
+        upload = build_upload(source_project_id, "phase13l-import.wav")
+        job = build_job(source_project_id, upload.upload_id, status="completed")
+        result = build_result("phase13l-import-source")
+        self.created_project_ids.append(source_project_id)
+        self._write_upload_asset(upload)
+        self._write_stem_assets(result)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+        client = TestClient(app)
+        client.put(
+            f"/api/v1/jobs/{source_project_id}/draft",
+            json={"draftResult": build_result("phase13l-import-source", first_pitch=72).model_dump(mode="json", by_alias=True)},
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_path = str(Path(temp_dir) / "phase13l-import.aismp.zip")
+            export_response = client.post(f"/api/v1/projects/{source_project_id}/export", json={"targetPath": target_path})
+            self.assertEqual(export_response.status_code, 200)
+
+            with Path(target_path).open("rb") as package_file:
+                import_response = client.post(
+                    "/api/v1/projects/import",
+                    files={"projectPackage": ("phase13l-import.aismp.zip", package_file.read(), "application/zip")},
+                )
+
+        self.assertEqual(import_response.status_code, 201)
+        imported_project = import_response.json()["project"]
+        imported_project_id = imported_project["projectId"]
+        self.created_project_ids.append(imported_project_id)
+        self.assertNotEqual(imported_project_id, source_project_id)
+        self.assertEqual(imported_project["jobId"], imported_project_id)
+        self.assertEqual(imported_project["savedDraft"]["jobId"], imported_project_id)
+        self.assertTrue(imported_project["savedDraft"]["result"]["tracks"][0]["notes"][0]["draftNoteId"].startswith(f"draft:{imported_project_id}:"))
+        self.assertEqual(imported_project["originalResult"]["stems"][0]["storedPath"], f"data/stems/{imported_project_id}/piano_stem.wav")
+        self.assertEqual(imported_project["upload"]["storedPath"], f"data/uploads/{imported_project_id}_{upload.file_name}")
+
+        export_response = client.get(f"/api/v1/jobs/{imported_project_id}/exports/midi")
+        self.assertEqual(export_response.status_code, 200)
+
+    def test_import_project_package_succeeds_without_saved_draft_file(self) -> None:
+        source_project_id = "phase13l-import-no-saved-draft"
+        upload = build_upload(source_project_id, "phase13l-import-no-saved-draft.wav")
+        job = build_job(source_project_id, upload.upload_id, status="completed")
+        result = build_result("phase13l-import-no-saved-draft")
+        self.created_project_ids.append(source_project_id)
+        self._write_upload_asset(upload)
+        self._write_stem_assets(result)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+        client = TestClient(app)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_path = str(Path(temp_dir) / "phase13l-import-no-saved-draft.aismp.zip")
+            export_response = client.post(f"/api/v1/projects/{source_project_id}/export", json={"targetPath": target_path})
+            self.assertEqual(export_response.status_code, 200)
+
+            package_buffer = io.BytesIO()
+            with zipfile.ZipFile(target_path, "r") as source_archive, zipfile.ZipFile(
+                package_buffer, "w", compression=zipfile.ZIP_DEFLATED
+            ) as rebuilt_archive:
+                for info in source_archive.infolist():
+                    if info.filename == "saved-draft.json":
+                        continue
+                    rebuilt_archive.writestr(info.filename, source_archive.read(info.filename))
+
+            import_response = client.post(
+                "/api/v1/projects/import",
+                files={"projectPackage": ("phase13l-import-no-saved-draft.aismp.zip", package_buffer.getvalue(), "application/zip")},
+            )
+
+        self.assertEqual(import_response.status_code, 201)
+        imported_project = import_response.json()["project"]
+        self.created_project_ids.append(imported_project["projectId"])
+        self.assertFalse(imported_project["hasSavedDraft"])
+        self.assertIsNone(imported_project["savedDraft"])
+
+    def test_import_project_package_succeeds_without_optional_assets(self) -> None:
+        package_buffer = io.BytesIO()
+        now = utc_now().isoformat()
+        base_result = build_result("phase13l-core-only-package")
+        result = JobResult(
+            projectName=base_result.project_name,
+            bpm=base_result.bpm,
+            stems=[
+                stem.model_copy(
+                    update={
+                        "stem_name": "missing_core_only_stem",
+                        "stored_path": "data/stems/nonexistent-phase13l-core-only/missing_core_only_stem.wav",
+                        "file_name": "missing_core_only_stem.wav",
+                    }
+                )
+                for stem in base_result.stems
+            ],
+            tracks=[track.model_copy(deep=True) for track in base_result.tracks],
+            warnings=list(base_result.warnings),
+        )
+        manifest = {
+            "summary": {
+                "projectId": "core-only-source",
+                "jobId": "core-only-source",
+                "projectName": "phase13l-core-only-package",
+                "createdAt": now,
+                "updatedAt": now,
+                "status": "completed",
+                "hasSavedDraft": False,
+                "draftVersion": None,
+                "draftSavedAt": None,
+                "assets": {
+                    "hasSourceUpload": False,
+                    "hasStems": False,
+                    "hasOriginalResult": True,
+                    "availableExports": ["midi", "musicxml"],
+                },
+                "sharePath": "/projects/core-only-source",
+                "currentStage": "completed",
+                "statusMessage": "Completed.",
+                "error": None,
+                "stemCount": len(result.stems),
+                "trackCount": len(result.tracks),
+            },
+            "upload": None,
+            "currentStage": "completed",
+            "statusMessage": "Completed.",
+            "error": None,
+            "draftSavedAt": None,
+        }
+        package_manifest = {
+            "formatVersion": 1,
+            "sourceProjectId": "core-only-source",
+            "sourceJobId": "core-only-source",
+            "exportedAt": now,
+            "includesSavedDraft": False,
+            "includesSourceUpload": False,
+            "includedStemCount": 0,
+        }
+
+        with zipfile.ZipFile(package_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("project-package.json", json.dumps(package_manifest))
+            archive.writestr("manifest.json", json.dumps(manifest))
+            archive.writestr("original-result.json", result.model_dump_json(by_alias=True))
+
+        response = TestClient(app).post(
+            "/api/v1/projects/import",
+            files={"projectPackage": ("phase13l-core-only-package.zip", package_buffer.getvalue(), "application/zip")},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        imported_project = response.json()["project"]
+        self.created_project_ids.append(imported_project["projectId"])
+        self.assertFalse(imported_project["assets"]["hasSourceUpload"])
+        self.assertFalse(imported_project["assets"]["hasStems"])
+        self.assertTrue(imported_project["assets"]["hasOriginalResult"])
+        self.assertTrue(any("missing some persisted stem assets" in warning.lower() for warning in imported_project["originalResult"]["warnings"]))
+
+    def test_open_local_path_returns_existing_managed_project_when_path_is_inside_library(self) -> None:
+        project_id = "phase13l-open-existing"
+        upload = build_upload(project_id, "phase13l-open-existing.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase13l-open-existing")
+        self.created_project_ids.append(project_id)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+
+        response = TestClient(app).post(
+            "/api/v1/projects/open-local",
+            json={"path": str(self.settings.projects_dir / project_id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["project"]["projectId"], project_id)
+        self.assertIsNone(payload["packageMetadata"])
+
+    def test_open_local_path_imports_external_project_folder_as_new_instance(self) -> None:
+        source_project_id = "phase13l-external-folder-source"
+        upload = build_upload(source_project_id, "phase13l-external.wav")
+        result = build_result("phase13l-external-source")
+        manifest = {
+            "summary": {
+                "projectId": source_project_id,
+                "jobId": source_project_id,
+                "projectName": "phase13l-external-source",
+                "createdAt": utc_now().isoformat(),
+                "updatedAt": utc_now().isoformat(),
+                "status": "completed",
+                "hasSavedDraft": False,
+                "draftVersion": None,
+                "draftSavedAt": None,
+                "assets": {
+                    "hasSourceUpload": False,
+                    "hasStems": False,
+                    "hasOriginalResult": True,
+                    "availableExports": ["midi", "musicxml"],
+                },
+                "sharePath": f"/projects/{source_project_id}",
+                "currentStage": "completed",
+                "statusMessage": "Completed.",
+                "error": None,
+                "stemCount": len(result.stems),
+                "trackCount": len(result.tracks),
+            },
+            "upload": upload.model_dump(mode="json", by_alias=True),
+            "currentStage": "completed",
+            "statusMessage": "Completed.",
+            "error": None,
+            "draftSavedAt": None,
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "external-project"
+            source_dir.mkdir(parents=True, exist_ok=True)
+            (source_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            (source_dir / "original-result.json").write_text(result.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
+
+            response = TestClient(app).post("/api/v1/projects/open-local", json={"path": str(source_dir)})
+
+        self.assertEqual(response.status_code, 200)
+        imported_project = response.json()["project"]
+        self.created_project_ids.append(imported_project["projectId"])
+        self.assertNotEqual(imported_project["projectId"], source_project_id)
+        self.assertEqual(imported_project["status"], "completed")
+
+    def test_import_rejects_unsafe_zip_entries(self) -> None:
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("../unsafe.txt", b"unsafe")
+
+        response = TestClient(app).post(
+            "/api/v1/projects/import",
+            files={"projectPackage": ("unsafe.zip", package_buffer.getvalue(), "application/zip")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("unsafe", response.json()["detail"].lower())
+
+    def test_import_rejects_missing_required_package_files(self) -> None:
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("manifest.json", "{}")
+
+        response = TestClient(app).post(
+            "/api/v1/projects/import",
+            files={"projectPackage": ("missing-required.zip", package_buffer.getvalue(), "application/zip")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("missing", response.json()["detail"].lower())
+
+    def test_import_rejects_unknown_package_version(self) -> None:
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "project-package.json",
+                json.dumps(
+                    {
+                        "formatVersion": 999,
+                        "sourceProjectId": "source-project",
+                        "sourceJobId": "source-job",
+                        "exportedAt": utc_now().isoformat(),
+                        "includesSavedDraft": False,
+                        "includesSourceUpload": False,
+                        "includedStemCount": 0,
+                    }
+                ),
+            )
+            archive.writestr("manifest.json", "{}")
+            archive.writestr("original-result.json", "{}")
+
+        response = TestClient(app).post(
+            "/api/v1/projects/import",
+            files={"projectPackage": ("unknown-version.zip", package_buffer.getvalue(), "application/zip")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("unsupported project package version", response.json()["detail"].lower())
+
+    def test_import_rejects_package_that_exceeds_size_limit(self) -> None:
+        package_buffer = io.BytesIO()
+        with zipfile.ZipFile(package_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "project-package.json",
+                json.dumps(
+                    {
+                        "formatVersion": 1,
+                        "sourceProjectId": "source-project",
+                        "sourceJobId": "source-job",
+                        "exportedAt": utc_now().isoformat(),
+                        "includesSavedDraft": False,
+                        "includesSourceUpload": False,
+                        "includedStemCount": 0,
+                    }
+                ),
+            )
+            archive.writestr("manifest.json", json.dumps({"summary": {"projectId": "a", "jobId": "a", "projectName": "a", "createdAt": utc_now().isoformat(), "updatedAt": utc_now().isoformat(), "status": "completed", "hasSavedDraft": False, "draftVersion": None, "draftSavedAt": None, "assets": {"hasSourceUpload": False, "hasStems": False, "hasOriginalResult": True, "availableExports": []}, "sharePath": "/projects/a", "currentStage": "completed", "statusMessage": "Completed.", "error": None, "stemCount": 0, "trackCount": 1}}))
+            archive.writestr("original-result.json", build_result("phase13l-large").model_dump_json(by_alias=True))
+
+        original_limit = project_packaging.MAX_PACKAGE_UNCOMPRESSED_BYTES
+        try:
+            project_packaging.MAX_PACKAGE_UNCOMPRESSED_BYTES = 10
+            response = TestClient(app).post(
+                "/api/v1/projects/import",
+                files={"projectPackage": ("too-large.zip", package_buffer.getvalue(), "application/zip")},
+            )
+        finally:
+            project_packaging.MAX_PACKAGE_UNCOMPRESSED_BYTES = original_limit
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("size limit", response.json()["detail"].lower())
 
 
 if __name__ == "__main__":

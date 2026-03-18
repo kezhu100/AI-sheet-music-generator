@@ -2,6 +2,41 @@
 
 ## Decision Log
 
+### 2026-03-18
+Decision:
+- Implement Phase 13L as a lightweight live-project model plus explicit zip-based project packaging/import, where imported packages always become new independent local project instances.
+
+Context:
+- Phase 12 and 12.5 already established a filesystem-backed local project library, immutable `original-result.json`, separate saved drafts, and persisted project reopen routes.
+- The product needed user-facing local project portability without collapsing the original-result versus saved-draft boundary or pretending to solve restart-resilient job recovery.
+- The current local-first runtime already stores uploads, stems, projects, and drafts in separate local filesystem locations, so a portable package needed to aggregate those artifacts without forcing an immediate live-storage redesign.
+
+Chosen option:
+- Keep the managed local library as the live source of truth under `apps/api/data/projects/<project-id>/`.
+- Keep live project folders lightweight in Phase 13L: `manifest.json` plus immutable `original-result.json`, with saved drafts still in the separate draft store.
+- Add explicit zip packaging via `project-package.json`, `manifest.json`, `original-result.json`, optional `saved-draft.json`, and optional local upload/stem assets when they exist.
+- Treat local-folder open as import-into-library rather than open-in-place.
+- Always generate a new local `projectId` and `jobId` on import, rewrite `sharePath`, restore assets into local managed storage, and re-namespace imported `draftNoteId` values to the new local project id.
+
+Alternatives considered:
+- Migrating all live projects immediately to a fully self-contained project-folder layout.
+- Opening external project folders in place and editing them directly.
+- Reusing the source package `projectId` as the active local identity after import.
+
+Tradeoffs:
+- Keeping live storage lightweight preserves Phase 12/12.5 compatibility and keeps Phase 13L small, but it means portability is centered on explicit package export/import rather than the live project directory alone.
+- Import-into-library keeps local project ownership and routes consistent, but users do not edit external folders in place.
+- Rewriting imported identities avoids hidden coupling between source and imported projects, but imported copies intentionally diverge from the source package identity.
+- Optional upload/stem assets are only restored when present, which keeps the implementation honest, but some imported/opened projects may lose region re-transcription support if stems are unavailable.
+- The current open-local flow may re-import the same external source folder multiple times, which keeps the implementation small and honest for this phase, but it can create multiple equivalent local project instances unless the selected path already points at a managed project directory.
+- Defensive version, size, and overwrite checks reduce surprising failures and unsafe package handling, but they make import/export stricter than a naive "always try it" workflow.
+
+Follow-up:
+- Revisit a self-contained live project-folder model only if later local deployment or desktop packaging work clearly benefits from it.
+- If the product later needs it, revisit whether local opening should evolve toward an open-in-place or reference-based model rather than import-into-library; do not treat that as promised Phase 13L behavior.
+- Keep package format changes backward-compatible where practical, prefer additive fields over destructive restructuring, and continue treating unknown package versions as clear import failures.
+- Keep Phase 14 focused on local deployment/startup UX rather than expanding Phase 13L into job recovery or cloud-style storage semantics.
+
 ### 2026-03-17
 Decision:
 - Implement Phase 12.5 project rename/delete/duplicate as manifest-backed project-management actions while preserving immutable `original-result.json` and isolating duplicated draft identifier space.

@@ -17,9 +17,10 @@ This repository now delivers a full local draft-notation workflow for piano and 
 - re-transcribe selected regions
 - analyze the draft for heuristic correction suggestions
 - reopen completed work from a local project library
+- import/export portable local project packages
 
 Current milestone:
-- Phase 12.5 is in place for local project product polish and management
+- Phase 13L is in place for a local project system with portable zip packaging
 
 Still deferred:
 - accounts and authentication
@@ -47,9 +48,11 @@ audio -> instrument separation -> instrument-specific transcription -> normalize
 
 Quick read:
 - the repo is complete through Phase 11F, Phase 12 MVP, and Phase 12.5
+- the repo is now complete through Phase 13L
 - the current product is still local-first and draft-first
 - the original completed result, saved latest draft, and current in-session draft remain separate artifacts
 - project-library reopen behavior is persisted; background job execution is still not restart-resilient
+- live local projects remain manifest-backed and lightweight, while portable project handoff uses explicit zip packaging
 
 ## Completed Phases
 
@@ -523,12 +526,14 @@ Current status:
 - Phase 12.5 is now implemented with project rename/delete/duplicate actions, duplicated draft-id isolation, clearer project metadata, stronger unsaved-change indication, locale-ready project copy structure, and cleaner project settings/workspace boundaries
 
 Planned scope:
-- user-facing local project folder model
-- open / save / import / export project workflows
-- zip-based project packaging for handoff and backup
-- project path handling rules and manifest strategy hardening
-- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+Completed:
+- user-facing local project folder model on top of the existing managed project library
+- open-local flow that imports a local project folder into the current library unless it already points at an existing managed project
+- save/export flow that writes a portable zip package to a caller-supplied local filesystem path through the local backend
+- import flow that restores a zip package into the local library as a new independent local project instance
+- package validation, path-safety checks, and identity rewriting
 - strict preservation of original-result vs saved-draft separation through import/export boundaries
+- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
 
 ---
 
@@ -574,13 +579,16 @@ Current runtime limitations:
 
 ## Phase 13L - Local Project System
 
-Planned scope:
-- user-facing local project folder model
-- open / save / import / export project workflows
-- zip-based project packaging for handoff and backup
-- project path handling rules and manifest strategy hardening
-- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
-- strict preservation of original-result vs saved-draft separation through import/export boundaries
+Completed scope:
+- managed live local projects still use the existing filesystem-backed project library under `apps/api/data/projects/<project-id>/`
+- live local projects stay lightweight: `manifest.json` plus immutable `original-result.json`, with saved drafts still in the separate draft store
+- portable project packages are zip files containing `project-package.json`, `manifest.json`, `original-result.json`, optional `saved-draft.json`, optional source upload, and optional stem assets
+- imported packages become new local project instances with new local identities and re-namespaced draft note ids
+- missing optional import assets are surfaced honestly rather than synthesized
+- package version is validated on import, zip import enforces size/path-safety checks, and export refuses to overwrite an existing target file silently
+- re-opening the same external source folder currently imports another independent local project instance unless the chosen path already points at a managed project inside the current library
+- this import-into-library `open-local` model is the intended Phase 13L behavior because it preserves local identity isolation and project-library consistency over path-coupled editing; a later phase may evolve that local-opening model if needed
+- package evolution should remain backward-compatible where practical, unknown package versions must fail clearly, and new package fields should preferably be additive rather than destructive
 
 ## Phase 14L - Local Deployment & One-Click Startup
 

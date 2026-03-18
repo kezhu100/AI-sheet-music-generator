@@ -160,6 +160,16 @@ export interface ProjectDetail extends ProjectSummary {
   savedDraft?: JobDraftRecord | null;
 }
 
+export interface ProjectPackageMetadata {
+  formatVersion: number;
+  sourceProjectId: string;
+  sourceJobId: string;
+  exportedAt: string;
+  includesSavedDraft: boolean;
+  includesSourceUpload: boolean;
+  includedStemCount: number;
+}
+
 export interface ProjectListResponse {
   status: "ok";
   projects: ProjectSummary[];
@@ -180,6 +190,22 @@ export interface DuplicateProjectRequest {
 
 export interface ProjectDeleteResponse {
   status: "ok";
+}
+
+export interface OpenLocalProjectRequest {
+  path: string;
+}
+
+export interface ExportProjectRequest {
+  targetPath: string;
+}
+
+export interface ProjectPackagingResponse {
+  status: "ok";
+  project: ProjectDetail;
+  packageMetadata?: ProjectPackageMetadata | null;
+  targetPath?: string | null;
+  savedPath?: string | null;
 }
 
 export interface JobProgress {

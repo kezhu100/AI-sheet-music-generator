@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type ChangeEvent } from "react";
 import type { ProjectSummary } from "@ai-sheet-music-generator/shared-types";
-import { deleteProject, duplicateProject, getProjects, renameProject } from "../../lib/api";
+import { deleteProject, duplicateProject, getProjects, importProjectPackage, openLocalProject, renameProject } from "../../lib/api";
 import { getUiCopy } from "../../lib/uiCopy";
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
+  const [isOpeningLocalProject, setIsOpeningLocalProject] = useState(false);
+  const [isImportingPackage, setIsImportingPackage] = useState(false);
   const copy = getUiCopy();
 
   useEffect(() => {
@@ -100,6 +104,48 @@ export default function ProjectsPage() {
     }
   }
 
+  async function handleOpenLocalProject(): Promise<void> {
+    const sourcePath = window.prompt("Open local project folder path");
+    if (!sourcePath?.trim()) {
+      return;
+    }
+
+    setIsOpeningLocalProject(true);
+    setError(null);
+    try {
+      const response = await openLocalProject(sourcePath.trim());
+      setProjects((currentProjects) => {
+        const remainingProjects = currentProjects.filter((project) => project.projectId !== response.project.projectId);
+        return [response.project, ...remainingProjects];
+      });
+      router.push(response.project.sharePath);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to open the local project path.");
+    } finally {
+      setIsOpeningLocalProject(false);
+    }
+  }
+
+  async function handleImportPackage(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setIsImportingPackage(true);
+    setError(null);
+    try {
+      const response = await importProjectPackage(file);
+      setProjects((currentProjects) => [response.project, ...currentProjects.filter((project) => project.projectId !== response.project.projectId)]);
+      router.push(response.project.sharePath);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to import the project package.");
+    } finally {
+      setIsImportingPackage(false);
+    }
+  }
+
   function formatProjectStatus(project: ProjectSummary): string {
     if (project.error) {
       return `Error: ${project.error}`;
@@ -123,10 +169,26 @@ export default function ProjectsPage() {
               Reopen local persisted projects from filesystem-backed manifests. Share routes are stable inside the same deployment,
               but they are not public publishing links and do not bypass missing auth or storage rules.
             </p>
+            <div className="actions">
+              <button className="button" disabled={isOpeningLocalProject || isImportingPackage} onClick={() => void handleOpenLocalProject()} type="button">
+                {isOpeningLocalProject ? "Opening local project..." : "Open local project path"}
+              </button>
+              <label className="button secondary" style={{ cursor: isImportingPackage ? "default" : "pointer" }}>
+                {isImportingPackage ? "Importing package..." : "Import project package"}
+                <input
+                  accept=".zip,application/zip"
+                  disabled={isImportingPackage || isOpeningLocalProject}
+                  hidden
+                  onChange={(event) => void handleImportPackage(event)}
+                  type="file"
+                />
+              </label>
+            </div>
             <div className="pill-row">
               <span className="pill">Manifest-backed listing</span>
               <span className="pill">Immutable original result</span>
               <span className="pill">Saved draft stays separate</span>
+              <span className="pill">Zip import/export</span>
               <span className="pill">No accounts yet</span>
             </div>
           </div>
@@ -140,6 +202,10 @@ export default function ProjectsPage() {
               <article className="note-card">
                 <strong>Draft model</strong>
                 <div className="muted">Projects show the immutable original result plus the latest saved draft when one exists. Current in-session edits are still separate.</div>
+              </article>
+              <article className="note-card">
+                <strong>Phase 13L portability</strong>
+                <div className="muted">Open a local project folder by importing it into this library, or import a zip bundle to create a new local project instance with a new project id.</div>
               </article>
               <article className="note-card">
                 <strong>Deferred items</strong>

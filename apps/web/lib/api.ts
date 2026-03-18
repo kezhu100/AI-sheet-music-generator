@@ -3,12 +3,15 @@ import type {
   AnalyzeDraftResponse,
   CreateJobRequest,
   DuplicateProjectRequest,
+  ExportProjectRequest,
   JobDraftResponse,
   ProjectDetailResponse,
   ProjectDeleteResponse,
   ProjectListResponse,
+  ProjectPackagingResponse,
   JobExportRequest,
   JobResponse,
+  OpenLocalProjectRequest,
   RenameProjectRequest,
   JobResult,
   RegionRetranscriptionRequest,
@@ -103,6 +106,30 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
   return parseJson<ProjectDetailResponse>(response);
 }
 
+export async function openLocalProject(path: string): Promise<ProjectPackagingResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/open-local`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ path } satisfies OpenLocalProjectRequest)
+  });
+
+  return parseJson<ProjectPackagingResponse>(response);
+}
+
+export async function importProjectPackage(file: File): Promise<ProjectPackagingResponse> {
+  const formData = new FormData();
+  formData.append("projectPackage", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/import`, {
+    method: "POST",
+    body: formData
+  });
+
+  return parseJson<ProjectPackagingResponse>(response);
+}
+
 export async function renameProject(projectId: string, projectName: string): Promise<ProjectDetailResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}`, {
     method: "PATCH",
@@ -125,6 +152,18 @@ export async function duplicateProject(projectId: string, projectName?: string):
   });
 
   return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function exportProjectToPath(projectId: string, targetPath: string): Promise<ProjectPackagingResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ targetPath } satisfies ExportProjectRequest)
+  });
+
+  return parseJson<ProjectPackagingResponse>(response);
 }
 
 export async function deleteProject(projectId: string): Promise<ProjectDeleteResponse> {

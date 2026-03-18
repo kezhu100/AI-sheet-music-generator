@@ -96,3 +96,11 @@ Phase 12.5 project-management update:
 - duplicate now creates a new local project/job identity, copies the persisted original result plus latest saved draft when present, and namespaces duplicated draft note ids
 - delete now removes projects from the library/detail routes immediately while local file cleanup remains best-effort in the same filesystem
 - persisted completed projects can now fall back to filesystem-backed project data for draft save/load, export, analysis, and region re-transcription flows when the in-memory job record is gone
+
+Phase 13L local project system update:
+- the live local project stays manifest-backed and lightweight under `apps/api/data/projects/<project-id>/`
+- open-local imports a valid external project folder into the current managed library unless the selected path already points at an existing managed project
+- export aggregates `manifest.json`, immutable `original-result.json`, separate `saved-draft.json` when present, and available local upload/stem assets into a zip package written to a caller-supplied local path
+- import restores that package into the managed local library as a new independent local project instance with a fresh local `projectId`
+- imported original-result and saved-draft artifacts remain separate, and imported draft note ids are re-namespaced to the new local project id
+- missing optional packaged assets are surfaced honestly; Phase 13L still does not recover in-progress background job execution

@@ -403,6 +403,44 @@ class ProjectDetail(ProjectSummary):
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
+class ProjectPackageMetadata(BaseModel):
+    format_version: int = Field(alias="formatVersion")
+    source_project_id: str = Field(alias="sourceProjectId")
+    source_job_id: str = Field(alias="sourceJobId")
+    exported_at: datetime = Field(alias="exportedAt")
+    includes_saved_draft: bool = Field(alias="includesSavedDraft")
+    includes_source_upload: bool = Field(alias="includesSourceUpload")
+    included_stem_count: int = Field(alias="includedStemCount")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class OpenLocalProjectRequest(BaseModel):
+    path: str
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("path must not be empty.")
+        return value.strip()
+
+
+class ExportProjectRequest(BaseModel):
+    target_path: str = Field(alias="targetPath")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("target_path")
+    @classmethod
+    def validate_target_path(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("targetPath must not be empty.")
+        return value.strip()
+
+
 class ProjectManifestRecord(BaseModel):
     summary: ProjectSummary
     upload: Optional[UploadedFileDescriptor] = None
@@ -460,5 +498,15 @@ class ProjectDuplicateRequest(BaseModel):
 
 class ProjectDeleteResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectPackagingResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    project: ProjectDetail
+    package_metadata: Optional[ProjectPackageMetadata] = Field(default=None, alias="packageMetadata")
+    target_path: Optional[str] = Field(default=None, alias="targetPath")
+    saved_path: Optional[str] = Field(default=None, alias="savedPath")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}

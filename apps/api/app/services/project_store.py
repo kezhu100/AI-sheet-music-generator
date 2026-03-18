@@ -291,6 +291,53 @@ class ProjectStore:
             error=manifest.error,
         )
 
+    def get_project_dir(self, project_id: str) -> Path:
+        return self._project_dir(project_id)
+
+    def get_original_result(self, project_id: str) -> Optional[JobResult]:
+        return self._read_original_result(project_id)
+
+    def namespace_draft_note_ids(self, result: JobResult, namespace: str) -> JobResult:
+        return self._namespace_draft_note_ids(result, namespace)
+
+    def find_project_id_by_path(self, path: Path) -> Optional[str]:
+        try:
+            resolved_path = path.resolve(strict=True)
+        except FileNotFoundError:
+            return None
+
+        try:
+            projects_root = self._projects_dir.resolve(strict=True)
+        except FileNotFoundError:
+            return None
+
+        try:
+            relative_path = resolved_path.relative_to(projects_root)
+        except ValueError:
+            return None
+
+        parts = relative_path.parts
+        if not parts:
+            return None
+
+        project_id = parts[0]
+        manifest = self._read_manifest(project_id)
+        if manifest is None or manifest.deleted_at is not None:
+            return None
+        return project_id
+
+    def import_project(
+        self,
+        manifest: ProjectManifestRecord,
+        original_result: JobResult,
+        saved_draft: Optional[JobDraftRecord] = None,
+    ) -> ProjectDetail:
+        self._write_original_result(manifest.summary.project_id, original_result)
+        self._write_manifest(manifest)
+        if saved_draft is not None:
+            draft_store.save_record(saved_draft)
+        return self.get_project_detail(manifest.summary.project_id)
+
     def _resolve_summary(self, manifest: ProjectManifestRecord) -> ProjectSummary:
         saved_draft = draft_store.get(manifest.summary.job_id)
         summary = manifest.summary.model_copy(deep=True)

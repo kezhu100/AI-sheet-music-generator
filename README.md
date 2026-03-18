@@ -16,6 +16,9 @@ The current product direction is local-first: the app runs as local backend serv
 - analyze the current editable draft and apply heuristic correction suggestions
 - reopen persisted projects from a local filesystem-backed project library
 - rename, duplicate, and delete local projects from the library and project workspace
+- open a local project folder path by importing it into the local library
+- export a local project as a portable zip package to a local filesystem path
+- import a portable zip package as a new independent local project instance
 
 ## Current Local MVP Limits
 
@@ -61,6 +64,7 @@ Current milestone:
 - Phase 11F completed: AI-assisted correction now analyzes the current editable draft, returns heuristic suggestion objects for likely note issues, highlights suggested notes in the editor, and lets users apply each suggestion as one undoable draft edit without changing the normalized `JobResult`
 - Phase 12 MVP completed: a local project library, manifest-backed project asset summaries, immutable completed original-result persistence, stable local project routes, and lightweight onboarding improvements are now implemented without adding accounts or public sharing
 - Phase 12.5 completed: project rename/delete/duplicate, duplicated draft-id isolation, clearer library metadata/status messaging, unsaved draft indicators, locale-ready project copy structure, and sidebar/workspace/settings cleanup are now implemented on top of the Phase 12 MVP
+- Phase 13L completed: local project open/import/export flows, zip-based project packaging, imported project identity regeneration, and local package validation are now implemented on top of the existing manifest-backed project library
 
 Current behavior:
 
@@ -82,6 +86,17 @@ Current behavior:
 - project rename now updates manifest-backed project labels without mutating the immutable persisted `original-result.json`
 - project duplication now creates a new local project/job identity, copies the persisted original result plus latest saved draft when present, and namespaces duplicated draft note ids so source and duplicate do not share draft identifier space
 - persisted completed projects can now continue using draft save/load, export, analysis, and region re-transcription flows through filesystem-backed project fallback even when no in-memory job record is available
+- Phase 13L keeps the managed local library as the live source of truth under `apps/api/data/projects/<project-id>/`
+- open-local now imports a valid local project folder into the current library as a local project instance unless the selected path already points at an existing managed project
+- in Phase 13L, `open-local` is intentionally import-into-library, not open-in-place; this favors local identity isolation and project-library consistency over path-coupled editing
+- export now writes a portable zip package directly from the local backend to a caller-supplied local filesystem path
+- portable project import now restores a new local project, restores the immutable original result plus saved draft separately, restores source upload and persisted stems when present in the package, and always assigns a fresh local `projectId`
+- imported bundles never reuse the source bundle `projectId` as the active local project identity, and imported draft note ids are re-namespaced to the new local project instance
+- import validates the package format version and rejects unknown versions
+- unknown or incompatible package versions fail with clear import errors
+- package format evolution should stay backward-compatible where practical, and new package fields should preferably be additive
+- zip import enforces package size limits and path-safety checks instead of blindly trusting archive contents
+- export now fails clearly when the target output file already exists; it does not silently overwrite existing files
 
 ## Environment Requirements
 
@@ -120,6 +135,14 @@ Generated stems are stored locally in `apps/api/data/stems/<job-id>`.
 Saved edited drafts are stored locally in `apps/api/data/drafts/<job-id>.json`.
 Phase 12 project manifests are stored locally in `apps/api/data/projects/<project-id>/manifest.json`.
 Phase 12 immutable completed originals are stored locally in `apps/api/data/projects/<project-id>/original-result.json`.
+Phase 13L portable project export packages are zip files written to the local path you choose and contain:
+
+- `project-package.json`
+- `manifest.json`
+- `original-result.json`
+- `saved-draft.json` when a saved draft exists
+- `assets/source-upload/...` when the source upload file is available locally
+- `assets/stems/...` for persisted stem files that are available locally
 
 Phase 12 MVP routes and endpoints:
 
@@ -127,6 +150,9 @@ Phase 12 MVP routes and endpoints:
 - web project route: `/projects/{projectId}`
 - API list route: `GET /api/v1/projects`
 - API detail route: `GET /api/v1/projects/{projectId}`
+- API open-local route: `POST /api/v1/projects/open-local`
+- API export route: `POST /api/v1/projects/{projectId}/export`
+- API import route: `POST /api/v1/projects/import`
 
 Optional source separation configuration:
 
@@ -229,6 +255,7 @@ If the API venv is missing, the root dev script exits with a clear message inste
 6. Drag the current selection horizontally to move timing, quantize selected notes or the whole draft, reassign selected drum hits to a different lane, draw a box over a piano-only or drum-only time region when you want to re-transcribe that section, run `Analyze draft` to fetch heuristic correction suggestions, apply any suggestion you want to accept, use keyboard shortcuts such as `Ctrl/Cmd+Z`, `Ctrl/Cmd+Y`, `Delete`, arrow keys, and `Q`, then click `Save draft`.
 7. Open `/projects` and confirm the completed job now appears in the local project library.
 8. Refresh or reopen the same completed job flow and confirm the saved draft auto-loads separately from the original completed result.
+9. Open `/projects`, use `Export project package` on a completed project, then import the resulting zip package and confirm the imported project appears as a separate local project with a new `projectId`.
 
 To try the optional stronger separation backend locally, set environment variables before starting the API or `npm run dev`. Example PowerShell:
 
@@ -306,6 +333,12 @@ Current limitations:
 - `/projects/{projectId}` is a stable local route for reopening persisted project state, not a resume/recovery path for background jobs
 - deleted projects are hidden from library/detail routes immediately; local file cleanup is attempted best-effort in the same local filesystem
 - shareable project links are local deployment routes only; they are not public internet-safe share tokens and do not add auth, permissions, or anonymous publishing
+- the live managed project directory remains lightweight in Phase 13L; source uploads and stems still live in the existing local uploads/stems stores rather than being migrated into each live project directory
+- portable zip packages aggregate manifest/original-result/saved-draft plus local source-upload and stem assets when those files exist; missing optional assets are not faked
+- open-local imports a valid external project folder into the managed library rather than editing it in place
+- opening the same external local project folder multiple times currently creates multiple imported local project instances unless the selected path is already one of this deployment's managed project directories
+- this `open-local` behavior is the intended Phase 13L model; a later phase may choose a more direct open-in-place or reference-based model if the product needs it
+- portable import restores source bundle content as a new independent local project instance; it does not reuse the source package `projectId` or pretend to recover background execution state
 - current hosted assumptions remain single-instance plus persistent disk/volume mounted under `apps/api/data`; multi-instance coordination and job recovery are deferred
 
 ## Validation Performed
@@ -329,7 +362,6 @@ Current validation reality:
 - production-validated piano transcription quality tuning across multiple real-world audio sets
 - production-validated drum transcription quality tuning across multiple real-world audio sets
 - persisted multi-revision edit history or saved projects
-- user-facing local project import/export packaging
 - desktop packaging and installer workflows
 - full bilingual UI copy coverage and language switching UX
 - user accounts or authentication
@@ -341,13 +373,6 @@ Current validation reality:
 ## Future Roadmap
 
 - Completed baseline: Phase 11A through Phase 11F, Phase 12 MVP, and Phase 12.5 are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
-- Phase 13L - Local Project System:
-  - user-facing local project folder model
-  - open / save / import / export project flows
-  - zip-based project packaging
-  - project-path handling and manifest strategy hardening
-  - always generate a new local `projectId` on import and never reuse the bundled source `projectId`
-  - preserve original-result vs saved-draft separation across import/export
 - Phase 14L - Local Deployment & One-Click Startup:
   - clean local deployment mode for end users
   - one-command or one-script startup for backend plus frontend
