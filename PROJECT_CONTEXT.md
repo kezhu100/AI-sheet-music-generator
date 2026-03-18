@@ -20,7 +20,7 @@ This repository now delivers a full local draft-notation workflow for piano and 
 - import/export portable local project packages
 
 Current milestone:
-- Phase 13L is in place for a local project system with portable zip packaging
+- Phase 14L is in place for local deployment and one-click startup on top of the local project system
 
 Still deferred:
 - accounts and authentication
@@ -49,6 +49,7 @@ audio -> instrument separation -> instrument-specific transcription -> normalize
 Quick read:
 - the repo is complete through Phase 11F, Phase 12 MVP, and Phase 12.5
 - the repo is now complete through Phase 13L
+- the repo is now complete through Phase 14L
 - the current product is still local-first and draft-first
 - the original completed result, saved latest draft, and current in-session draft remain separate artifacts
 - project-library reopen behavior is persisted; background job execution is still not restart-resilient
@@ -454,6 +455,12 @@ Current local development workflow:
 - repository root `npm run dev` starts both the Next.js frontend and the FastAPI backend together
 - the root dev script expects the backend Python interpreter to live in `apps/api/venv`
 
+Current user-facing local app workflow:
+- repository root `npm run app` reuses the same orchestrator but adds app-mode runtime preflight, readiness waiting, and optional browser auto-open
+- `npm run app:check` runs the app-mode preflight without starting the services
+- `start-local.ps1` and `start-local.sh` are thin wrappers around `npm run app`
+- app-mode browser auto-open can be disabled with `--no-open` or `APP_START_NO_OPEN=1`
+
 Current UI supports:
 - audio file upload
 - job status polling
@@ -508,32 +515,22 @@ Local dev startup
 - API: `http://127.0.0.1:8000`
 - API health check: `http://127.0.0.1:8000/health`
 - backend prerequisite: install `apps/api/requirements.txt` into `apps/api/venv`
+- local app command: `npm run app`
+- app-mode runtime diagnostics route: `GET /api/v1/runtime`
 
 ---
 
 # Next Development Phase
 
-## Phase 13L - Local Project System
+## Phase 14L - Local Deployment & One-Click Startup
 
 Current status:
-- Phase 11A is complete for stronger source separation provider selection and fallback
-- Phase 11B is complete for stronger piano transcription provider selection and fallback
-- Phase 11C is complete for stronger drum transcription provider selection and fallback
-- Phase 11D is complete for richer backend post-processing while preserving the normalized result contract
-- Phase 11E is complete for draft-only region re-transcription while preserving the normalized result contract
-- Phase 11F is complete for AI-assisted correction suggestions without breaking the normalized result, draft editing, persistence, or export boundaries established through Phase 10
-- Phase 12 MVP is now implemented with a local project library, project manifests, immutable completed original-result persistence, stable local project routes, and lightweight onboarding updates
-- Phase 12.5 is now implemented with project rename/delete/duplicate actions, duplicated draft-id isolation, clearer project metadata, stronger unsaved-change indication, locale-ready project copy structure, and cleaner project settings/workspace boundaries
-
-Planned scope:
-Completed:
-- user-facing local project folder model on top of the existing managed project library
-- open-local flow that imports a local project folder into the current library unless it already points at an existing managed project
-- save/export flow that writes a portable zip package to a caller-supplied local filesystem path through the local backend
-- import flow that restores a zip package into the local library as a new independent local project instance
-- package validation, path-safety checks, and identity rewriting
-- strict preservation of original-result vs saved-draft separation through import/export boundaries
-- always generate a new local `projectId` on import and never reuse the source bundle `projectId`
+- app mode now reuses the existing root Node orchestrator instead of replacing it
+- `npm run dev` remains the unchanged developer workflow
+- `npm run app` now adds app-mode preflight, readiness wait, and optional browser auto-open
+- backend runtime diagnostics now surface storage readiness, provider readiness, fallback/degraded status, and explicit local-first constraints at `GET /api/v1/runtime`
+- the frontend now surfaces compact local runtime guidance without introducing a large new settings subsystem
+- runtime checks stay additive and do not change the processing pipeline, `JobResult`, or project/draft persistence rules
 
 ---
 
@@ -589,18 +586,6 @@ Completed scope:
 - re-opening the same external source folder currently imports another independent local project instance unless the chosen path already points at a managed project inside the current library
 - this import-into-library `open-local` model is the intended Phase 13L behavior because it preserves local identity isolation and project-library consistency over path-coupled editing; a later phase may evolve that local-opening model if needed
 - package evolution should remain backward-compatible where practical, unknown package versions must fail clearly, and new package fields should preferably be additive rather than destructive
-
-## Phase 14L - Local Deployment & One-Click Startup
-
-Planned scope:
-- clean local deployment mode for end users
-- one-command or one-script startup for frontend plus backend
-- automatic browser open where appropriate
-- environment checks for Python runtime and optional ML providers, or clear missing-dependency guidance
-- preserve seamless local filesystem persistence in the deployed local workflow
-- improve the transition from developer setup to usable local app flow
-- settings UI and documentation for provider/runtime configuration where appropriate
-- explicit local-first constraints and unsupported-runtime messaging without introducing cloud or account assumptions
 
 ## Phase 15L - Desktop Application Packaging (Optional / Future)
 

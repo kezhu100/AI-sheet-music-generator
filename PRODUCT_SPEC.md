@@ -22,6 +22,8 @@ Current product outputs:
 
 Current delivery model:
 - browser UI + local backend services
+- user-facing local startup through `npm run app` / `start-local` wrappers
+- backend runtime diagnostics surfaced to the frontend
 - local filesystem-backed project and draft persistence
 - local zip-based project packaging
 - no accounts, no cloud sync, and no SaaS assumptions
@@ -58,6 +60,7 @@ The currently implemented local MVP supports:
 - local project open/import/export actions
 - clearer project metadata plus unsaved draft-state indication in library/workspace surfaces
 - locale-ready project/library labels through a small bilingual copy structure
+- local app startup guidance plus honest runtime/provider diagnostics for the deployed-local flow
 
 ## Success Criteria
 A successful local MVP:
@@ -80,7 +83,7 @@ A successful local MVP:
 - the current product does not implement accounts, public sharing, or background job recovery
 
 ## Near-Term Product Roadmap (Local-First)
-- Phase 14L - Local deployment and one-click startup for the browser UI plus local services, with runtime checks and clearer setup flow
+- Phase 14L - Completed: local deployment and one-click startup for the browser UI plus local services, with runtime checks and clearer setup flow
 - Phase 15L - Optional desktop application packaging (Electron, Tauri, or equivalent) for OS-level integration later
 
 Roadmap guardrails:

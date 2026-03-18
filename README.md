@@ -19,6 +19,7 @@ The current product direction is local-first: the app runs as local backend serv
 - open a local project folder path by importing it into the local library
 - export a local project as a portable zip package to a local filesystem path
 - import a portable zip package as a new independent local project instance
+- start the local app through a user-facing `npm run app` / `start-local` flow with runtime diagnostics
 
 ## Current Local MVP Limits
 
@@ -65,6 +66,7 @@ Current milestone:
 - Phase 12 MVP completed: a local project library, manifest-backed project asset summaries, immutable completed original-result persistence, stable local project routes, and lightweight onboarding improvements are now implemented without adding accounts or public sharing
 - Phase 12.5 completed: project rename/delete/duplicate, duplicated draft-id isolation, clearer library metadata/status messaging, unsaved draft indicators, locale-ready project copy structure, and sidebar/workspace/settings cleanup are now implemented on top of the Phase 12 MVP
 - Phase 13L completed: local project open/import/export flows, zip-based project packaging, imported project identity regeneration, and local package validation are now implemented on top of the existing manifest-backed project library
+- Phase 14L completed: user-facing local app startup, app-mode runtime preflight, backend runtime diagnostics, optional browser auto-open, and frontend runtime guidance are now implemented while keeping the app browser-based and local-first
 
 Current behavior:
 
@@ -187,6 +189,49 @@ Optional drum transcription configuration:
 
 ### One-command startup from the repo root
 
+Developer workflow:
+
+`npm run dev`
+
+This keeps the existing developer-oriented behavior:
+
+- starts both local services together from the repository root
+- does not auto-open the browser
+- keeps startup checks minimal beyond the existing `apps/api/venv` requirement
+
+User-facing local app workflow:
+
+`npm run app`
+
+This adds the Phase 14L local-app behavior:
+
+- runs app-mode runtime preflight before starting the API
+- starts the API in a no-reload single-process mode intended for stable local app startup
+- starts the browser UI plus API together
+- waits for readiness before optionally opening the actual selected local web URL
+- surfaces provider/runtime issues honestly without treating optional ML integrations as mandatory when fallback remains valid
+
+You can also use:
+
+- `start-local.ps1` on Windows PowerShell
+- `./start-local.sh` on Unix-like shells
+
+Run this to check the local app environment without starting the services:
+
+`npm run app:check`
+
+Disable browser auto-open in app mode with either:
+
+- `npm run app -- --no-open`
+- `APP_START_NO_OPEN=1 npm run app`
+
+Recommended usage:
+
+- use `npm run app` for normal local app usage
+- use `npm run dev` when actively developing and you want the existing developer workflow
+
+### Existing dev startup behavior
+
 Run:
 
 `npm run dev`
@@ -203,11 +248,11 @@ The root script does two things:
 - starts the FastAPI app with the Python interpreter from `apps/api/venv`
 - links both child processes so the local dev session shuts down together
 
-This is also the intended direction for user-facing local deployment: a browser-based UI backed by local services, aiming for a desktop-like local app experience without requiring a desktop shell.
+This remains the developer workflow. Phase 14L adds a separate app-mode startup instead of changing dev-mode behavior.
 
 ### Prerequisites
 
-Before `npm run dev` will work, make sure:
+Before either `npm run dev` or `npm run app` will work, make sure:
 
 1. `npm install` has been run from the repository root.
 2. A Python virtual environment exists at `apps/api/venv`.
@@ -239,15 +284,42 @@ If the API venv is missing, the root dev script exits with a clear message inste
 - It should also work on Unix-like systems if the API virtual environment lives at `apps/api/venv/bin/python`.
 - No manual venv activation is required for the one-command workflow because the root script calls the venv interpreter directly.
 - Press `Ctrl+C` in the root terminal to stop the combined local development session. The script will attempt to stop both the web and API processes together.
+- `npm run app` adds strict app-mode-only preflight checks for blocking runtime issues; `npm run dev` stays the lighter developer path.
 
 ### Optional single-service commands
 
 - `npm run dev:web`: start only the Next.js app
 - `npm run dev:api`: start only the FastAPI app through the same root helper script
 
+### App-mode runtime diagnostics
+
+Phase 14L adds:
+
+- `GET /api/v1/runtime` for honest local runtime and provider diagnostics
+- a compact runtime panel on the upload page
+- app-mode preflight that blocks only when startup is truly impossible
+
+App-mode preflight blocks only for:
+
+- missing or unusable `apps/api/venv` Python runtime
+- explicitly configured provider selections with no usable fallback
+
+App-mode preflight does not block for:
+
+- optional stronger ML runtimes that are not selected
+- selected stronger ML runtimes when a valid fallback provider is configured
+
+Common app-mode startup fixes:
+
+- missing `node` or `npm`: install Node.js 18+ and rerun `npm run app`
+- missing root dependencies: run `npm install` from the repository root
+- missing `apps/api/venv`: create the API virtual environment and install `apps/api/requirements.txt`
+- missing configured Python/ML runtime with no fallback: either install that runtime or switch back to the documented fallback provider
+- port `3000` or `8000` already in use: stop the conflicting process and rerun `npm run app`
+
 ## Running the Current Phase 12.5 Build Locally
 
-1. Run `npm run dev` from the repository root.
+1. Run `npm run app` from the repository root for the user-facing local app flow, or `npm run dev` if you want the existing developer workflow.
 2. Open `http://127.0.0.1:3000`.
 3. Upload an audio file from the UI.
 4. Wait for the job to complete and inspect the returned stems, estimated tempo, piano-roll preview, simplified piano/drum score previews, track visibility toggles, editing draft controls, warnings, saved-draft status, and original/draft MIDI/MusicXML export actions.
@@ -335,6 +407,8 @@ Current limitations:
 - shareable project links are local deployment routes only; they are not public internet-safe share tokens and do not add auth, permissions, or anonymous publishing
 - the live managed project directory remains lightweight in Phase 13L; source uploads and stems still live in the existing local uploads/stems stores rather than being migrated into each live project directory
 - portable zip packages aggregate manifest/original-result/saved-draft plus local source-upload and stem assets when those files exist; missing optional assets are not faked
+- runtime guidance and startup preflight are local-instance checks only; they do not add cloud hosting, account ownership, or remote deployment orchestration
+- app-mode browser auto-open is best-effort and can be disabled; headless or restricted environments may no-op instead of launching a browser
 - open-local imports a valid external project folder into the managed library rather than editing it in place
 - opening the same external local project folder multiple times currently creates multiple imported local project instances unless the selected path is already one of this deployment's managed project directories
 - this `open-local` behavior is the intended Phase 13L model; a later phase may choose a more direct open-in-place or reference-based model if the product needs it
@@ -345,6 +419,7 @@ Current limitations:
 
 Recommended local validation commands:
 
+- `npm run app:check`
 - `npm run typecheck`
 - `npm run test:music-engine`
 - `npm run test:api`
@@ -372,15 +447,7 @@ Current validation reality:
 
 ## Future Roadmap
 
-- Completed baseline: Phase 11A through Phase 11F, Phase 12 MVP, and Phase 12.5 are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
-- Phase 14L - Local Deployment & One-Click Startup:
-  - clean local deployment mode for end users
-  - one-command or one-script startup for backend plus frontend
-  - automatic browser open where appropriate
-  - environment checks and clear dependency/setup messaging
-  - seamless local filesystem persistence in the deployed local workflow
-  - settings and runtime guidance for local provider/runtime configuration
-  - explicit local-first runtime constraints and failure messaging without introducing cloud or account assumptions
+- Completed baseline: Phase 11A through Phase 11F, Phase 12 MVP, Phase 12.5, Phase 13L, and Phase 14L are in place while preserving the normalized `JobResult` contract and the original-result vs saved-draft boundary
 - Phase 15L - Desktop Application Packaging (Optional / Future):
   - wrap the existing local app in a desktop shell such as Electron or Tauri
   - add a desktop bridge interface only if packaging requires it

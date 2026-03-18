@@ -3,9 +3,27 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ChangeEvent } from "react";
-import type { ProjectSummary } from "@ai-sheet-music-generator/shared-types";
-import { deleteProject, duplicateProject, getProjects, importProjectPackage, openLocalProject, renameProject } from "../../lib/api";
+import type { ProjectSummary, RuntimeDiagnosticsResponse } from "@ai-sheet-music-generator/shared-types";
+import {
+  deleteProject,
+  duplicateProject,
+  getProjects,
+  getRuntimeDiagnostics,
+  importProjectPackage,
+  openLocalProject,
+  renameProject
+} from "../../lib/api";
 import { getUiCopy } from "../../lib/uiCopy";
+
+function getRuntimeSeverityClass(severity: RuntimeDiagnosticsResponse["severity"]): string {
+  if (severity === "ready") {
+    return "pill pill-success";
+  }
+  if (severity === "degraded") {
+    return "pill pill-warning";
+  }
+  return "pill pill-danger";
+}
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -15,6 +33,7 @@ export default function ProjectsPage() {
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
   const [isOpeningLocalProject, setIsOpeningLocalProject] = useState(false);
   const [isImportingPackage, setIsImportingPackage] = useState(false);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const copy = getUiCopy();
 
   useEffect(() => {
@@ -35,6 +54,27 @@ export default function ProjectsPage() {
       } finally {
         if (!cancelled) {
           setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await getRuntimeDiagnostics();
+        if (!cancelled) {
+          setRuntimeDiagnostics(response);
+        }
+      } catch {
+        if (!cancelled) {
+          setRuntimeDiagnostics(null);
         }
       }
     })();
@@ -217,6 +257,14 @@ export default function ProjectsPage() {
       </section>
 
       <section className="content-grid">
+        {runtimeDiagnostics ? (
+          <div className="panel panel-full">
+            <h2>Local Runtime</h2>
+            <p className="muted">
+              Status: <span className={getRuntimeSeverityClass(runtimeDiagnostics.severity)}>{runtimeDiagnostics.severity}</span> | {runtimeDiagnostics.summary}
+            </p>
+          </div>
+        ) : null}
         <div className="panel panel-full">
           <h2>Projects</h2>
           {isLoading ? <p className="muted">Loading local project manifests...</p> : null}

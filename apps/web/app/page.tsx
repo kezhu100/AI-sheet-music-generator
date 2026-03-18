@@ -18,6 +18,7 @@ import type {
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  RuntimeDiagnosticsResponse,
   UploadResponse
 } from "@ai-sheet-music-generator/shared-types";
 import {
@@ -27,6 +28,7 @@ import {
   downloadMusicXmlExport,
   getJob,
   getJobDraft,
+  getRuntimeDiagnostics,
   saveJobDraft,
   uploadAudio
 } from "../lib/api";
@@ -43,6 +45,16 @@ function formatNote(note: NoteEvent): string {
   }
 
   return `MIDI ${note.pitch ?? "n/a"}`;
+}
+
+function getRuntimeSeverityClass(severity: RuntimeDiagnosticsResponse["severity"]): string {
+  if (severity === "ready") {
+    return "pill pill-success";
+  }
+  if (severity === "degraded") {
+    return "pill pill-warning";
+  }
+  return "pill pill-danger";
 }
 
 export default function HomePage() {
@@ -72,6 +84,8 @@ export default function HomePage() {
   const [addDrumMidiNote, setAddDrumMidiNote] = useState(38);
   const [reassignDrumLabel, setReassignDrumLabel] = useState("snare");
   const [reassignDrumMidiNote, setReassignDrumMidiNote] = useState(38);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
+  const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
   const lastDraftJobIdRef = useRef<string | null>(null);
   const {
     draftResult,
@@ -114,6 +128,30 @@ export default function HomePage() {
     retranscribeSelectedRegion,
     applySuggestion
   } = useEditableJobResult(job?.result ?? null, savedDraft, job?.id ?? null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await getRuntimeDiagnostics();
+        if (!cancelled) {
+          setRuntimeDiagnostics(response);
+          setRuntimeDiagnosticsError(null);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setRuntimeDiagnosticsError(
+            loadError instanceof Error ? loadError.message : "Failed to load local runtime diagnostics."
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") {
@@ -685,6 +723,53 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <div className="panel panel-full">
+          <h2>Local Runtime</h2>
+          {runtimeDiagnostics ? (
+            <>
+              <p className="muted">
+                Status: <span className={getRuntimeSeverityClass(runtimeDiagnostics.severity)}>{runtimeDiagnostics.severity}</span> | {runtimeDiagnostics.summary}
+              </p>
+              <div className="note-list">
+                {runtimeDiagnostics.providers.map((provider) => (
+                  <article className="note-card" key={provider.key}>
+                    <strong>{provider.label}</strong>
+                    <div>
+                      {provider.selectedProviderLabel}
+                      {provider.fallbackProviderLabel ? ` | fallback ${provider.fallbackProviderLabel}` : ""}
+                    </div>
+                    <div className="muted">{provider.message}</div>
+                    {provider.guidance.map((guidance) => (
+                      <div className="muted" key={`${provider.key}-${guidance}`}>
+                        {guidance}
+                      </div>
+                    ))}
+                  </article>
+                ))}
+                {runtimeDiagnostics.storage.map((storage) => (
+                  <article className="note-card" key={storage.key}>
+                    <strong>{storage.label}</strong>
+                    <div>{storage.ready ? "Ready" : "Blocking"}</div>
+                    <div className="muted">{storage.message}</div>
+                  </article>
+                ))}
+                {runtimeDiagnostics.constraints.map((constraint) => (
+                  <article className="note-card" key={constraint}>
+                    <strong>Local-first constraint</strong>
+                    <div className="muted">{constraint}</div>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : runtimeDiagnosticsError ? (
+            <p className="error">{runtimeDiagnosticsError}</p>
+          ) : (
+            <p className="muted">Loading local runtime diagnostics...</p>
+          )}
         </div>
       </section>
 

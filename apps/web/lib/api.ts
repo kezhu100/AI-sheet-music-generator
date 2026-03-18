@@ -14,6 +14,7 @@ import type {
   OpenLocalProjectRequest,
   RenameProjectRequest,
   JobResult,
+  RuntimeDiagnosticsResponse,
   RegionRetranscriptionRequest,
   RegionRetranscriptionResponse,
   SaveJobDraftRequest,
@@ -104,6 +105,15 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
   });
 
   return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnosticsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runtime`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  return parseJson<RuntimeDiagnosticsResponse>(response);
 }
 
 export async function openLocalProject(path: string): Promise<ProjectPackagingResponse> {

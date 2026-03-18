@@ -6,7 +6,11 @@
 
 - The system runs as local backend services plus a browser-based frontend.
 - It behaves like a desktop-like local application without requiring a desktop shell.
-- Phase 14 focuses on local deployment and one-click startup, while Phase 15 keeps desktop packaging optional.
+- Phase 14L now adds a user-facing local app startup mode on top of the existing developer startup mode.
+- `npm run dev` remains the developer workflow.
+- `npm run app` reuses the same orchestrator but adds app-mode preflight, readiness waiting, and optional browser auto-open.
+- `GET /api/v1/runtime` exposes runtime diagnostics for storage readiness, configured providers, fallback/degraded states, and local-first constraints.
+- Phase 15 keeps desktop packaging optional.
 
 ## Phase 12 Summary
 
@@ -78,6 +82,7 @@ Responsibilities:
 - persist the latest saved edited draft separately from the completed job result
 - normalize outputs
 - expose result APIs
+- expose runtime diagnostics for the local deployment flow
 
 ### Shared Types
 `packages/shared-types`
@@ -87,6 +92,7 @@ Responsibilities:
 - note event schema
 - job state types
 - stem metadata DTOs
+- runtime diagnostics DTOs
 
 ### Music Engine
 `packages/music-engine`
@@ -290,7 +296,7 @@ Phase 12 productization boundary:
 - package evolution should stay backward-compatible where practical: unknown package versions fail clearly, new fields should preferably be additive, and active local runtime identity must never depend on source package identity
 
 Future roadmap boundaries:
-- Phase 14L will add a clean local deployment mode with one-command or one-script startup for local backend services plus browser UI, environment/runtime checks, automatic browser open where appropriate, and clearer local configuration guidance while keeping the architecture local-first and browser-based
+- Phase 14L is now implemented as an additive local deployment layer: app-mode startup, runtime diagnostics, and frontend runtime guidance while preserving the existing pipeline and result/draft/project boundaries
 - Phase 15L will optionally wrap the same local app in a desktop shell such as Electron or Tauri, adding a desktop bridge only if packaging needs one and improving OS-level integration without changing core product viability
 
 Validation boundary after Phase 10:

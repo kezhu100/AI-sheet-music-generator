@@ -208,6 +208,40 @@ export interface ProjectPackagingResponse {
   savedPath?: string | null;
 }
 
+export type RuntimeSeverity = "ready" | "degraded" | "blocking";
+export type RuntimeCheckStatus = "ready" | "optional-missing" | "degraded-fallback" | "blocking-misconfigured";
+
+export interface RuntimeStorageStatus {
+  key: string;
+  label: string;
+  path: string;
+  ready: boolean;
+  message: string;
+}
+
+export interface RuntimeProviderStatus {
+  key: string;
+  label: string;
+  selectedProvider: string;
+  selectedProviderLabel: string;
+  fallbackProvider?: string | null;
+  fallbackProviderLabel?: string | null;
+  status: RuntimeCheckStatus;
+  message: string;
+  guidance: string[];
+  optional: boolean;
+}
+
+export interface RuntimeDiagnosticsResponse {
+  status: "ok";
+  severity: RuntimeSeverity;
+  ready: boolean;
+  summary: string;
+  storage: RuntimeStorageStatus[];
+  providers: RuntimeProviderStatus[];
+  constraints: string[];
+}
+
 export interface JobProgress {
   stage: string;
   percent: number;

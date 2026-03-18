@@ -129,14 +129,14 @@
 - [x] document package format version validation and additive/backward-compatible evolution expectations
 
 ## Phase 14L - Local Deployment & One-Click Startup
-- [ ] provide a user-facing one-command startup for the local app (for example `npm run dev` or a packaged script)
-- [ ] ensure the backend and frontend start together in a coordinated local runtime
-- [ ] open the browser automatically where appropriate
-- [ ] add local runtime checks for Python and optional ML providers
-- [ ] provide clear missing-dependency and environment setup guidance
-- [ ] make local filesystem persistence work seamlessly in the deployed local flow
-- [ ] improve the user-facing local run/startup experience without requiring a desktop shell
-- [ ] document explicit local-first runtime constraints and unsupported cases
+- [x] provide a user-facing one-command startup for the local app (for example `npm run dev` or a packaged script)
+- [x] ensure the backend and frontend start together in a coordinated local runtime
+- [x] open the browser automatically where appropriate
+- [x] add local runtime checks for Python and optional ML providers
+- [x] provide clear missing-dependency and environment setup guidance
+- [x] make local filesystem persistence work seamlessly in the deployed local flow
+- [x] improve the user-facing local run/startup experience without requiring a desktop shell
+- [x] document explicit local-first runtime constraints and unsupported cases
 
 ## Phase 15L - Desktop Application Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)

@@ -4,6 +4,37 @@
 
 ### 2026-03-18
 Decision:
+- Implement Phase 14L by extending the existing root Node orchestrator with a separate app mode, plus additive backend runtime diagnostics, instead of replacing the local startup architecture.
+
+Context:
+- The repository already had a working root `npm run dev` flow in `scripts/dev.mjs`, a local FastAPI backend, browser UI, and filesystem-backed persistence.
+- Phase 14L needed to improve user-facing local startup and runtime guidance without changing the processing pipeline, `JobResult`, or the existing original-result / saved-draft / in-session-draft boundaries.
+- The product direction explicitly deferred Electron, Tauri, installer work, cloud assumptions, and background job recovery.
+
+Chosen option:
+- Keep `npm run dev` as the existing developer workflow and preserve its behavior.
+- Add `npm run app` and `npm run app:check` through the same `scripts/dev.mjs` orchestrator.
+- Limit strict preflight checks to app mode only.
+- Add `GET /api/v1/runtime` plus a shared runtime diagnostics service so startup preflight and frontend runtime guidance reuse the same status logic.
+- Treat optional ML providers honestly: blocking only when a selected provider has no usable fallback, degraded when fallback remains valid, and never mandatory when left unselected.
+- Add thin `start-local.ps1` and `start-local.sh` wrappers for user-facing startup without introducing a new runtime stack.
+
+Alternatives considered:
+- Replacing the current orchestrator with a new task runner or desktop-oriented launcher.
+- Baking startup checks directly into the pipeline or provider modules.
+- Expanding Phase 14L into desktop packaging, installer work, or larger settings/productization refactors.
+
+Tradeoffs:
+- Reusing the existing orchestrator keeps the change small and reviewable, but user-facing local deployment still depends on the documented `apps/api/venv` convention.
+- Shared runtime diagnostics reduce duplicated logic between startup and frontend guidance, but they intentionally report configuration/runtime state only and do not validate model quality.
+- Keeping browser auto-open app-mode-only avoids changing developer workflow, but some headless or restricted environments will intentionally no-op rather than force a browser launch.
+
+Follow-up:
+- Keep any future desktop shell or installer work in optional Phase 15L.
+- If the local product later needs richer runtime configuration UX, extend the current diagnostics/guidance surfaces rather than changing the pipeline or result contracts.
+
+### 2026-03-18
+Decision:
 - Implement Phase 13L as a lightweight live-project model plus explicit zip-based project packaging/import, where imported packages always become new independent local project instances.
 
 Context:

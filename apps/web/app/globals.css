@@ -112,6 +112,11 @@ select {
   background: rgba(13, 110, 110, 0.16);
 }
 
+.pill-danger {
+  background: rgba(178, 74, 63, 0.16);
+  color: var(--danger);
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);

@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:api": "node scripts/dev.mjs --api-only",
+    "app": "node scripts/dev.mjs --app",
+    "app:check": "node scripts/dev.mjs --app --check",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

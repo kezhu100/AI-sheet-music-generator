@@ -12,6 +12,8 @@ CorrectionInstrumentType = Literal["piano", "drums"]
 CorrectionSuggestionType = Literal["pitch", "timing", "velocity", "drum-pattern"]
 JobStatus = Literal["queued", "processing", "failed", "completed"]
 ExportFormat = Literal["midi", "musicxml"]
+RuntimeSeverity = Literal["ready", "degraded", "blocking"]
+RuntimeCheckStatus = Literal["ready", "optional-missing", "degraded-fallback", "blocking-misconfigured"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
 MAX_MIDI_NOTE = 127
@@ -508,5 +510,42 @@ class ProjectPackagingResponse(BaseModel):
     package_metadata: Optional[ProjectPackageMetadata] = Field(default=None, alias="packageMetadata")
     target_path: Optional[str] = Field(default=None, alias="targetPath")
     saved_path: Optional[str] = Field(default=None, alias="savedPath")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class RuntimeStorageStatus(BaseModel):
+    key: str
+    label: str
+    path: str
+    ready: bool
+    message: str
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class RuntimeProviderStatus(BaseModel):
+    key: str
+    label: str
+    selected_provider: str = Field(alias="selectedProvider")
+    selected_provider_label: str = Field(alias="selectedProviderLabel")
+    fallback_provider: Optional[str] = Field(default=None, alias="fallbackProvider")
+    fallback_provider_label: Optional[str] = Field(default=None, alias="fallbackProviderLabel")
+    status: RuntimeCheckStatus
+    message: str
+    guidance: List[str]
+    optional: bool
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class RuntimeDiagnostics(BaseModel):
+    status: Literal["ok"] = "ok"
+    severity: RuntimeSeverity
+    ready: bool
+    summary: str
+    storage: List[RuntimeStorageStatus]
+    providers: List[RuntimeProviderStatus]
+    constraints: List[str]
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
