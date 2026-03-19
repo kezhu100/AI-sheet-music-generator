@@ -1,88 +1,215 @@
 # AI Sheet Music Generator
 
-A local-first browser tool for turning audio into editable draft sheet music.
+Turn audio into structured sheet music — locally, privately, and in a score-first workspace.  
+将音频转换为结构化乐谱 —— 本地运行、隐私优先，并以乐谱为核心工作流。
 
-## Product Positioning
-- Local-first: runs on your machine with local filesystem storage
-- Browser UI + local backend: no cloud dependency, no upload-to-SaaS flow
-- Draft-first: generated notation is editable and savable without overwriting the original result
-- Score-first workspace: the main UI now emphasizes score preview first, then editing and export
-- Bilingual product UI: key user-facing workflow copy is presented in English and Chinese
+Local-first AI sheet music generation with a browser UI, local backend, editable draft workflow, and export-ready results.  
+这是一个本地优先的 AI 乐谱生成工具，采用浏览器界面 + 本地后端，支持可编辑草稿与导出工作流。
 
-## Phase Status
-Current shipped product status:
-- Phase 14L completed: local deployment, one-command startup, runtime diagnostics
-- Phase 14.5 completed: workspace product polish, score-first layout, restrained manuscript/fantasy visual direction, bilingual cleanup, advanced details collapse
+![GitHub stars](https://img.shields.io/github/stars/your-name/ai-sheet-music-generator?style=for-the-badge)
+![Next.js](https://img.shields.io/badge/Next.js-Web_UI-black?style=for-the-badge)
+![FastAPI](https://img.shields.io/badge/FastAPI-Local_Backend-009688?style=for-the-badge)
+![Local First](https://img.shields.io/badge/Local--First-No_Cloud-355c42?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-gold?style=for-the-badge)
 
-## Core Capabilities
-- Upload audio and create a local transcription job
-- Generate piano and drum draft notation
-- Review a piano score preview, drum notation companion, and piano-roll editor
-- Edit note timing, pitch, drum lanes, and added notes in the browser
-- Save the latest draft separately from the original completed result
-- Analyze the draft for correction suggestions
-- Re-transcribe selected regions without rerunning the entire job
-- Export MIDI and MusicXML from either the original result or the current draft
-- Reopen work from a local project library
-- Import or export local project packages
+---
 
-## Workspace Structure
-The main workspace is organized as:
-1. Hero and primary action area
-2. Upload or project entry
-3. Main result preview with score first
-4. Editing area
-5. Export area
-6. Advanced Details (collapsed by default)
+## Why This Project / 为什么值得关注
 
-Advanced Details includes runtime diagnostics, track/provider summaries, generated stems, warnings, and note detail lists so the main workflow stays focused.
+- **Local-first by design**  
+  **本地优先设计**
+- **No cloud upload, no accounts, privacy by default**  
+  **无需上传到云端，无需账号，默认保护隐私**
+- **Creative workflow: audio -> score -> edit -> export**  
+  **创作工作流：音频 -> 乐谱 -> 编辑 -> 导出**
+- **Score-first product, not a settings-heavy dashboard**  
+  **以乐谱为核心，而不是参数面板优先**
 
-## Visual Direction
-Phase 14.5 introduces a restrained visual language inspired by manuscript, Celtic, fantasy, medieval, and RPG aesthetics while keeping the app product-like and readable.
+---
 
-Implemented through:
-- parchment-toned panels and backgrounds
-- bronze / forest / teal accents
-- framed cards and ornamental borders
-- stronger heading hierarchy
-- compact piano-roll viewport so the score remains visually primary
+## 📸 Demo / 演示
 
-## Local-First Architecture
-- Frontend: Next.js
-- Backend: FastAPI
-- Storage: local filesystem
-- Shared contract: `JobResult`
-- Editing model: original completed result, saved latest draft, and in-session draft remain separate artifacts
+> Add real screenshots in `docs/` for the strongest GitHub presentation.  
+> 建议将真实截图放入 `docs/` 目录，以获得更好的 GitHub 展示效果。
 
-## Quick Start
+### Homepage / 首页
+![Homepage](docs/homepage.png)
+*Magical local-first entry with upload, runtime options, and product overview.*  
+*带有上传入口、运行选项与产品概览的本地优先首页。*
+
+### Project Library / 项目库
+![Project Library](docs/project-library.png)
+*Reopen local projects, import packages, and manage your saved work.*  
+*重新打开本地项目、导入项目包，并管理已保存的工作内容。*
+
+### Score Preview Workspace / 乐谱预览工作区
+![Score Preview](docs/score-preview.png)
+*Read the generated piano score first, compare the drum companion, then refine the draft.*  
+*先阅读生成的钢琴乐谱，再对照鼓谱辅助视图，随后继续精修草稿。*
+
+---
+
+## ✨ Features / 特性
+
+- **Local-first processing**  
+  **全部处理在本机完成，无云端依赖**
+
+- **Audio to piano + drum transcription**  
+  **将音频转换为钢琴与鼓的转谱结果**
+
+- **Score-first preview workflow**  
+  **以乐谱预览为主的结果浏览流程**
+
+- **Scrollable score readers for long results**  
+  **长结果使用可滚动读谱视窗，浏览更稳定**
+
+- **Editable draft system**  
+  **支持草稿编辑，且不会覆盖原始结果**
+
+- **Saved draft and original result stay separate**  
+  **已保存草稿与原始结果保持分离**
+
+- **Project Library with local persistence**  
+  **提供本地持久化的项目库**
+
+- **MIDI + MusicXML export**  
+  **支持导出 MIDI 与 MusicXML**
+
+- **Provider-based quality control**  
+  **支持基于 provider 的质量调节**
+
+- **Advanced runtime options with Auto defaults**  
+  **高级运行选项支持 Auto 默认策略**
+
+---
+
+## 🚀 Quick Start / 快速开始
+
 ```bash
 npm install
 npm run app
 ```
 
-Then open the local URL printed by the app startup flow.
+Then:
 
-## Developer Notes
-Recommended validation path:
-```bash
-npm run validate
+1. **Upload audio**  
+   **上传音频**
+2. **Generate a score draft**  
+   **生成乐谱草稿**
+3. **Edit and export**  
+   **编辑并导出**
+
+Open the local URL printed in the terminal.  
+打开终端中输出的本地地址即可开始使用。
+
+---
+
+## 🧠 How It Works / 工作方式
+
+```text
+audio
+  -> source separation
+  -> piano / drum transcription
+  -> post-processing
+  -> score preview
+  -> editable draft
+  -> MIDI / MusicXML export
 ```
 
-In this repository environment, frontend typecheck and music-engine tests pass. API tests still require the backend test dependency `httpx` in the local Python environment.
+- **Upload a song or stem**  
+  **上传完整音频或单独 stem**
+- **Run local separation + transcription**  
+  **执行本地分离与转谱**
+- **Review the generated score first**  
+  **优先查看生成的乐谱**
+- **Refine the draft in-browser**  
+  **在浏览器内继续修订草稿**
+- **Export clean structured output**  
+  **导出结构化结果**
 
-## UI Improvements (Phase 14.5+)
-- Added main-workspace project ZIP export entry for local package export
-- Split piano and drum piano-roll previews into separate panels
-- Refined the piano preview with a compact scrollable paper-like viewport
-- Extended the restrained fantasy / Celtic UI polish across cards, buttons, and backgrounds
+---
 
-## Constraints
-- No cloud sync
-- No public sharing system
-- No accounts/auth
-- No background job recovery after restart
-- Output is a draft, not publication-grade engraving
+## 🏗 Project Structure / 项目结构
 
-## Roadmap
-- Phase 15L: optional desktop packaging (Electron / Tauri or similar)
-- Deferred: accounts, cloud storage, public sharing, multi-device sync, background job recovery
+```text
+apps/
+  web/           Next.js frontend
+  api/           FastAPI local backend
+packages/
+  shared-types/  shared DTOs and contracts
+  music-engine/  music-domain utilities
+```
+
+- **`apps/web`**: score-first UI, project library, editing workflow  
+  **`apps/web`**：乐谱优先界面、项目库与编辑流程
+- **`apps/api`**: upload, jobs, runtime diagnostics, export  
+  **`apps/api`**：上传、任务、运行诊断与导出
+- **`packages/shared-types`**: shared request/response types  
+  **`packages/shared-types`**：共享请求与响应类型
+
+---
+
+## 🎯 Design Philosophy / 设计理念
+
+### Local-first / 本地优先
+- Your audio, drafts, and exports stay on your machine.  
+  你的音频、草稿与导出结果保留在本机。
+
+### Draft-first / 草稿优先
+- The generated result is editable without overwriting the original completed output.  
+  生成结果可继续编辑，同时不会覆盖原始完成结果。
+
+### Score-first / 乐谱优先
+- The product is built around readable score preview first, then editing and export.  
+  产品围绕“先看乐谱，再编辑与导出”的流程设计。
+
+This combination is what makes the project different: it is not just an AI demo, and not just an export tool. It is a local creative workspace.  
+这正是本项目的独特之处：它不只是 AI 演示，也不只是导出工具，而是一个本地创作工作区。
+
+---
+
+## ⚠️ Current Limits / 当前限制
+
+- **Best results currently come from clearer piano + drum material**  
+  **当前在钢琴和鼓较清晰的素材上表现更好**
+
+- **Some providers are still heuristic or optional-runtime dependent**  
+  **部分 provider 仍基于启发式方法或依赖可选运行环境**
+
+- **This is not a full DAW replacement**  
+  **它不是完整的 DAW 替代品**
+
+- **No cloud sync, accounts, or sharing system**  
+  **暂不提供云同步、账号系统或分享功能**
+
+- **Score rendering is readable, not publication-grade engraving**  
+  **乐谱渲染以可读性为主，并非出版级排版**
+
+---
+
+## 🛣 Roadmap / 路线图
+
+- **Better transcription models**  
+  **更好的转谱模型**
+
+- **Desktop packaging**  
+  **桌面应用封装**
+
+- **Improved editing workflow**  
+  **更完善的编辑体验**
+
+- **Stronger project management and quality controls**  
+  **更强的项目管理与质量控制**
+
+---
+
+## 📄 License / 许可证
+
+MIT
+
+---
+
+## Support the Project / 支持项目
+
+If this project is useful to you, give it a star. It helps more people discover it.  
+如果这个项目对你有帮助，欢迎点一个 Star，让更多人看到它。

@@ -144,7 +144,7 @@ export function NoteEditorPanel({
           <strong>
             {hasDraftChanges
               ? "Draft Updated / 草稿已修改"
-              : "Draft Matches Source / 草稿与原结果一致"}
+              : "Draft Matches Original Result / 草稿与原始结果一致"}
           </strong>
           <div className="muted">
             {hasSavedDraft
@@ -170,7 +170,7 @@ export function NoteEditorPanel({
             onClick={onRestoreSavedDraft}
             type="button"
           >
-            Restore Saved / 恢复已保存
+            Restore Saved Draft / 恢复已保存草稿
           </button>
         </div>
       </div>
@@ -224,8 +224,8 @@ export function NoteEditorPanel({
                 </div>
               ) : (
                 <p className="muted">
-                  Multi-selection supports delete, drag timing, quantize, and drum lane reassignment. /
-                  多选支持删除、拖动时值、量化和鼓组轨道重分配。
+                  Multi-selection supports delete, timing edits, quantize, and drum lane reassignment.
+                  / 多选支持删除、时值调整、量化和鼓组轨道重分配。
                 </p>
               )}
 
@@ -314,7 +314,7 @@ export function NoteEditorPanel({
 
             <p className="muted">
               Keyboard: Delete removes selection, Ctrl/Cmd+Z undo, Ctrl/Cmd+Y redo, arrow keys nudge
-              timing, and piano selections use up/down for pitch. / 键盘支持删除、撤销、重做、时值微调和音高调整。
+              timing, and piano selections use up/down for pitch. / 键盘支持删除、撤销、重做、时值微调，以及钢琴音高调整。
             </p>
           </div>
         </article>
@@ -409,7 +409,7 @@ export function NoteEditorPanel({
                 ? `Saved draft v${savedDraftVersion ?? 1} / 已保存草稿 v${savedDraftVersion ?? 1}${
                     savedDraftSavedAt ? ` · ${new Date(savedDraftSavedAt).toLocaleString()}` : ""
                   }`
-                : "No saved draft baseline yet / 还没有保存草稿基线"}
+                : "No saved draft yet / 还没有已保存草稿"}
             </div>
             <div className="actions">
               <button className="button secondary small" onClick={onRevertDraft} type="button">
@@ -440,7 +440,7 @@ export function NoteEditorPanel({
           <div className="editor-fields">
             <div className="muted">
               {retranscriptionRegion
-                ? `Region / 区域: ${retranscriptionRegion.startSec.toFixed(3)}s - ${retranscriptionRegion.endSec.toFixed(
+                ? `Region Selection / 区域选择: ${retranscriptionRegion.startSec.toFixed(3)}s - ${retranscriptionRegion.endSec.toFixed(
                     3
                   )}s · ${retranscriptionRegion.instrument ?? "mixed"}`
                 : "Draw a box in the piano roll to choose a piano or drum region. / 在钢琴卷帘中框选区域，用于钢琴或鼓组重转写。"}
@@ -463,7 +463,7 @@ export function NoteEditorPanel({
                 : suggestions.length > 0
                   ? `${suggestions.length} active suggestions / 当前有 ${suggestions.length} 条建议${
                       selectedSuggestionCount > 0
-                        ? ` · ${selectedSuggestionCount} on the current selection`
+                        ? ` · ${selectedSuggestionCount} on the current selection / 当前选择中有 ${selectedSuggestionCount} 条`
                         : ""
                     }`
                   : "No active suggestions yet. / 目前还没有建议。"}

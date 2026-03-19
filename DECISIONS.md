@@ -34,3 +34,85 @@ Follow-up:
 - Keep future polish work aligned with the current score-first hierarchy.
 - Continue improving bilingual coverage in secondary routes where needed.
 - Do not let future product polish undermine the current contract and persistence guardrails.
+
+### 2026-03-20
+Decision:
+- Apply a copy-cleanup-only pass across the web UI without changing layout structure, provider controls, or viewport behavior.
+
+Context:
+- Key workflow surfaces still had inconsistent terminology, some overly dense helper copy, and a mix of readable bilingual labels and single-line mixed labels.
+- A few user-facing Chinese strings in preview surfaces needed cleanup so the product tone stayed intentional and product-oriented.
+
+Chosen option:
+- Standardize terms such as Project Library, Score Preview, Piano Score, Drum Companion, Draft, Original Result, Saved Draft, Export, and Advanced Details.
+- Prefer two-line English/Chinese presentation in major informational headings and cards where it improves scanability.
+- Keep compact controls and dense action rows on single-line bilingual labels when space matters.
+
+Tradeoffs:
+- The pass improves clarity without risking layout churn, but some secondary technical surfaces still use compact slash-style bilingual labels for space efficiency.
+
+### 2026-03-20
+Decision:
+- Refine the Project Library UX with lighter management controls while preserving all meaningful local-project workflows.
+
+Context:
+- The library already supported the right capabilities, but each project card exposed too many same-weight buttons at once.
+- The result felt noisier than the main workspace and made project entry less visually clear.
+
+Chosen option:
+- Keep `Open Project` as the primary visible card action.
+- Keep `Open Local Project` and `Import Package` as the main page-entry actions.
+- Move lower-frequency per-project management actions behind a lightweight disclosure instead of removing the underlying capabilities.
+
+Tradeoffs:
+- Rename, duplicate, and delete now take one extra click, but the page is cleaner and project entry is easier to scan.
+
+### 2026-03-20
+Decision:
+- Keep the score-first result area visually stable by using fixed-height preview readers with internal scrolling for long score content.
+
+Context:
+- Long generated results could make the main result section feel too tall and less product-like.
+- The piano score and drum companion were already reader-like surfaces, so containment was better handled at the viewport layer than by changing rendering logic.
+
+Chosen option:
+- Preserve the current score and drum rendering logic.
+- Give the piano score and drum companion explicit viewport heights with internal scrolling.
+- Keep the score section headers and surrounding context outside the scrolling region.
+
+Tradeoffs:
+- Users scroll inside the preview readers for long content, which improves page stability but adds one more local scroll area.
+
+### 2026-03-20
+Decision:
+- Expose provider choice through a restrained Advanced Runtime Options panel near upload/start, backed by additive runtime diagnostics and per-job provider preference overrides.
+
+Context:
+- Source separation, piano transcription, and drum transcription providers materially affect result quality, but the main workspace should still feel like a creative tool rather than a runtime dashboard.
+- Existing runtime diagnostics already knew the selected provider state, but the upload flow did not expose discoverable provider choice or disabled unavailable options.
+
+Chosen option:
+- Keep `Auto` as the default path for all three provider categories.
+- Extend runtime diagnostics so each category exposes concrete provider options plus availability.
+- Add a collapsed Advanced Runtime Options panel near the upload/start area instead of large top-level engineering dropdowns.
+- Pass explicit user selections as additive per-job provider preferences while preserving the current environment-backed defaults for `Auto`.
+
+Tradeoffs:
+- The backend contract grows slightly, but only in an additive way that preserves the existing normalized result boundary.
+- Provider choice is easier to discover, though some users may still never open the advanced panel unless results look weak.
+
+### 2026-03-20
+Decision:
+- Use the supplied fantasy music artwork as a homepage visual-language reference, translated into controlled hero atmospherics and shared product-surface styling rather than stretched raw-image backgrounds.
+
+Context:
+- The product already had a restrained manuscript/fantasy direction, but the homepage and surrounding product surfaces still felt more generic than the reference artwork.
+- The app still needed to behave like a readable creative workspace, so imagery had to stay behind strong panels instead of becoming the UI itself.
+
+Chosen option:
+- Give the homepage hero the strongest emerald-gold atmosphere and musical ribbon ornamentation.
+- Carry a quieter version of that same family into the Project Library and main workspace heroes.
+- Align cards and panels across pages with stronger framed highlights, softer glow accents, and more cohesive surface gradients.
+
+Tradeoffs:
+- The result is more distinctive and better aligned across pages, but it intentionally abstracts the artwork into CSS layers and decorative overlays instead of showing a literal full-screen fantasy scene.

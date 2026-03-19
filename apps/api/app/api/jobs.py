@@ -40,7 +40,7 @@ async def create_job(payload: CreateJobRequest) -> JobResponse:
 
     job = job_store.create(payload.upload_id)
     project_store.create_project(job, upload)
-    start_job(job.id, upload)
+    start_job(job.id, upload, payload.provider_preferences)
     return JobResponse(job=job)
 
 

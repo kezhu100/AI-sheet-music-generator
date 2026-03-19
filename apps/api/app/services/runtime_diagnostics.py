@@ -7,7 +7,7 @@ import sys
 from typing import Iterable, Optional
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import RuntimeDiagnostics, RuntimeProviderStatus, RuntimeStorageStatus
+from app.models.schemas import RuntimeDiagnostics, RuntimeProviderOption, RuntimeProviderStatus, RuntimeStorageStatus
 from app.pipeline.drum_transcription import (
     DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
     DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
@@ -109,6 +109,7 @@ class RuntimeDiagnosticsService:
                 message="The local development copy provider is available and keeps the app runnable without optional ML runtimes.",
                 guidance=[],
                 optional=False,
+                options=self._build_source_options(settings),
             )
 
         if selected == SOURCE_SEPARATION_PROVIDER_DEMUCS:
@@ -126,9 +127,17 @@ class RuntimeDiagnosticsService:
                     "Install Demucs into the configured Python environment or switch SOURCE_SEPARATION_PROVIDER back to development-copy.",
                     "Set SOURCE_SEPARATION_FALLBACK_PROVIDER=development-copy to keep startup non-blocking when Demucs is unavailable.",
                 ],
+                options=self._build_source_options(settings),
             )
 
-        return self._unsupported_provider_status("source-separation", "Source separation", selected, fallback, self._source_provider_label)
+        return self._unsupported_provider_status(
+            "source-separation",
+            "Source separation",
+            selected,
+            fallback,
+            self._source_provider_label,
+            self._build_source_options(settings),
+        )
 
     def _build_piano_status(self, settings: Settings) -> RuntimeProviderStatus:
         selected = settings.piano_transcription_provider
@@ -145,6 +154,7 @@ class RuntimeDiagnosticsService:
                 message="The heuristic piano provider is available without optional ML runtimes.",
                 guidance=[],
                 optional=False,
+                options=self._build_piano_options(settings),
             )
 
         if selected in {PIANO_TRANSCRIPTION_PROVIDER_ML, PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH}:
@@ -162,9 +172,17 @@ class RuntimeDiagnosticsService:
                     "Install Basic Pitch into the configured Python environment or switch PIANO_TRANSCRIPTION_PROVIDER back to heuristic.",
                     "Set PIANO_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic to keep startup non-blocking when Basic Pitch is unavailable.",
                 ],
+                options=self._build_piano_options(settings),
             )
 
-        return self._unsupported_provider_status("piano-transcription", "Piano transcription", selected, fallback, self._piano_provider_label)
+        return self._unsupported_provider_status(
+            "piano-transcription",
+            "Piano transcription",
+            selected,
+            fallback,
+            self._piano_provider_label,
+            self._build_piano_options(settings),
+        )
 
     def _build_drum_status(self, settings: Settings) -> RuntimeProviderStatus:
         selected = settings.drum_transcription_provider
@@ -181,6 +199,7 @@ class RuntimeDiagnosticsService:
                 message="The heuristic drum provider is available without optional ML runtimes.",
                 guidance=[],
                 optional=False,
+                options=self._build_drum_options(settings),
             )
 
         if selected in {DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM}:
@@ -198,9 +217,17 @@ class RuntimeDiagnosticsService:
                     "Install madmom into the configured Python environment or switch DRUM_TRANSCRIPTION_PROVIDER back to heuristic.",
                     "Set DRUM_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic to keep startup non-blocking when madmom is unavailable.",
                 ],
+                options=self._build_drum_options(settings),
             )
 
-        return self._unsupported_provider_status("drum-transcription", "Drum transcription", selected, fallback, self._drum_provider_label)
+        return self._unsupported_provider_status(
+            "drum-transcription",
+            "Drum transcription",
+            selected,
+            fallback,
+            self._drum_provider_label,
+            self._build_drum_options(settings),
+        )
 
     def _build_python_provider_status(
         self,
@@ -215,6 +242,7 @@ class RuntimeDiagnosticsService:
         module_name: str,
         optional_when_unselected: bool,
         install_guidance: Iterable[str],
+        options: list[RuntimeProviderOption],
     ) -> RuntimeProviderStatus:
         executable = python_executable or sys.executable
         provider_available, detail = self._check_python_module(executable, module_name)
@@ -232,6 +260,7 @@ class RuntimeDiagnosticsService:
                 message=f"{selected_label} is available in the configured Python runtime.",
                 guidance=[],
                 optional=optional_when_unselected,
+                options=options,
             )
 
         has_fallback = fallback_provider is not None and fallback_provider != selected_provider
@@ -250,6 +279,7 @@ class RuntimeDiagnosticsService:
                 ),
                 guidance=guidance,
                 optional=optional_when_unselected,
+                options=options,
             )
 
         return RuntimeProviderStatus(
@@ -263,6 +293,7 @@ class RuntimeDiagnosticsService:
             message=f"{selected_label} is configured as the primary provider but is unavailable. Details: {detail}",
             guidance=guidance,
             optional=optional_when_unselected,
+            options=options,
         )
 
     def _check_python_module(self, python_executable: str, module_name: str) -> tuple[bool, str]:
@@ -289,6 +320,7 @@ class RuntimeDiagnosticsService:
         selected: str,
         fallback: Optional[str],
         label_resolver,
+        options: list[RuntimeProviderOption],
     ) -> RuntimeProviderStatus:
         return RuntimeProviderStatus(
             key=key,
@@ -301,7 +333,62 @@ class RuntimeDiagnosticsService:
             message=f"Unsupported provider '{selected}' is configured.",
             guidance=["Update the provider environment variable to one of the documented supported providers."],
             optional=False,
+            options=options,
         )
+
+    def _build_source_options(self, settings: Settings) -> list[RuntimeProviderOption]:
+        demucs_available, demucs_detail = self._check_python_module(settings.source_separation_demucs_python or sys.executable, "demucs")
+        return [
+            RuntimeProviderOption(
+                provider=SOURCE_SEPARATION_PROVIDER_DEVELOPMENT,
+                label="Development copy",
+                available=True,
+                detail="Always available for local draft-first runs.",
+            ),
+            RuntimeProviderOption(
+                provider=SOURCE_SEPARATION_PROVIDER_DEMUCS,
+                label="Demucs",
+                available=demucs_available,
+                detail="Installed in the configured local Python runtime." if demucs_available else demucs_detail,
+            ),
+        ]
+
+    def _build_piano_options(self, settings: Settings) -> list[RuntimeProviderOption]:
+        basic_pitch_available, basic_pitch_detail = self._check_python_module(
+            settings.piano_transcription_ml_python or sys.executable,
+            "basic_pitch",
+        )
+        return [
+            RuntimeProviderOption(
+                provider=PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC,
+                label="Heuristic WAV",
+                available=True,
+                detail="Always available for local draft generation.",
+            ),
+            RuntimeProviderOption(
+                provider=PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH,
+                label="Basic Pitch",
+                available=basic_pitch_available,
+                detail="Installed in the configured local Python runtime." if basic_pitch_available else basic_pitch_detail,
+            ),
+        ]
+
+    def _build_drum_options(self, settings: Settings) -> list[RuntimeProviderOption]:
+        madmom_available, madmom_detail = self._check_python_module(settings.drum_transcription_ml_python or sys.executable, "madmom")
+        return [
+            RuntimeProviderOption(
+                provider=DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
+                label="Heuristic WAV",
+                available=True,
+                detail="Always available for local draft generation.",
+            ),
+            RuntimeProviderOption(
+                provider=DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
+                label="madmom",
+                available=madmom_available,
+                detail="Installed in the configured local Python runtime." if madmom_available else madmom_detail,
+            ),
+        ]
 
     def _source_provider_label(self, provider: Optional[str]) -> Optional[str]:
         mapping = {

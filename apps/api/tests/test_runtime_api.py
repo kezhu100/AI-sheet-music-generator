@@ -32,6 +32,18 @@ class RuntimeApiTests(unittest.TestCase):
         self.assertEqual(provider_statuses["source-separation"]["status"], "ready")
         self.assertEqual(provider_statuses["piano-transcription"]["status"], "ready")
         self.assertEqual(provider_statuses["drum-transcription"]["status"], "ready")
+        self.assertEqual(
+            [option["provider"] for option in provider_statuses["source-separation"]["options"]],
+            ["development-copy", "demucs"],
+        )
+        self.assertEqual(
+            [option["provider"] for option in provider_statuses["piano-transcription"]["options"]],
+            ["heuristic", "basic-pitch"],
+        )
+        self.assertEqual(
+            [option["provider"] for option in provider_statuses["drum-transcription"]["options"]],
+            ["heuristic", "madmom"],
+        )
 
     def test_runtime_endpoint_reports_degraded_when_selected_ml_provider_has_fallback(self) -> None:
         with patch.dict(
@@ -53,6 +65,8 @@ class RuntimeApiTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         piano_status = next(provider for provider in payload["providers"] if provider["key"] == "piano-transcription")
         self.assertEqual(piano_status["status"], "degraded-fallback")
+        basic_pitch_option = next(option for option in piano_status["options"] if option["provider"] == "basic-pitch")
+        self.assertFalse(basic_pitch_option["available"])
 
     def test_runtime_endpoint_reports_blocking_when_selected_ml_provider_has_no_fallback(self) -> None:
         with patch.dict(

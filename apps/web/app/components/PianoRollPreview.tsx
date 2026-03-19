@@ -281,8 +281,8 @@ export function PianoRollPreview({
         {isPianoOnly
           ? "No visible piano notes are available yet. / 当前还没有可显示的钢琴音符。"
           : isDrumOnly
-            ? "No visible drum hits are available yet. / 当前还没有可显示的鼓组击打。"
-            : "No visible note events are available for the piano-roll preview yet. / 当前还没有可显示的卷帘音符。"}
+            ? "No visible drum hits are available yet. / 当前还没有可显示的鼓点。"
+            : "No visible note events are available for the piano-roll preview yet. / 当前还没有可显示的音符事件。"}
       </p>
     );
   }
@@ -295,7 +295,7 @@ export function PianoRollPreview({
             ? "Scroll the paper-like view to inspect the score-shaped piano layout. / 可滚动查看更接近乐谱阅读感的钢琴布局。"
             : isDrumOnly
               ? "Scroll to inspect the separated drum lanes. / 可滚动查看分离后的鼓组轨道。"
-              : "Scroll vertically to inspect detail. / 可上下滚动查看细节。"}
+              : "Scroll vertically to inspect details. / 可上下滚动查看细节。"}
         </span>
         <span>Drag notes or box-select a region. / 可拖动音符或框选区域。</span>
       </div>
@@ -592,3 +592,4 @@ function toRetranscriptionRegionSelection(
     endSec
   };
 }
+

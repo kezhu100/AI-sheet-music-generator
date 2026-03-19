@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   areJobResultsEqual,
   beatsToSeconds,
@@ -19,8 +19,10 @@ import type {
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  ProviderPreferences,
   ProjectDetail,
   RuntimeDiagnosticsResponse,
+  RuntimeProviderStatus,
   UploadResponse
 } from "@ai-sheet-music-generator/shared-types";
 import {
@@ -53,6 +55,28 @@ interface ProjectWorkspaceProps {
   initialProjectDetail?: ProjectDetail | null;
 }
 
+const DEFAULT_PROVIDER_PREFERENCES: ProviderPreferences = {
+  sourceSeparation: "auto",
+  pianoTranscription: "auto",
+  drumTranscription: "auto"
+};
+
+function renderBilingualText(text: string): ReactNode {
+  const [english, chinese] = text.split("\n");
+
+  if (!chinese) {
+    return text;
+  }
+
+  return (
+    <>
+      <span>{english}</span>
+      <br />
+      <span>{chinese}</span>
+    </>
+  );
+}
+
 function formatNote(note: NoteEvent): string {
   if (note.instrument === "drums") {
     return `${note.drumLabel ?? "drum"} (${note.midiNote ?? "n/a"})`;
@@ -69,6 +93,85 @@ function getRuntimeSeverityClass(severity: RuntimeDiagnosticsResponse["severity"
     return "pill pill-warning";
   }
   return "pill pill-danger";
+}
+
+function getRuntimeProvider(
+  diagnostics: RuntimeDiagnosticsResponse | null,
+  key: RuntimeProviderStatus["key"]
+): RuntimeProviderStatus | null {
+  return diagnostics?.providers.find((provider) => provider.key === key) ?? null;
+}
+
+function buildCreateJobPayload(uploadId: string, providerPreferences: ProviderPreferences) {
+  const hasExplicitPreference = Object.values(providerPreferences).some((value) => value && value !== "auto");
+
+  return hasExplicitPreference ? { uploadId, providerPreferences } : { uploadId };
+}
+
+interface RuntimeProviderPreferenceFieldProps {
+  fieldName: string;
+  title: string;
+  titleZh: string;
+  currentValue: string | undefined;
+  selectedProviderLabel?: string;
+  options?: RuntimeProviderStatus["options"];
+  onChange: (value: string) => void;
+}
+
+function RuntimeProviderPreferenceField({
+  fieldName,
+  title,
+  titleZh,
+  currentValue,
+  selectedProviderLabel,
+  options,
+  onChange
+}: RuntimeProviderPreferenceFieldProps) {
+  return (
+    <fieldset className="runtime-option-group">
+      <legend>
+        {title}
+        <br />
+        {titleZh}
+      </legend>
+      <div className="runtime-option-list">
+        <label className={`runtime-option-card ${currentValue === "auto" ? "is-selected" : ""}`}>
+          <input
+            checked={currentValue === "auto"}
+            name={fieldName}
+            type="radio"
+            value="auto"
+            onChange={() => onChange("auto")}
+          />
+          <span className="runtime-option-label">Auto (Recommended) / 自动（推荐）</span>
+          <span className="muted">
+            {selectedProviderLabel
+              ? `Current local default: ${selectedProviderLabel} / 当前本地默认值：${selectedProviderLabel}`
+              : "Use the current local default. / 使用当前本地默认设置。"}
+          </span>
+        </label>
+        {options?.map((option) => (
+          <label
+            className={`runtime-option-card ${currentValue === option.provider ? "is-selected" : ""} ${!option.available ? "is-disabled" : ""}`}
+            key={option.provider}
+          >
+            <input
+              checked={currentValue === option.provider}
+              disabled={!option.available}
+              name={fieldName}
+              type="radio"
+              value={option.provider}
+              onChange={() => onChange(option.provider)}
+            />
+            <span className="runtime-option-label">
+              {option.label} {!option.available ? "· Not installed / 未安装" : ""}
+            </span>
+            <span className="muted">{option.detail}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRecord | null {
@@ -192,6 +295,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
+  const [providerPreferences, setProviderPreferences] = useState<ProviderPreferences>(DEFAULT_PROVIDER_PREFERENCES);
   const lastDraftJobIdRef = useRef<string | null>(null);
 
   const {
@@ -372,6 +476,19 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const visibleTracks = useMemo(() => {
     return activeResult ? getVisibleTracks(activeResult.tracks, visibleTrackKeys) : [];
   }, [activeResult, visibleTrackKeys]);
+
+  const sourceRuntimeProvider = useMemo(
+    () => getRuntimeProvider(runtimeDiagnostics, "source-separation"),
+    [runtimeDiagnostics]
+  );
+  const pianoRuntimeProvider = useMemo(
+    () => getRuntimeProvider(runtimeDiagnostics, "piano-transcription"),
+    [runtimeDiagnostics]
+  );
+  const drumRuntimeProvider = useMemo(
+    () => getRuntimeProvider(runtimeDiagnostics, "drum-transcription"),
+    [runtimeDiagnostics]
+  );
 
   const pianoTrack = useMemo(() => {
     return visibleTracks.find((track) => track.instrument === "piano") ?? null;
@@ -594,7 +711,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       setUpload(uploadResponse);
       setIsUploading(false);
       setIsCreatingJob(true);
-      const jobResponse = await createJob({ uploadId: uploadResponse.upload.uploadId });
+      const jobResponse = await createJob(buildCreateJobPayload(uploadResponse.upload.uploadId, providerPreferences));
       setJob(jobResponse.job);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Upload failed.");
@@ -758,6 +875,16 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
 
   function handleBoxSelect(noteIds: string[], options?: { additive?: boolean }): void {
     replaceSelection(noteIds, { additive: options?.additive, primaryDraftNoteId: noteIds[0] ?? null });
+  }
+
+  function handleProviderPreferenceChange<K extends keyof ProviderPreferences>(
+    key: K,
+    value: NonNullable<ProviderPreferences[K]>
+  ): void {
+    setProviderPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      [key]: value
+    }));
   }
 
   function handleMoveNote(_trackKey: string, draftNoteId: string, onsetSec: number): void {
@@ -939,8 +1066,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   }
 
   return (
-    <main className="page workspace-page">
-      <section className="hero product-hero">
+    <main className={`page workspace-page ${mode === "home" ? "home-workspace-page" : "project-workspace-page"}`}>
+      <section className={`hero product-hero ${mode === "home" ? "hero-home-fantasy" : "hero-workspace-fantasy"}`}>
         <div className="top-nav">
           <Link className="button secondary" href={mode === "home" ? "/projects" : "/"}>
             {mode === "home" ? "Open Library / 打开项目库" : "Back to Home / 返回首页"}
@@ -956,8 +1083,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <h1>{mode === "home" ? "AI Sheet Music Generator" : projectDetail?.projectName ?? "Project Workspace / 项目工作区"}</h1>
             <p>
               A local-first creative workspace for turning audio into editable draft notation.
-              {" "}
-              / 一个本地优先的创作工作区，把音频整理成可编辑的草稿乐谱。
+              <br />
+              一个本地优先的创作工作区，把音频整理成可编辑的草稿乐谱。
             </p>
             <div className="pill-row">
               <span className="pill">Local-first / 本地优先</span>
@@ -1001,7 +1128,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       {mode === "home" ? (
         <section className="content-grid workspace-entry-grid">
           <div className="panel panel-entry">
-            <h2>Start a Project / 开始项目</h2>
+            <h2>
+              Start a Project
+              <br />
+              开始项目
+            </h2>
             <div className="upload-form">
               <div className="upload-box ornate-card">
                 <label htmlFor="audio-file">Audio File / 音频文件</label>
@@ -1011,8 +1142,52 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   accept="audio/*"
                   onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
                 />
-                <p className="muted">Upload a full mix or an isolated stem. / 可以上传完整混音，也可以上传单独音轨素材。</p>
+                <p className="muted">
+                  Upload a full mix or an isolated stem.
+                  <br />
+                  可以上传完整混音，也可以上传单独音轨素材。
+                </p>
               </div>
+              <details className="runtime-options-panel ornate-card">
+                <summary>Advanced Runtime Options / 高级运行选项</summary>
+                <div className="runtime-options-body">
+                  <p className="muted">
+                    Use stronger local providers when difficult songs produce weak or empty draft results.
+                    <br />
+                    当复杂歌曲生成结果较弱或为空时，可尝试更强的本地 provider。
+                  </p>
+                  <div className="runtime-option-grid">
+                    <RuntimeProviderPreferenceField
+                      currentValue={providerPreferences.sourceSeparation}
+                      fieldName="source-separation-provider"
+                      onChange={(value) => handleProviderPreferenceChange("sourceSeparation", value as "auto" | "development-copy" | "demucs")}
+                      options={sourceRuntimeProvider?.options}
+                      selectedProviderLabel={sourceRuntimeProvider?.selectedProviderLabel}
+                      title="Source Separation"
+                      titleZh="源分离"
+                    />
+                    <RuntimeProviderPreferenceField
+                      currentValue={providerPreferences.pianoTranscription}
+                      fieldName="piano-transcription-provider"
+                      onChange={(value) => handleProviderPreferenceChange("pianoTranscription", value as "auto" | "heuristic" | "basic-pitch")}
+                      options={pianoRuntimeProvider?.options}
+                      selectedProviderLabel={pianoRuntimeProvider?.selectedProviderLabel}
+                      title="Piano Transcription"
+                      titleZh="钢琴转谱"
+                    />
+                    <RuntimeProviderPreferenceField
+                      currentValue={providerPreferences.drumTranscription}
+                      fieldName="drum-transcription-provider"
+                      onChange={(value) => handleProviderPreferenceChange("drumTranscription", value as "auto" | "heuristic" | "madmom")}
+                      options={drumRuntimeProvider?.options}
+                      selectedProviderLabel={drumRuntimeProvider?.selectedProviderLabel}
+                      title="Drum Transcription"
+                      titleZh="鼓轨转谱"
+                    />
+                  </div>
+                  {runtimeDiagnosticsError ? <p className="error">{runtimeDiagnosticsError}</p> : null}
+                </div>
+              </details>
               <div className="actions action-bar-primary">
                 <button
                   className="button"
@@ -1075,7 +1250,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           </div>
 
           <div className="panel panel-entry side-info-panel">
-            <h2>What This Session Creates / 本次将产出</h2>
+            <h2>
+              What This Session Creates
+              <br />
+              本次将产出
+            </h2>
             <div className="note-list compact-list">
               <article className="note-card ornate-card">
                 <strong>Score First / 乐谱优先</strong>
@@ -1095,7 +1274,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       ) : (
         <section className="content-grid workspace-entry-grid">
           <div className="panel panel-entry">
-            <h2>Project Entry / 项目入口</h2>
+            <h2>
+              Project Entry
+              <br />
+              项目入口
+            </h2>
             {projectDetail ? (
               <div className="meta-list compact-list">
                 <article className="meta-item ornate-card">
@@ -1119,11 +1302,15 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           </div>
 
           <div className="panel panel-entry side-info-panel">
-            <h2>Workspace Notes / 工作区提示</h2>
+            <h2>
+              Workspace Notes
+              <br />
+              工作区提示
+            </h2>
             <div className="note-list compact-list">
               <article className="note-card ornate-card">
                 <strong>Stable Route / 稳定路由</strong>
-                <div className="muted">{copy.project.localRouteNotice}</div>
+                <div className="muted">{renderBilingualText(copy.project.localRouteNotice)}</div>
               </article>
               <article className="note-card ornate-card">
                 <strong>Current Assets / 当前资产</strong>
@@ -1137,7 +1324,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       {error ? <p className="error">{error}</p> : null}
       {exportSuccessMessage ? (
         <section className="panel panel-full">
-          <h2>Package Export / 项目包导出</h2>
+          <h2>
+            Package Export
+            <br />
+            项目包导出
+          </h2>
           <p style={{ whiteSpace: "pre-wrap" }}>{exportSuccessMessage}</p>
         </section>
       ) : null}
@@ -1191,11 +1382,15 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <div className="section-heading-row">
               <div>
                 <div className="eyebrow">Main Result / 主结果</div>
-                <h2>Score Preview / 乐谱预览</h2>
+                <h2>
+                  Score Preview
+                  <br />
+                  乐谱预览
+                </h2>
                 <p className="muted section-help">
                   Read the piano score first, then compare the drum companion below before refining the draft.
-                  {" "}
-                  / 先查看生成后的乐谱，再用下方工具微调时值、音高和鼓点。
+                  <br />
+                  先查看生成后的乐谱，再参考下方的鼓谱辅助预览，然后继续调整草稿。
                 </p>
               </div>
               <div className="result-meta-chip">{activeResult.bpm} BPM</div>
@@ -1277,7 +1472,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <div className="section-heading-row">
                 <div>
                   <div className="eyebrow">Editing Area / 编辑区</div>
-                  <h2>Refine the Draft / 调整草稿</h2>
+                  <h2>
+                    Refine the Draft
+                    <br />
+                    调整草稿
+                  </h2>
                 </div>
               </div>
               <p className="muted section-help">
@@ -1361,8 +1560,16 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <div className="section-heading-row">
                 <div>
                   <div className="eyebrow">Export / 导出</div>
-                  <h2>Export the Draft / 导出当前草稿</h2>
-                  <p className="muted section-help">Draft export uses the current editable score. Original export keeps the untouched generated result. / 草稿导出使用当前可编辑乐谱，原始导出保留未修改的生成结果。</p>
+                  <h2>
+                    Export the Draft
+                    <br />
+                    导出当前草稿
+                  </h2>
+                  <p className="muted section-help">
+                    Draft export uses the current editable score. Original export keeps the untouched generated result.
+                    <br />
+                    草稿导出使用当前可编辑乐谱，原始导出保留未修改的生成结果。
+                  </p>
                 </div>
               </div>
               <div className="export-card-grid">
@@ -1449,7 +1656,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                       <div className="note-list compact-list">
                         <article className="note-card ornate-card">
                           <strong>Route / 路由</strong>
-                          <div className="muted">{copy.project.localRouteNotice}</div>
+                          <div className="muted">{renderBilingualText(copy.project.localRouteNotice)}</div>
                         </article>
                         <div className="actions">
                           <button className="button secondary" type="button" onClick={() => void handleCopyProjectLink()}>

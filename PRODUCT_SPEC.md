@@ -40,6 +40,10 @@ Presentation priorities:
 - drum notation is a secondary companion
 - the piano roll is an editing support surface rather than the dominant result
 - advanced technical details stay available but are collapsed by default
+- in the Project Library, opening a project should remain the clearest action while rename/duplicate/delete stay available with less visual weight
+- long score and drum results should stay inside stable preview readers with internal scrolling rather than stretching the full page
+- advanced runtime provider choices should be discoverable near upload/start, but kept inside a restrained product-style panel rather than a dominant engineering control row
+- the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
 
 ## User Story
 As a user, I want to upload audio, get a readable draft score, refine it locally, save my work, and export it without relying on the cloud.
@@ -58,6 +62,8 @@ A successful current product:
 - do not imply cloud sync or public sharing
 - keep accessibility, readability, and hierarchy strong even with the manuscript/fantasy visual direction
 - keep bilingual copy intentional and consistent rather than partial
+- prefer two-line English/Chinese presentation for major section headings, helper copy, and informational cards when it improves readability
+- keep shared product terms consistent across home, library, preview, draft, and export surfaces
 
 ## Deferred / Not Near-Term
 - accounts and authentication

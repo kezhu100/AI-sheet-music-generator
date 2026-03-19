@@ -38,10 +38,11 @@ It adds:
 - a restrained manuscript / fantasy / Celtic visual system implemented through CSS and SVG-style ornamentation only
 
 It does not add:
-- backend contract changes
 - persistence model changes
 - provider architecture changes
 - cloud features
+
+Small additive contract refinements are allowed when they stay architecture-safe, such as exposing runtime provider availability options and accepting per-job provider preferences without changing the normalized `JobResult` boundary.
 
 ## Frontend Composition
 The main workspace now follows this structure:

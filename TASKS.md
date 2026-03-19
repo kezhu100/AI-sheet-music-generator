@@ -27,6 +27,11 @@
 - [x] add restrained manuscript / fantasy / Celtic-inspired visual polish through CSS
 - [x] remove garbled Chinese text and improve bilingual UI wording in the main workflow
 - [x] update core documentation to reflect the new page structure and positioning
+- [x] standardize core UI terms and refine two-line bilingual presentation on major library/workspace headings
+- [x] simplify Project Library action hierarchy while preserving useful local project workflows
+- [x] stabilize long score-preview browsing with fixed-height internal-scroll preview readers
+- [x] expose Advanced Runtime Options near upload/start with Auto defaults, provider availability, and per-job provider preferences
+- [x] align homepage, library, and workspace visuals around an artwork-inspired fantasy music hero language without sacrificing readability
 
 ## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)

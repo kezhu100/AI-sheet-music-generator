@@ -14,6 +14,9 @@ JobStatus = Literal["queued", "processing", "failed", "completed"]
 ExportFormat = Literal["midi", "musicxml"]
 RuntimeSeverity = Literal["ready", "degraded", "blocking"]
 RuntimeCheckStatus = Literal["ready", "optional-missing", "degraded-fallback", "blocking-misconfigured"]
+SourceSeparationProviderPreference = Literal["auto", "development-copy", "demucs"]
+PianoTranscriptionProviderPreference = Literal["auto", "heuristic", "basic-pitch"]
+DrumTranscriptionProviderPreference = Literal["auto", "heuristic", "madmom"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
 MAX_MIDI_NOTE = 127
@@ -41,8 +44,17 @@ class UploadResponse(BaseModel):
     upload: UploadedFileDescriptor
 
 
+class ProviderPreferences(BaseModel):
+    source_separation: Optional[SourceSeparationProviderPreference] = Field(default=None, alias="sourceSeparation")
+    piano_transcription: Optional[PianoTranscriptionProviderPreference] = Field(default=None, alias="pianoTranscription")
+    drum_transcription: Optional[DrumTranscriptionProviderPreference] = Field(default=None, alias="drumTranscription")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 class CreateJobRequest(BaseModel):
     upload_id: str = Field(alias="uploadId")
+    provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -524,6 +536,15 @@ class RuntimeStorageStatus(BaseModel):
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
+class RuntimeProviderOption(BaseModel):
+    provider: str
+    label: str
+    available: bool
+    detail: str
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 class RuntimeProviderStatus(BaseModel):
     key: str
     label: str
@@ -535,6 +556,7 @@ class RuntimeProviderStatus(BaseModel):
     message: str
     guidance: List[str]
     optional: bool
+    options: List[RuntimeProviderOption]
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

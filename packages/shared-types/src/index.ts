@@ -18,6 +18,17 @@ export interface UploadResponse {
 
 export interface CreateJobRequest {
   uploadId: string;
+  providerPreferences?: ProviderPreferences;
+}
+
+export type SourceSeparationProviderPreference = "auto" | "development-copy" | "demucs";
+export type PianoTranscriptionProviderPreference = "auto" | "heuristic" | "basic-pitch";
+export type DrumTranscriptionProviderPreference = "auto" | "heuristic" | "madmom";
+
+export interface ProviderPreferences {
+  sourceSeparation?: SourceSeparationProviderPreference;
+  pianoTranscription?: PianoTranscriptionProviderPreference;
+  drumTranscription?: DrumTranscriptionProviderPreference;
 }
 
 export interface NoteEvent {
@@ -230,6 +241,14 @@ export interface RuntimeProviderStatus {
   message: string;
   guidance: string[];
   optional: boolean;
+  options: RuntimeProviderOption[];
+}
+
+export interface RuntimeProviderOption {
+  provider: string;
+  label: string;
+  available: boolean;
+  detail: string;
 }
 
 export interface RuntimeDiagnosticsResponse {

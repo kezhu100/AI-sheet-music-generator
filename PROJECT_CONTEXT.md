@@ -31,6 +31,11 @@ Phase 14.5 adds:
 - advanced technical details collapsed by default
 - restrained manuscript / fantasy / Celtic-inspired product styling
 - stronger bilingual UI wording in the main workflow
+- cleaner two-line English/Chinese presentation in key library and workspace headings
+- a quieter Project Library action hierarchy with direct project entry emphasized over lower-frequency management controls
+- fixed-height internal-scroll preview readers for longer score and drum results
+- an Advanced Runtime Options panel near upload/start with Auto defaults, explicit provider choices, and disabled unavailable options
+- a homepage-led visual alignment pass that translates the fantasy music artwork into controlled hero atmospherics and shared framed product surfaces
 
 ## Product Guardrails
 These remain unchanged:
