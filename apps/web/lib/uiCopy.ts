@@ -1,4 +1,4 @@
-export type UiLocale = "en" | "zh-CN";
+﻿export type UiLocale = "en" | "zh-CN";
 
 interface ProjectUiCopy {
   libraryTitle: string;
@@ -24,36 +24,39 @@ const COPY_BY_LOCALE: Record<UiLocale, UiCopy> = {
   en: {
     locale: "en",
     project: {
-      libraryTitle: "Project Library",
-      libraryEmptyTitle: "No projects yet",
-      libraryEmptyBody: "Create a job from the upload page, then come back here to reopen it from its stable local project route.",
-      renameAction: "Rename",
-      duplicateAction: "Duplicate",
-      deleteAction: "Delete",
-      openAction: "Open project",
-      copyLinkAction: "Copy local share link",
-      unsavedChanges: "Unsaved draft changes",
-      savedDraft: "Saved draft baseline",
-      projectSettings: "Project Settings",
+      libraryTitle: "Project Library / 项目库",
+      libraryEmptyTitle: "No projects yet / 还没有项目",
+      libraryEmptyBody:
+        "Create a score from the main workspace, then return here to reopen it from the local library. / 先在主工作区生成乐谱，再回到这里从本地项目库重新打开。",
+      renameAction: "Rename / 重命名",
+      duplicateAction: "Duplicate / 复制",
+      deleteAction: "Delete / 删除",
+      openAction: "Open Project / 打开项目",
+      copyLinkAction: "Copy Local Link / 复制本地链接",
+      unsavedChanges: "Unsaved Changes / 有未保存修改",
+      savedDraft: "Saved Draft / 已保存草稿",
+      projectSettings: "Project Settings / 项目设置",
       localRouteNotice:
-        "This is a stable local route, not a public internet-safe share token. It only works on the same deployed instance with the same persisted project files."
+        "This is a stable local route, not a public share link. It works only on the same local deployment with the same project files. / 这是稳定的本地路由，不是公开分享链接，只能在同一套本地部署和项目文件下使用。"
     }
   },
   "zh-CN": {
     locale: "zh-CN",
     project: {
-      libraryTitle: "项目库",
-      libraryEmptyTitle: "还没有项目",
-      libraryEmptyBody: "先在上传页创建一个任务，然后回到这里通过稳定的本地项目路由重新打开它。",
-      renameAction: "重命名",
-      duplicateAction: "复制",
-      deleteAction: "删除",
-      openAction: "打开项目",
-      copyLinkAction: "复制本地链接",
-      unsavedChanges: "有未保存的草稿修改",
-      savedDraft: "已保存草稿基线",
-      projectSettings: "项目设置",
-      localRouteNotice: "这是稳定的本地路由，不是公开分享链接。它只在同一部署实例和同一组持久化项目文件下可用。"
+      libraryTitle: "项目库 / Project Library",
+      libraryEmptyTitle: "还没有项目 / No Projects Yet",
+      libraryEmptyBody:
+        "先在主工作区生成乐谱，再回到这里从本地项目库重新打开。 / Create a score from the main workspace, then return here to reopen it from the local library.",
+      renameAction: "重命名 / Rename",
+      duplicateAction: "复制 / Duplicate",
+      deleteAction: "删除 / Delete",
+      openAction: "打开项目 / Open Project",
+      copyLinkAction: "复制本地链接 / Copy Local Link",
+      unsavedChanges: "有未保存修改 / Unsaved Changes",
+      savedDraft: "已保存草稿 / Saved Draft",
+      projectSettings: "项目设置 / Project Settings",
+      localRouteNotice:
+        "这是稳定的本地路由，不是公开分享链接，只能在同一套本地部署和项目文件下使用。 / This is a stable local route, not a public share link. It works only on the same local deployment with the same project files."
     }
   }
 };
@@ -62,4 +65,3 @@ export function getUiCopy(locale?: string | null): UiCopy {
   const normalizedLocale = locale === "zh-CN" ? "zh-CN" : "en";
   return COPY_BY_LOCALE[normalizedLocale];
 }
-

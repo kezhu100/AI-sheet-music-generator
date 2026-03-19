@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -85,7 +85,7 @@ export default function ProjectsPage() {
   }, []);
 
   async function handleRenameProject(project: ProjectSummary): Promise<void> {
-    const nextName = window.prompt("Rename project", project.projectName)?.trim();
+    const nextName = window.prompt("Rename project / 重命名项目", project.projectName)?.trim();
     if (!nextName || nextName === project.projectName) {
       return;
     }
@@ -107,7 +107,7 @@ export default function ProjectsPage() {
   }
 
   async function handleDuplicateProject(project: ProjectSummary): Promise<void> {
-    const nextName = window.prompt("Duplicate project as", `${project.projectName} copy`)?.trim();
+    const nextName = window.prompt("Duplicate project as / 复制项目为", `${project.projectName} copy`)?.trim();
     if (nextName === "") {
       return;
     }
@@ -125,7 +125,9 @@ export default function ProjectsPage() {
   }
 
   async function handleDeleteProject(project: ProjectSummary): Promise<void> {
-    const confirmed = window.confirm(`Delete "${project.projectName}" and its saved draft?`);
+    const confirmed = window.confirm(
+      `Delete "${project.projectName}" and its saved draft? / 删除“${project.projectName}”及其已保存草稿？`
+    );
     if (!confirmed) {
       return;
     }
@@ -145,7 +147,7 @@ export default function ProjectsPage() {
   }
 
   async function handleOpenLocalProject(): Promise<void> {
-    const sourcePath = window.prompt("Open local project folder path");
+    const sourcePath = window.prompt("Open local project folder path / 打开本地项目文件夹路径");
     if (!sourcePath?.trim()) {
       return;
     }
@@ -155,7 +157,9 @@ export default function ProjectsPage() {
     try {
       const response = await openLocalProject(sourcePath.trim());
       setProjects((currentProjects) => {
-        const remainingProjects = currentProjects.filter((project) => project.projectId !== response.project.projectId);
+        const remainingProjects = currentProjects.filter(
+          (project) => project.projectId !== response.project.projectId
+        );
         return [response.project, ...remainingProjects];
       });
       router.push(response.project.sharePath);
@@ -177,7 +181,10 @@ export default function ProjectsPage() {
     setError(null);
     try {
       const response = await importProjectPackage(file);
-      setProjects((currentProjects) => [response.project, ...currentProjects.filter((project) => project.projectId !== response.project.projectId)]);
+      setProjects((currentProjects) => [
+        response.project,
+        ...currentProjects.filter((project) => project.projectId !== response.project.projectId)
+      ]);
       router.push(response.project.sharePath);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Failed to import the project package.");
@@ -199,22 +206,31 @@ export default function ProjectsPage() {
       <section className="hero">
         <div className="top-nav">
           <Link className="button secondary" href="/">
-            Back to upload
+            Back to Home / 返回首页
           </Link>
         </div>
         <div className="hero-grid">
           <div>
             <h1>{copy.project.libraryTitle}</h1>
             <p>
-              Reopen local persisted projects from filesystem-backed manifests. Share routes are stable inside the same deployment,
-              but they are not public publishing links and do not bypass missing auth or storage rules.
+              Reopen local projects from manifest-backed storage. /
+              从基于 manifest 的本地存储重新打开项目。
             </p>
             <div className="actions">
-              <button className="button" disabled={isOpeningLocalProject || isImportingPackage} onClick={() => void handleOpenLocalProject()} type="button">
-                {isOpeningLocalProject ? "Opening local project..." : "Open local project path"}
+              <button
+                className="button"
+                disabled={isOpeningLocalProject || isImportingPackage}
+                onClick={() => void handleOpenLocalProject()}
+                type="button"
+              >
+                {isOpeningLocalProject
+                  ? "Opening local project... / 正在打开本地项目..."
+                  : "Open Local Project / 打开本地项目"}
               </button>
               <label className="button secondary" style={{ cursor: isImportingPackage ? "default" : "pointer" }}>
-                {isImportingPackage ? "Importing package..." : "Import project package"}
+                {isImportingPackage
+                  ? "Importing package... / 导入中..."
+                  : "Import Package / 导入项目包"}
                 <input
                   accept=".zip,application/zip"
                   disabled={isImportingPackage || isOpeningLocalProject}
@@ -225,31 +241,43 @@ export default function ProjectsPage() {
               </label>
             </div>
             <div className="pill-row">
-              <span className="pill">Manifest-backed listing</span>
-              <span className="pill">Immutable original result</span>
-              <span className="pill">Saved draft stays separate</span>
-              <span className="pill">Zip import/export</span>
-              <span className="pill">No accounts yet</span>
+              <span className="pill">Manifest-backed / 基于清单</span>
+              <span className="pill">Original stays immutable / 原始结果不变</span>
+              <span className="pill">Saved draft stays separate / 草稿独立保存</span>
+              <span className="pill">Zip import/export / Zip 导入导出</span>
+              <span className="pill">No accounts / 无账户系统</span>
             </div>
           </div>
           <div className="panel inset-panel">
-            <h3>Onboarding</h3>
+            <h3>Onboarding / 使用提示</h3>
             <div className="note-list">
               <article className="note-card">
-                <strong>Input expectations</strong>
-                <div className="muted">Use audio that clearly exposes piano and drums when possible. Mixed songs still depend heavily on separation quality.</div>
+                <strong>Input Expectations / 输入建议</strong>
+                <div className="muted">
+                  Use audio that clearly exposes piano and drums when possible. /
+                  尽量使用钢琴和鼓更清晰的音频素材。
+                </div>
               </article>
               <article className="note-card">
-                <strong>Draft model</strong>
-                <div className="muted">Projects show the immutable original result plus the latest saved draft when one exists. Current in-session edits are still separate.</div>
+                <strong>Draft Model / 草稿模型</strong>
+                <div className="muted">
+                  Projects keep the original result and the latest saved draft separate. /
+                  项目会把原始结果与最近保存草稿分开保存。
+                </div>
               </article>
               <article className="note-card">
-                <strong>Phase 13L portability</strong>
-                <div className="muted">Open a local project folder by importing it into this library, or import a zip bundle to create a new local project instance with a new project id.</div>
+                <strong>Local Portability / 本地可迁移性</strong>
+                <div className="muted">
+                  Import a folder or zip package to create a new local project instance. /
+                  导入文件夹或 zip 项目包时，会创建新的本地项目实例。
+                </div>
               </article>
               <article className="note-card">
-                <strong>Deferred items</strong>
-                <div className="muted">Accounts, public sharing, databases, cloud storage, and job recovery remain intentionally out of scope for this MVP.</div>
+                <strong>Deferred Items / 暂缓功能</strong>
+                <div className="muted">
+                  Accounts, public sharing, cloud storage, and job recovery remain out of scope. /
+                  账号、公开分享、云存储和任务恢复仍不在当前范围内。
+                </div>
               </article>
             </div>
           </div>
@@ -259,15 +287,15 @@ export default function ProjectsPage() {
       <section className="content-grid">
         {runtimeDiagnostics ? (
           <div className="panel panel-full">
-            <h2>Local Runtime</h2>
+            <h2>Local Runtime / 本地运行状态</h2>
             <p className="muted">
-              Status: <span className={getRuntimeSeverityClass(runtimeDiagnostics.severity)}>{runtimeDiagnostics.severity}</span> | {runtimeDiagnostics.summary}
+              Status / 状态 <span className={getRuntimeSeverityClass(runtimeDiagnostics.severity)}>{runtimeDiagnostics.severity}</span> | {runtimeDiagnostics.summary}
             </p>
           </div>
         ) : null}
         <div className="panel panel-full">
-          <h2>Projects</h2>
-          {isLoading ? <p className="muted">Loading local project manifests...</p> : null}
+          <h2>Projects / 项目列表</h2>
+          {isLoading ? <p className="muted">Loading local project manifests... / 正在加载本地项目清单...</p> : null}
           {error ? <p className="error">{error}</p> : null}
           {!isLoading && !error && projects.length === 0 ? (
             <div className="note-list">
@@ -282,34 +310,28 @@ export default function ProjectsPage() {
               {projects.map((project) => (
                 <article className="track-card" key={project.projectId}>
                   <strong>{project.projectName}</strong>
-                  <div className="muted">Status: {project.status}</div>
-                  <div className="muted">Stage: {formatProjectStatus(project)}</div>
-                  <div className="muted">Updated: {new Date(project.updatedAt).toLocaleString()}</div>
+                  <div className="muted">Status / 状态: {project.status}</div>
+                  <div className="muted">Stage / 阶段: {formatProjectStatus(project)}</div>
+                  <div className="muted">Updated / 更新时间: {new Date(project.updatedAt).toLocaleString()}</div>
                   <div className="muted">
                     {project.trackCount != null || project.stemCount != null
-                      ? `Tracks: ${project.trackCount ?? 0} | Stems: ${project.stemCount ?? 0}`
-                      : "Tracks and stems appear after a completed result is persisted."}
+                      ? `Tracks / 轨道: ${project.trackCount ?? 0} | Stems / 分轨: ${project.stemCount ?? 0}`
+                      : "Tracks and stems appear after a completed result is persisted. / 完成后会显示轨道与分轨。"}
                   </div>
                   <div>
-                    Assets:
-                    {" "}
-                    {[
+                    Assets / 资产: {[
                       project.assets.hasSourceUpload ? "upload" : null,
                       project.assets.hasStems ? "stems" : null,
                       project.assets.hasOriginalResult ? "result" : null,
                       project.hasSavedDraft ? `draft v${project.draftVersion ?? 1}` : null
-                    ]
-                      .filter(Boolean)
-                      .join(" | ") || "none"}
+                    ].filter(Boolean).join(" | ") || "none / 无"}
                   </div>
                   <div>
-                    Draft state:
-                    {" "}
-                    {project.hasSavedDraft
+                    Draft state / 草稿状态: {project.hasSavedDraft
                       ? `saved v${project.draftVersion ?? 1}${project.draftSavedAt ? ` on ${new Date(project.draftSavedAt).toLocaleString()}` : ""}`
-                      : "no saved draft"}
+                      : "no saved draft / 暂无已保存草稿"}
                   </div>
-                  <div>Exports: {project.assets.availableExports.join(", ") || "not available yet"}</div>
+                  <div>Exports / 导出: {project.assets.availableExports.join(", ") || "not available yet / 暂不可用"}</div>
                   <div className="actions">
                     <Link className="button secondary" href={project.sharePath}>
                       {copy.project.openAction}

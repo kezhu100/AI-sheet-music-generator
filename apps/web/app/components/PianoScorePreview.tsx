@@ -17,27 +17,33 @@ const STAFF_LINE_SPACING = 12;
 
 export function PianoScorePreview({ track, bpm }: PianoScorePreviewProps) {
   if (!track) {
-    return <p className="muted">A visible piano track is required before the score preview can render.</p>;
+    return <p className="muted">A visible piano track is required before the score preview can render. / 需要先显示钢琴轨道，才能渲染乐谱预览。</p>;
   }
 
   const pitchedNotes = track.notes.filter((note) => note.pitch != null);
 
   if (pitchedNotes.length === 0) {
-    return <p className="muted">No pitched piano notes are available for score preview in the current visible track set.</p>;
+    return <p className="muted">No pitched piano notes are available for score preview in the current visible track set. / 当前可见轨道中没有可用于乐谱预览的钢琴音符。</p>;
   }
 
   const measures = groupNotesByBar(pitchedNotes, bpm, 8);
 
   return (
-    <div className="measure-grid">
+    <div className="result-window result-window-score">
+      <div className="result-window-toolbar muted">
+        <span>Score Reader / 乐谱阅读窗</span>
+        <span>Scroll inside the window to browse the draft score bar by bar. / 可在窗口内滚动，按小节浏览草稿乐谱。</span>
+      </div>
+      <div className="result-window-viewport result-window-viewport-score">
+        <div className="measure-grid">
       {measures.map((measure) => (
         <article className="measure-card" key={`piano-measure-${measure.bar}`}>
           <div className="measure-meta">
-            <strong>Bar {measure.bar}</strong>
-            <span className="muted">{measure.notes.length} notes</span>
+            <strong>Bar {measure.bar} / 第 {measure.bar} 小节</strong>
+            <span className="muted">{measure.notes.length} notes / 音符</span>
           </div>
 
-          <svg aria-label={`Piano score bar ${measure.bar}`} className="preview-svg" role="img" viewBox="0 0 220 230">
+          <svg aria-label={`Piano score bar ${measure.bar}`} className="score-measure-svg" role="img" viewBox="0 0 220 230">
             <rect fill="rgba(255,255,255,0.86)" height="230" rx="18" width="220" x="0" y="0" />
 
             {renderStaff(46)}
@@ -75,6 +81,8 @@ export function PianoScorePreview({ track, bpm }: PianoScorePreviewProps) {
           </svg>
         </article>
       ))}
+        </div>
+      </div>
     </div>
   );
 }

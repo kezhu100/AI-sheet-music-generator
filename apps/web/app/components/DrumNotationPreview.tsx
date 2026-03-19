@@ -10,11 +10,11 @@ interface DrumNotationPreviewProps {
 
 export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
   if (!track) {
-    return <p className="muted">A visible drum track is required before the drum notation preview can render.</p>;
+    return <p className="muted">A visible drum track is required before the drum notation preview can render. / 需要先显示鼓组轨道，才能渲染鼓组预览。</p>;
   }
 
   if (track.notes.length === 0) {
-    return <p className="muted">No drum hits are available for drum notation preview in the current visible track set.</p>;
+    return <p className="muted">No drum hits are available for drum notation preview in the current visible track set. / 当前可见轨道中没有可用于鼓组预览的击打音符。</p>;
   }
 
   const measures = groupNotesByBar(track.notes, bpm, 8);
@@ -26,8 +26,13 @@ export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
   const height = lanes.length * rowHeight + 36;
 
   return (
-    <div className="preview-scroll">
-      <svg aria-label="Drum notation preview" className="preview-svg" role="img" viewBox={`0 0 ${width} ${height}`}>
+    <div className="result-window result-window-drum">
+      <div className="result-window-toolbar muted">
+        <span>Drum Companion / 鼓组伴随窗</span>
+        <span>Scroll inside the window to inspect drum lanes and bar detail. / 可在窗口内滚动查看鼓组轨道与小节细节。</span>
+      </div>
+      <div className="preview-scroll result-window-viewport result-window-viewport-drum">
+        <svg aria-label="Drum notation preview" className="preview-svg" role="img" viewBox={`0 0 ${width} ${height}`}>
         <rect fill="rgba(255,255,255,0.82)" height={height} rx="18" width={width} x="0" y="0" />
 
         {lanes.map((lane, index) => {
@@ -49,7 +54,7 @@ export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
           return (
             <g key={`measure-${measure.bar}`}>
               <text className="preview-axis" x={x + 8} y="18">
-                Bar {measure.bar}
+                Bar {measure.bar} / 第 {measure.bar} 小节
               </text>
               <line className="preview-grid-line strong" x1={x} x2={x} y1="24" y2={height - 14} />
               {Array.from({ length: 4 }, (_, beatIndex) => {
@@ -77,7 +82,8 @@ export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
         })}
 
         <line className="preview-grid-line strong" x1={labelWidth + measureWidth * measures.length} x2={labelWidth + measureWidth * measures.length} y1="24" y2={height - 14} />
-      </svg>
+        </svg>
+      </div>
     </div>
   );
 }

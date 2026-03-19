@@ -1,153 +1,43 @@
 # TASKS.md
 
-## Phase 0 - Repository Bootstrap
-- [x] create monorepo structure
-- [x] add frontend app
-- [x] add backend app
-- [x] add shared types package
-- [x] add music engine package
-- [x] add basic README and developer setup
+## Completed Through Phase 14L
+- repository bootstrap
+- upload and job pipeline
+- source separation
+- piano transcription
+- drum transcription
+- post-processing
+- export
+- score preview
+- editing
+- editing persistence
+- editing UX improvements
+- provider and quality upgrades
+- project library / local project system
+- local deployment and one-click startup
 
-## Phase 1 - Upload and Job Pipeline
-- [x] add audio upload flow
-- [x] create job creation API
-- [x] create job status API
-- [x] store uploaded files locally for development
-- [x] display job progress in UI
+## Phase 14.5 - Workspace Product Polish
+- [x] unify home and project workspace around one shared layout shell
+- [x] make the score preview the primary result surface
+- [x] reduce piano-roll dominance with a compact scrollable viewport
+- [x] separate editing and export into clearer product sections
+- [x] move runtime/provider/stem/warning/raw-note details into a collapsed advanced area
+- [x] simplify editing panel wording and grouping without changing editing behavior
+- [x] tighten action hierarchy between primary, secondary, and advanced actions
+- [x] add restrained manuscript / fantasy / Celtic-inspired visual polish through CSS
+- [x] remove garbled Chinese text and improve bilingual UI wording in the main workflow
+- [x] update core documentation to reflect the new page structure and positioning
 
-## Phase 2 - Source Separation
-- [x] define separation provider interface
-- [x] add first separation backend
-- [x] persist generated stems
-- [x] display stems in UI
-- [x] document supported formats and limitations
-
-## Phase 3 - Piano Transcription
-- [x] define piano transcription provider interface
-- [x] add first piano provider
-- [x] normalize provider output to NoteEvent schema
-- [x] preview piano notes in UI
-- [x] basic validation on a sample clip
-
-## Phase 4 - Drum Transcription
-- [x] define drum transcription provider interface
-- [x] add first drum provider
-- [x] map drum labels to MIDI notes
-- [x] preview drum hits in UI
-- [x] basic validation on a sample clip
-
-## Phase 5 - Post Processing
-- [x] tempo estimation integration
-- [x] quantization helpers
-- [x] bar and beat alignment
-- [x] track merge logic
-- [x] confidence-based filtering
-
-## Phase 5.5 - Post-Processing Consolidation
-- [x] extract reusable timing utility functions
-- [x] split backend timing math from post-processing orchestration
-- [x] expose shared frontend timing helpers in `packages/music-engine`
-- [x] reduce ad hoc timing formatting in the result UI
-- [x] document the timing helper boundaries for Phase 6 preparation
-
-## Phase 6 - Export
-- [x] MIDI export
-- [x] MusicXML export
-- [x] file download endpoints
-- [x] export buttons in UI
-
-## Phase 7 - Score Preview
-- [x] piano-roll preview
-- [x] score preview for piano
-- [x] drum notation preview
-- [x] track visibility toggles
-
-## Phase 8 - Editing
-- [x] note selection
-- [x] drag to move note timing
-- [x] adjust pitch
-- [x] delete/add notes
-- [x] re-export edited score
-
-## Phase 9 - Editing Persistence
-- [x] add draft storage for edited `JobResult` data
-- [x] add save draft API endpoint(s)
-- [x] add load draft API endpoint(s)
-- [x] auto-load a saved draft in the frontend when available
-- [x] add explicit save draft action in the editor UI
-- [x] support continuing edits from an existing saved draft
-- [x] distinguish export of original result versus edited draft result
-- [x] add minimal draft version tracking
-- [x] document saved-draft limitations and lifecycle clearly
-
-## Phase 10 - Editing UX Improvements
-- [x] add undo / redo for draft edits
-- [x] add multi-note selection
-- [x] add box selection in the piano-roll editing surface
-- [x] add keyboard editing shortcuts and affordances
-- [x] add quantization tools for edited notes
-- [x] add drum lane reassignment
-- [x] expand tests around richer editing actions and state transitions
-
-## Phase 11 - Result Quality & AI Improvements
-- [x] evaluate stronger source separation backends behind the existing provider contract
-- [x] evaluate improved piano transcription backends behind the existing provider contract
-- [x] evaluate improved drum transcription backends behind the existing provider contract
-- [x] improve post-processing without breaking the normalized `JobResult` contract
-- [x] add region re-transcription workflow hooks
-- [x] explore AI-assisted correction helpers on top of the editable draft flow
-- [x] document quality expectations and fallback behavior for upgraded providers
-
-## Phase 12 - Productization
-- [x] add a project library view
-- [x] surface persisted upload metadata and saved drafts as user-facing project assets
-- [x] support stable local project routes for reopening persisted local project state
-- [x] improve first-run onboarding and guidance
-- [x] document hosted deployment targets and operational assumptions
-
-## Phase 12.5 - Product Polish + Project Management
-- [x] add project rename action
-- [x] add project delete action
-- [x] add project duplicate action
-- [x] regenerate or namespace draft-level identifiers during duplication so duplicated projects do not share identifier space with source projects
-- [x] improve project list metadata and status clarity
-- [x] add unsaved draft-change indication in key UI surfaces
-- [x] improve onboarding and empty states
-- [x] prepare bilingual UI copy structure and locale-ready labels
-- [x] clean up sidebar / workspace / settings layout boundaries
-
-## Phase 13L - Local Project System
-- [x] define user-facing local project folder model
-- [x] add open project flow from local path
-- [x] add save/export project flow to local path
-- [x] add import project flow from packaged file
-- [x] always generate a new local `projectId` on import and never reuse the source bundle `projectId`
-- [x] add zip-based project packaging/unpackaging
-- [x] harden project path handling and manifest consistency checks
-- [x] preserve original-result vs saved-draft separation across import/export
-- [x] document that `open-local` is import-into-library in Phase 13L rather than open-in-place
-- [x] document package format version validation and additive/backward-compatible evolution expectations
-
-## Phase 14L - Local Deployment & One-Click Startup
-- [x] provide a user-facing one-command startup for the local app (for example `npm run dev` or a packaged script)
-- [x] ensure the backend and frontend start together in a coordinated local runtime
-- [x] open the browser automatically where appropriate
-- [x] add local runtime checks for Python and optional ML providers
-- [x] provide clear missing-dependency and environment setup guidance
-- [x] make local filesystem persistence work seamlessly in the deployed local flow
-- [x] improve the user-facing local run/startup experience without requiring a desktop shell
-- [x] document explicit local-first runtime constraints and unsupported cases
-
-## Phase 15L - Desktop Application Packaging (Optional / Future)
+## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)
 - [ ] wrap the existing local app in a desktop shell if packaging is pursued
-- [ ] introduce a typed desktop bridge interface only if packaging requires it
-- [ ] add OS-level integration such as native file dialogs or menus where worthwhile
-- [ ] document desktop packaging as optional rather than required for core product viability
+- [ ] introduce a typed desktop bridge only if packaging requires it
+- [ ] add OS-level integration where worthwhile
+- [ ] keep desktop packaging optional rather than required for core product viability
 
-## Deferred Track (Not Near-Term)
+## Deferred Track
 - [ ] user accounts and authentication
-- [ ] cloud storage and database-backed ownership models
+- [ ] cloud storage and multi-device sync
 - [ ] public sharing and permission systems
-- [ ] multi-device sync
-- [ ] background job recovery
+- [ ] background job recovery after restart
+- [ ] richer engraving fidelity and advanced notation semantics
