@@ -17,6 +17,9 @@ class Settings(BaseModel):
     stems_dir: Path = Path(__file__).resolve().parents[2] / "data" / "stems"
     drafts_dir: Path = Path(__file__).resolve().parents[2] / "data" / "drafts"
     projects_dir: Path = Path(__file__).resolve().parents[2] / "data" / "projects"
+    max_upload_size_bytes: int = 200 * 1024 * 1024
+    upload_stream_chunk_size_bytes: int = 1024 * 1024
+    ffmpeg_executable: Optional[str] = None
     cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     source_separation_provider: str = "development-copy"
     source_separation_fallback_provider: Optional[str] = None
@@ -38,6 +41,9 @@ class Settings(BaseModel):
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings(
+        max_upload_size_bytes=int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(200 * 1024 * 1024))),
+        upload_stream_chunk_size_bytes=int(os.getenv("UPLOAD_STREAM_CHUNK_SIZE_BYTES", str(1024 * 1024))),
+        ffmpeg_executable=os.getenv("FFMPEG_EXECUTABLE"),
         source_separation_provider=os.getenv("SOURCE_SEPARATION_PROVIDER", "development-copy"),
         source_separation_fallback_provider=os.getenv("SOURCE_SEPARATION_FALLBACK_PROVIDER"),
         source_separation_demucs_python=os.getenv("SOURCE_SEPARATION_DEMUCS_PYTHON"),

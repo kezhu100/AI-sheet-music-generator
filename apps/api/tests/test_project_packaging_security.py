@@ -108,6 +108,28 @@ class ProjectPackagingSecurityTests(unittest.TestCase):
 
         self.assertIn("must stay within the selected local project folder", str(context.exception))
 
+    def test_fallback_path_resolution_rejects_symlink_that_points_outside_selected_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "project"
+            source_dir.mkdir(parents=True, exist_ok=True)
+            external_dir = Path(temp_dir) / "external"
+            external_dir.mkdir(parents=True, exist_ok=True)
+            external_file = external_dir / "outside.wav"
+            external_file.write_bytes(b"outside")
+
+            link_path = source_dir / "escape-link.wav"
+            try:
+                link_path.symlink_to(external_file)
+            except (NotImplementedError, OSError):
+                self.skipTest("Symlinks are not available in this test environment.")
+
+            resolved = project_packaging_service._resolve_fallback_source_path(
+                "escape-link.wav",
+                source_dir,
+            )
+
+        self.assertIsNone(resolved)
+
 
 if __name__ == "__main__":
     unittest.main()

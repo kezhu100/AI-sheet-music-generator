@@ -16,6 +16,7 @@ from app.pipeline.drum_transcription import build_drum_transcription_provider
 from app.pipeline.post_processing import LightweightPostProcessor
 from app.pipeline.piano_transcription import build_piano_transcription_provider
 from app.pipeline.source_separation import build_source_separation_provider
+from app.services.audio_preprocessing import LocalAudioPreprocessor, NormalizedAudioFile
 
 
 class DevelopmentProcessingPipeline:
@@ -25,17 +26,21 @@ class DevelopmentProcessingPipeline:
         piano_provider: PianoTranscriptionProvider,
         drum_provider: DrumTranscriptionProvider,
         post_processor: LightweightPostProcessor,
+        audio_preprocessor: LocalAudioPreprocessor,
     ) -> None:
         self._separation_provider = separation_provider
         self._piano_provider = piano_provider
         self._drum_provider = drum_provider
         self._post_processor = post_processor
+        self._audio_preprocessor = audio_preprocessor
 
     def run(self, audio_path: Path, original_file_name: str, job_id: str) -> JobResult:
-        separation_result: SourceSeparationRunResult = self._separation_provider.separate(audio_path, job_id)
+        normalized_audio: NormalizedAudioFile = self._audio_preprocessor.normalize(audio_path, original_file_name, job_id)
+        separation_result: SourceSeparationRunResult = self._separation_provider.separate(normalized_audio.path, job_id)
         stems = separation_result.stems
         transcriptions: list[TranscriptionResult] = []
-        warnings = list(separation_result.warnings)
+        warnings = list(normalized_audio.warnings)
+        warnings.extend(separation_result.warnings)
 
         for stem in stems:
             if stem.instrument_hint == "piano":
@@ -76,6 +81,7 @@ def build_processing_pipeline(settings: Settings | None = None) -> ProcessingPip
         piano_provider=build_piano_transcription_provider(resolved_settings),
         drum_provider=build_drum_transcription_provider(resolved_settings),
         post_processor=LightweightPostProcessor(),
+        audio_preprocessor=LocalAudioPreprocessor(resolved_settings),
     )
 
 

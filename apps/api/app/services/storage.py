@@ -10,20 +10,50 @@ from app.core.config import get_settings
 from app.models.schemas import StemAsset, UploadedFileDescriptor, utc_now
 
 
+class UploadTooLargeError(Exception):
+    pass
+
+
+class UploadStorageError(Exception):
+    pass
+
+
 async def save_upload(file: UploadFile) -> UploadedFileDescriptor:
     settings = get_settings()
     upload_id = uuid4().hex
     target_name = f"{upload_id}_{file.filename or 'audio.bin'}"
     destination = settings.uploads_dir / target_name
+    size_bytes = 0
 
-    content = await file.read()
-    destination.write_bytes(content)
+    try:
+        with destination.open("wb") as output_file:
+            while True:
+                chunk = await file.read(settings.upload_stream_chunk_size_bytes)
+                if not chunk:
+                    break
+
+                size_bytes += len(chunk)
+                if size_bytes > settings.max_upload_size_bytes:
+                    raise UploadTooLargeError(
+                        f"Upload exceeds the local size limit of {_format_size_bytes(settings.max_upload_size_bytes)}."
+                    )
+
+                output_file.write(chunk)
+    except UploadTooLargeError:
+        destination.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        destination.unlink(missing_ok=True)
+        raise UploadStorageError("Failed to store the uploaded file on local disk.") from exc
+    except Exception as exc:
+        destination.unlink(missing_ok=True)
+        raise UploadStorageError("Upload was interrupted before the file could be stored safely.") from exc
 
     return UploadedFileDescriptor(
         uploadId=upload_id,
         fileName=file.filename or target_name,
         contentType=file.content_type or "application/octet-stream",
-        sizeBytes=len(content),
+        sizeBytes=size_bytes,
         storedPath=str(destination.relative_to(settings.project_root)).replace("\\", "/"),
         createdAt=utc_now(),
     )
@@ -68,3 +98,11 @@ def persist_stem_copy(*, source_path: Path, job_id: str, stem_name: str, instrum
         instrument_hint=instrument_hint,
         provider=provider,
     )
+
+
+def _format_size_bytes(size_bytes: int) -> str:
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.0f} MB"
+    if size_bytes >= 1024:
+        return f"{size_bytes / 1024:.0f} KB"
+    return f"{size_bytes} bytes"

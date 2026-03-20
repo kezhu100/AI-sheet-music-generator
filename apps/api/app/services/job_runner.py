@@ -24,7 +24,7 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: 
             status="processing",
             stage="normalizing",
             percent=15,
-            message="Preparing uploaded audio for pipeline execution.",
+            message="Preparing uploaded audio with local normalization and ffmpeg transcoding when needed.",
         )
         job = job_store.get(job_id)
         if job is not None:
