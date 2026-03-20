@@ -177,7 +177,7 @@ packages/shared-types: shared request/response types
 
 packages/music-engine: music-domain utilities
 音乐处理逻辑模块
-```
+
 
 ## 🎯 Design Philosophy / 设计理念
 
