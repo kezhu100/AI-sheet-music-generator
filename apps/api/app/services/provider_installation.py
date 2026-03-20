@@ -276,7 +276,14 @@ class ProviderInstallationService:
                     settings.provider_install_cache_dir,
                 )
                 try:
-                    completed = subprocess.run(command, check=False, capture_output=True, text=True)
+                    completed = subprocess.run(
+                        command,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
                 except OSError as exc:
                     attempt_succeeded = False
                     failed_attempts.append(f"{attempt.label} ({command_plan.label})")

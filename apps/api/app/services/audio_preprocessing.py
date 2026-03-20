@@ -65,6 +65,8 @@ class LocalAudioPreprocessor:
                 check=False,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=FFMPEG_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:

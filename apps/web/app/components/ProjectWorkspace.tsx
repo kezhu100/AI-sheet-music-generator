@@ -157,6 +157,25 @@ function getFirstActionableStep(steps: string[]): string | null {
   return steps[0]?.trim() || null;
 }
 
+const PROVIDER_NAME_TO_OPTION_ID: Record<string, string> = {
+  "local-development-separation": "development-copy",
+  "demucs-separation": "demucs",
+  "heuristic-wav-piano-provider": "heuristic",
+  "basic-pitch-piano-provider": "basic-pitch",
+  "heuristic-wav-drum-provider": "heuristic",
+  "demucs-onset-drum-provider": "demucs-drums",
+  ml: "demucs-drums",
+  madmom: "demucs-drums"
+};
+
+function normalizeUsedProviderId(providerName: string | null): string | null {
+  if (!providerName) {
+    return null;
+  }
+
+  return PROVIDER_NAME_TO_OPTION_ID[providerName] ?? providerName;
+}
+
 function getCompactInstallMessage(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) {
@@ -730,9 +749,13 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       return [];
     }
 
-    const sourceUsedProvider = activeResult.stems[0]?.provider ?? null;
-    const pianoUsedProvider = activeResult.tracks.find((track) => track.instrument === "piano")?.provider ?? null;
-    const drumUsedProvider = activeResult.tracks.find((track) => track.instrument === "drums")?.provider ?? null;
+    const sourceUsedProvider = normalizeUsedProviderId(activeResult.stems[0]?.provider ?? null);
+    const pianoUsedProvider = normalizeUsedProviderId(
+      activeResult.tracks.find((track) => track.instrument === "piano")?.provider ?? null
+    );
+    const drumUsedProvider = normalizeUsedProviderId(
+      activeResult.tracks.find((track) => track.instrument === "drums")?.provider ?? null
+    );
 
     function buildSummaryItem(
       key: keyof ProviderPreferences,

@@ -11,7 +11,14 @@ def check_python_module(python_executable: str, module_name: str) -> tuple[bool,
 
     command = [python_executable, "-c", f"import {module_name}"]
     try:
-        completed = subprocess.run(command, check=False, capture_output=True, text=True)
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     except OSError as exc:
         return False, f"Could not run '{python_executable}': {exc}"
 
@@ -20,4 +27,3 @@ def check_python_module(python_executable: str, module_name: str) -> tuple[bool,
 
     detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
     return False, detail
-

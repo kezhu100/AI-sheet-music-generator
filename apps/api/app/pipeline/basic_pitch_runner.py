@@ -6,6 +6,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - numpy is expected transitively, but keep serialization guard resilient
+    np = None  # type: ignore[assignment]
+
 
 def main() -> int:
     args = _parse_args()
@@ -25,7 +30,7 @@ def main() -> int:
     payload = {
         "noteEvents": _normalize_events(note_events),
     }
-    args.output.write_text(json.dumps(payload), encoding="utf-8")
+    args.output.write_text(json.dumps(payload, default=_json_default), encoding="utf-8")
     return 0
 
 
@@ -66,6 +71,30 @@ def _coerce_event(event: Any) -> Optional[Dict[str, Any]]:
         }
 
     return None
+
+
+def _json_default(value: Any) -> Any:
+    if np is not None:
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+
+    if hasattr(value, "item") and callable(value.item):
+        try:
+            return value.item()
+        except Exception:
+            pass
+
+    if hasattr(value, "tolist") and callable(value.tolist):
+        try:
+            return value.tolist()
+        except Exception:
+            pass
+
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 if __name__ == "__main__":
