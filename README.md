@@ -164,6 +164,7 @@ apps/
 packages/
   shared-types/  shared DTOs
   music-engine/  music logic
+```
 
 apps/web: score-first UI, project library, editing workflow
 前端界面、项目库与编辑流程
