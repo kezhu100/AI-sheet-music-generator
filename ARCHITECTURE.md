@@ -44,6 +44,38 @@ It does not add:
 
 Small additive contract refinements are allowed when they stay architecture-safe, such as exposing runtime provider availability options and accepting per-job provider preferences without changing the normalized `JobResult` boundary.
 
+## Additive Provider Capability Layer (Backend Foundation)
+An additive backend foundation now exists for optional enhanced providers.
+
+This layer does not change the transcription pipeline stages or `JobResult`.
+It adds:
+- provider capability manifest metadata per option (id, category, display name, built-in vs optional-enhanced, recommended)
+- richer runtime provider-option diagnostics (installed/available/installable/missing-reason/help/status text)
+- explicit backend-owned install actions for optional enhanced providers only
+- backend-owned local install state and install logs under the local data directory
+
+This provider foundation is now split more explicitly:
+- built-in base providers remain the default local fast path
+- the official enhanced-provider set is fixed and explicit:
+  - demucs
+  - basic-pitch
+  - demucs-drums
+- future extra providers should not be added as new built-in official enhanced providers
+- future extra providers should instead enter through a controlled custom-provider extension path
+
+The first custom-provider extension path is intentionally narrow:
+- install source type is manifest-driven only
+- the backend currently accepts only a local `file://` manifest URL
+- the backend validates the manifest structure, validates declared local asset URLs, and copies those files into app-managed local storage
+- custom provider registration is backend-owned and persisted locally
+- this step does not add arbitrary command execution, arbitrary script installers, provider discovery, or automatic pipeline wiring for custom providers
+
+This layer preserves:
+- built-in baseline providers as default runnable behavior
+- existing `Auto` preference defaults
+- existing fallback behavior when stronger providers are unavailable
+- no cloud dependencies
+
 ## Frontend Composition
 The main workspace now follows this structure:
 1. Hero and primary action area
@@ -81,7 +113,15 @@ Phase 14.5 preserves the current boundary:
 - the frontend still owns preview rendering, draft editing interactions, and workspace composition
 - the web app consumes normalized backend results rather than backend storage details
 
+Provider install behavior follows the same boundary:
+- install logic is backend-owned and explicit
+- frontend should only trigger install actions and render structured backend status
+- heavy optional downloads are never forced during normal app startup
+- custom-provider registration status is queryable through the same backend-owned install-status layer
+- runtime diagnostics surface custom providers distinctly from official enhanced options instead of folding them into the fixed official set
+
 ## Future Direction
 - preserve the current local-first browser architecture
 - keep desktop packaging optional in Phase 15L
 - continue refining usability without destabilizing core contracts
+

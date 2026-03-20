@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import {
   areJobResultsEqual,
   beatsToSeconds,
@@ -15,13 +15,16 @@ import {
   updateNoteTiming
 } from "@ai-sheet-music-generator/music-engine";
 import type {
+  CustomProviderInstallRequest,
   CorrectionSuggestion,
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  ProviderInstallState,
   ProviderPreferences,
   ProjectDetail,
   RuntimeDiagnosticsResponse,
+  RuntimeProviderOption,
   RuntimeProviderStatus,
   UploadResponse
 } from "@ai-sheet-music-generator/shared-types";
@@ -35,7 +38,10 @@ import {
   exportProjectToPath,
   getJob,
   getJobDraft,
+  getProviderInstallStatus,
   getRuntimeDiagnostics,
+  installCustomProvider,
+  installEnhancedProvider,
   saveJobDraft,
   renameProject,
   uploadAudio
@@ -108,25 +114,160 @@ function buildCreateJobPayload(uploadId: string, providerPreferences: ProviderPr
   return hasExplicitPreference ? { uploadId, providerPreferences } : { uploadId };
 }
 
+function buildRuntimeOptionInstallKey(option: RuntimeProviderOption): string {
+  return `${option.category}:${option.id}`;
+}
+
+interface RuntimeProviderInstallUiState {
+  state: ProviderInstallState | "starting";
+  installId?: string;
+  message: string;
+  failureReason?: string;
+  actionableSteps: string[];
+  preferenceKey: keyof ProviderPreferences;
+  useAfterInstall: boolean;
+  targetProvider: NonNullable<ProviderPreferences[keyof ProviderPreferences]>;
+}
+
+interface RuntimeUsedProviderSummaryItem {
+  key: keyof ProviderPreferences;
+  label: string;
+  requestedProvider: string;
+  requestedLabel: string;
+  usedProvider: string | null;
+  usedLabel: string;
+  fallback: boolean;
+  autoPickedEnhanced: boolean;
+}
+
+interface RuntimeCustomProviderInstallUiState {
+  state: ProviderInstallState | "starting";
+  installId?: string;
+  message: string;
+  failureReason?: string;
+  actionableSteps: string[];
+  targetManifestUrl: string;
+}
+
+function getFirstActionableStep(steps: string[]): string | null {
+  if (steps.length === 0) {
+    return null;
+  }
+
+  return steps[0]?.trim() || null;
+}
+
+function getCompactInstallMessage(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return "Check the local manifest path and try again. / 检查本地 manifest 路径后重试。";
+  }
+
+  if (trimmed.length <= 140) {
+    return trimmed;
+  }
+
+  const sentence = trimmed.split(/[.!?]\s/)[0]?.trim();
+  if (sentence && sentence.length <= 140) {
+    return `${sentence}.`;
+  }
+
+  return `${trimmed.slice(0, 137).trimEnd()}...`;
+}
+
+function getProviderLayerLabel(option: RuntimeProviderOption): string {
+  return option.optionalEnhanced ? "Official enhanced / 官方增强" : "Built-in / 内置";
+}
+
+function getProviderInstallFailureNote(option: RuntimeProviderOption, failed: boolean): string | null {
+  if (!failed || option.id !== "demucs-drums") {
+    return null;
+  }
+
+  return "Demucs Drums needs the local Demucs runtime. Built-in drum transcription remains available. / Demucs Drums 需要本地 Demucs 运行时；内置鼓转谱仍可作为稳定回退。";
+}
+
+interface RuntimeCustomProviderSectionProps {
+  provider: RuntimeProviderStatus;
+}
+
+function RuntimeCustomProviderSection({ provider }: RuntimeCustomProviderSectionProps) {
+  if (provider.customProviders.length === 0) {
+    return (
+      <div className="runtime-custom-provider-list">
+        <article className="runtime-custom-card">
+          <strong>Custom registered providers / 自定义已注册 providers</strong>
+          <div className="muted">
+            No custom registrations yet. Not part of Auto or execution in this step.
+            <br />
+            当前还没有已注册项目；本阶段仅提供注册与诊断展示。
+          </div>
+        </article>
+      </div>
+    );
+  }
+
+  return (
+    <div className="runtime-custom-provider-list">
+      {provider.customProviders.map((customProvider) => (
+        <article className="runtime-custom-card" key={`${provider.key}:${customProvider.providerId}`}>
+          <strong>{customProvider.displayName}</strong>
+          <div className="runtime-provider-kind runtime-provider-kind-custom">Custom registered / 已注册自定义</div>
+          <div className="muted">
+            {customProvider.providerId} · v{customProvider.providerVersion}
+          </div>
+          <div className="muted">{customProvider.statusText}</div>
+          <div className="muted">
+            Manifest URL: {customProvider.manifestUrl}
+            <br />
+            Asset count: {customProvider.assetCount} · Execution not enabled in this step.
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 interface RuntimeProviderPreferenceFieldProps {
   fieldName: string;
   title: string;
   titleZh: string;
+  preferenceKey: keyof ProviderPreferences;
   currentValue: string | undefined;
   selectedProviderLabel?: string;
   options?: RuntimeProviderStatus["options"];
   onChange: (value: string) => void;
+  installStates: Record<string, RuntimeProviderInstallUiState>;
+  onInstall: (
+    preferenceKey: keyof ProviderPreferences,
+    option: RuntimeProviderOption,
+    options: { useAfterInstall: boolean; forceReinstall: boolean }
+  ) => void;
 }
 
 function RuntimeProviderPreferenceField({
   fieldName,
   title,
   titleZh,
+  preferenceKey,
   currentValue,
   selectedProviderLabel,
   options,
-  onChange
+  onChange,
+  installStates,
+  onInstall
 }: RuntimeProviderPreferenceFieldProps) {
+  function handleInlineInstallAction(
+    event: MouseEvent<HTMLButtonElement>,
+    option: RuntimeProviderOption,
+    useAfterInstall: boolean,
+    forceReinstall: boolean
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+    onInstall(preferenceKey, option, { useAfterInstall, forceReinstall });
+  }
+
   return (
     <fieldset className="runtime-option-group">
       <legend>
@@ -150,25 +291,94 @@ function RuntimeProviderPreferenceField({
               : "Use the current local default. / 使用当前本地默认设置。"}
           </span>
         </label>
-        {options?.map((option) => (
-          <label
-            className={`runtime-option-card ${currentValue === option.provider ? "is-selected" : ""} ${!option.available ? "is-disabled" : ""}`}
-            key={option.provider}
-          >
-            <input
-              checked={currentValue === option.provider}
-              disabled={!option.available}
-              name={fieldName}
-              type="radio"
-              value={option.provider}
-              onChange={() => onChange(option.provider)}
-            />
-            <span className="runtime-option-label">
-              {option.label} {!option.available ? "· Not installed / 未安装" : ""}
-            </span>
-            <span className="muted">{option.detail}</span>
-          </label>
-        ))}
+        {options?.map((option) => {
+          const installKey = buildRuntimeOptionInstallKey(option);
+          const installState = installStates[installKey];
+          const isInstalling = installState?.state === "starting" || installState?.state === "running";
+          const installFailed = installState?.state === "failed";
+          const installCompleted = installState?.state === "completed";
+          const showInstallAction = option.optionalEnhanced && !option.installed;
+          const installButtonDisabled = isInstalling || !option.installable;
+          const failedGuidance = getFirstActionableStep(installState?.actionableSteps ?? []);
+          const failedNote = getProviderInstallFailureNote(option, Boolean(installFailed));
+          const optionGuidance = getFirstActionableStep(option.actionableSteps);
+
+          return (
+            <label
+              className={`runtime-option-card ${currentValue === option.provider ? "is-selected" : ""} ${!option.available ? "is-disabled" : ""}`}
+              key={`${option.category}:${option.provider}`}
+            >
+              <input
+                checked={currentValue === option.provider}
+                disabled={!option.available || isInstalling}
+                name={fieldName}
+                type="radio"
+                value={option.provider}
+                onChange={() => onChange(option.provider)}
+              />
+              <span className="runtime-option-label">
+                {option.label}
+                <span
+                  className={`runtime-provider-kind ${
+                    option.optionalEnhanced ? "runtime-provider-kind-official" : "runtime-provider-kind-built-in"
+                  }`}
+                >
+                  {getProviderLayerLabel(option)}
+                </span>
+                {option.recommended ? " · Recommended / 推荐" : ""}
+                {!option.available && option.optionalEnhanced ? " · Optional install / 可选安装" : ""}
+              </span>
+              <span className="muted">{option.statusText || option.detail}</span>
+              {option.optionalEnhanced ? <span className="muted runtime-option-help">{option.helpText}</span> : null}
+              {showInstallAction ? (
+                <div className="runtime-option-actions">
+                  <button
+                    className="button secondary button-tiny"
+                    type="button"
+                    disabled={installButtonDisabled}
+                    onClick={(event) => handleInlineInstallAction(event, option, false, Boolean(installFailed))}
+                  >
+                    {installFailed ? "Retry / 重试" : "Install / 安装"}
+                  </button>
+                  <button
+                    className="button tertiary button-tiny"
+                    type="button"
+                    disabled={installButtonDisabled}
+                    onClick={(event) => handleInlineInstallAction(event, option, true, Boolean(installFailed))}
+                  >
+                    {installFailed ? "Retry & Use / 重试并使用" : "Install & Use / 安装并使用"}
+                  </button>
+                </div>
+              ) : null}
+              {isInstalling ? (
+                <span className="muted runtime-install-status">
+                  Installing official provider... / 正在安装官方 provider：
+                  {installState?.message ?? "Preparing install."}
+                </span>
+              ) : null}
+              {installCompleted && option.installed ? (
+                <span className="muted runtime-install-status runtime-install-success">
+                  Installed. Available for selection. / 已安装，可直接选择。
+                </span>
+              ) : null}
+              {installFailed ? (
+                <>
+                  <span className="muted runtime-install-status runtime-install-error">
+                    {installState.message}
+                    {failedGuidance ? ` ${failedGuidance}` : ""}
+                  </span>
+                  {failedNote ? <span className="muted runtime-install-status">{failedNote}</span> : null}
+                </>
+              ) : null}
+              {showInstallAction && !option.installable && option.missingReason ? (
+                <span className="muted runtime-install-status runtime-install-error">
+                  {option.missingReason}
+                  {optionGuidance ? ` ${optionGuidance}` : ""}
+                </span>
+              ) : null}
+            </label>
+          );
+        })}
       </div>
     </fieldset>
   );
@@ -295,7 +505,12 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
+  const [isRefreshingRuntimeDiagnostics, setIsRefreshingRuntimeDiagnostics] = useState(false);
   const [providerPreferences, setProviderPreferences] = useState<ProviderPreferences>(DEFAULT_PROVIDER_PREFERENCES);
+  const [providerInstallStates, setProviderInstallStates] = useState<Record<string, RuntimeProviderInstallUiState>>({});
+  const [isCustomProviderFormOpen, setIsCustomProviderFormOpen] = useState(false);
+  const [customProviderManifestUrl, setCustomProviderManifestUrl] = useState("");
+  const [customProviderInstallState, setCustomProviderInstallState] = useState<RuntimeCustomProviderInstallUiState | null>(null);
   const lastDraftJobIdRef = useRef<string | null>(null);
 
   const {
@@ -340,6 +555,29 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     applySuggestion
   } = useEditableJobResult(job?.result ?? null, savedDraft, job?.id ?? null);
 
+  async function refreshRuntimeDiagnostics(options?: { quiet?: boolean }): Promise<RuntimeDiagnosticsResponse | null> {
+    const quiet = options?.quiet ?? false;
+    if (!quiet) {
+      setIsRefreshingRuntimeDiagnostics(true);
+    }
+
+    try {
+      const response = await getRuntimeDiagnostics();
+      setRuntimeDiagnostics(response);
+      setRuntimeDiagnosticsError(null);
+      return response;
+    } catch (loadError) {
+      setRuntimeDiagnosticsError(
+        loadError instanceof Error ? loadError.message : "Failed to load local runtime diagnostics."
+      );
+      return null;
+    } finally {
+      if (!quiet) {
+        setIsRefreshingRuntimeDiagnostics(false);
+      }
+    }
+  }
+
   useEffect(() => {
     setProjectDetail(initialProjectDetail);
     setJob(buildJobFromProjectDetail(initialProjectDetail));
@@ -354,18 +592,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     let cancelled = false;
 
     void (async () => {
-      try {
-        const response = await getRuntimeDiagnostics();
-        if (!cancelled) {
-          setRuntimeDiagnostics(response);
-          setRuntimeDiagnosticsError(null);
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setRuntimeDiagnosticsError(
-            loadError instanceof Error ? loadError.message : "Failed to load local runtime diagnostics."
-          );
-        }
+      const response = await refreshRuntimeDiagnostics({ quiet: true });
+      if (!response || cancelled) {
+        return;
       }
     })();
 
@@ -489,6 +718,235 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     () => getRuntimeProvider(runtimeDiagnostics, "drum-transcription"),
     [runtimeDiagnostics]
   );
+  const providerOptionLookup = useMemo(() => {
+    return {
+      source: new Map((sourceRuntimeProvider?.options ?? []).map((option) => [option.provider, option])),
+      piano: new Map((pianoRuntimeProvider?.options ?? []).map((option) => [option.provider, option])),
+      drum: new Map((drumRuntimeProvider?.options ?? []).map((option) => [option.provider, option]))
+    };
+  }, [sourceRuntimeProvider?.options, pianoRuntimeProvider?.options, drumRuntimeProvider?.options]);
+  const runtimeUsedProviderSummary = useMemo<RuntimeUsedProviderSummaryItem[]>(() => {
+    if (!activeResult) {
+      return [];
+    }
+
+    const sourceUsedProvider = activeResult.stems[0]?.provider ?? null;
+    const pianoUsedProvider = activeResult.tracks.find((track) => track.instrument === "piano")?.provider ?? null;
+    const drumUsedProvider = activeResult.tracks.find((track) => track.instrument === "drums")?.provider ?? null;
+
+    function buildSummaryItem(
+      key: keyof ProviderPreferences,
+      label: string,
+      usedProvider: string | null,
+      optionMap: Map<string, RuntimeProviderOption>
+    ): RuntimeUsedProviderSummaryItem {
+      const requestedProvider = providerPreferences[key] ?? "auto";
+      const requestedOption = requestedProvider === "auto" ? undefined : optionMap.get(requestedProvider);
+      const usedOption = usedProvider ? optionMap.get(usedProvider) : undefined;
+      const fallback = requestedProvider !== "auto" && usedProvider != null && usedProvider !== requestedProvider;
+      const autoPickedEnhanced = requestedProvider === "auto" && Boolean(usedOption?.optionalEnhanced);
+
+      return {
+        key,
+        label,
+        requestedProvider,
+        requestedLabel: requestedOption?.label ?? (requestedProvider === "auto" ? "Auto" : requestedProvider),
+        usedProvider,
+        usedLabel: usedOption?.label ?? usedProvider ?? "unknown",
+        fallback,
+        autoPickedEnhanced
+      };
+    }
+
+    return [
+      buildSummaryItem("sourceSeparation", "Source", sourceUsedProvider, providerOptionLookup.source),
+      buildSummaryItem("pianoTranscription", "Piano", pianoUsedProvider, providerOptionLookup.piano),
+      buildSummaryItem("drumTranscription", "Drums", drumUsedProvider, providerOptionLookup.drum)
+    ];
+  }, [activeResult, providerPreferences, providerOptionLookup]);
+  const runtimeUsedFallbackDetected = useMemo(() => {
+    if (!activeResult) {
+      return false;
+    }
+
+    return activeResult.warnings.some((warning) => {
+      const normalizedWarning = warning.toLowerCase();
+      return normalizedWarning.includes("fell back") || normalizedWarning.includes("fallback");
+    });
+  }, [activeResult]);
+
+  useEffect(() => {
+    const trackedInstalls = Object.entries(providerInstallStates).filter(
+      ([, installState]) =>
+        Boolean(installState.installId) && (installState.state === "starting" || installState.state === "running")
+    );
+
+    if (trackedInstalls.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollInstallStatuses = async (): Promise<void> => {
+      const statusResults = await Promise.all(
+        trackedInstalls.map(async ([installKey, installState]) => {
+          if (!installState.installId) {
+            return null;
+          }
+
+          try {
+            const response = await getProviderInstallStatus(installState.installId);
+            return { installKey, installState, response };
+          } catch (statusError) {
+            return {
+              installKey,
+              installState,
+              error: statusError instanceof Error ? statusError.message : "Failed to load install status."
+            };
+          }
+        })
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      let shouldRefreshRuntime = false;
+      setProviderInstallStates((currentStates) => {
+        const nextStates = { ...currentStates };
+
+        for (const result of statusResults) {
+          if (!result) {
+            continue;
+          }
+
+          if ("error" in result) {
+            nextStates[result.installKey] = {
+              ...result.installState,
+              state: "failed",
+              message: result.error ?? "Install status check failed.",
+              failureReason: "status_poll_failed",
+              actionableSteps: ["Retry install from this option."]
+            };
+            continue;
+          }
+
+          const install = result.response.install;
+          nextStates[result.installKey] = {
+            state: install.state,
+            installId: install.installId ?? undefined,
+            message: install.message,
+            failureReason: install.failureReason ?? undefined,
+            actionableSteps: install.actionableSteps,
+            preferenceKey: result.installState.preferenceKey,
+            useAfterInstall: result.installState.useAfterInstall,
+            targetProvider: result.installState.targetProvider
+          };
+
+          if (install.state === "completed") {
+            shouldRefreshRuntime = true;
+          }
+        }
+
+        return nextStates;
+      });
+
+      for (const result of statusResults) {
+        if (!result || "error" in result) {
+          continue;
+        }
+        if (result.response.install.state === "completed" && result.installState.useAfterInstall) {
+          setProviderPreferences((currentPreferences) => ({
+            ...currentPreferences,
+            [result.installState.preferenceKey]: result.installState.targetProvider
+          }));
+        }
+      }
+
+      if (shouldRefreshRuntime) {
+        await refreshRuntimeDiagnostics({ quiet: true });
+      }
+    };
+
+    void pollInstallStatuses();
+    const intervalId = window.setInterval(() => {
+      void pollInstallStatuses();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [providerInstallStates]);
+
+  useEffect(() => {
+    if (
+      !customProviderInstallState?.installId ||
+      (customProviderInstallState.state !== "starting" && customProviderInstallState.state !== "running")
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollCustomInstallStatus = async (): Promise<void> => {
+      try {
+        const response = await getProviderInstallStatus(customProviderInstallState.installId ?? "");
+        if (cancelled) {
+          return;
+        }
+
+        const install = response.install;
+        setCustomProviderInstallState((currentState) => {
+          if (!currentState) {
+            return currentState;
+          }
+
+          return {
+            state: install.state,
+            installId: install.installId ?? undefined,
+            message: getCompactInstallMessage(install.message),
+            failureReason: install.failureReason ?? undefined,
+            actionableSteps: install.actionableSteps,
+            targetManifestUrl: currentState.targetManifestUrl
+          };
+        });
+
+        if (install.state === "completed") {
+          await refreshRuntimeDiagnostics({ quiet: true });
+        }
+      } catch (statusError) {
+        if (cancelled) {
+          return;
+        }
+
+        setCustomProviderInstallState((currentState) => {
+          if (!currentState) {
+            return currentState;
+          }
+
+          return {
+            ...currentState,
+            state: "failed",
+            message: "Could not load custom install status. / 无法加载自定义安装状态。",
+            failureReason: "status_poll_failed",
+            actionableSteps: ["Retry with the same local file:// manifest URL."]
+          };
+        });
+        setError(statusError instanceof Error ? statusError.message : "Failed to load custom install status.");
+      }
+    };
+
+    void pollCustomInstallStatus();
+    const intervalId = window.setInterval(() => {
+      void pollCustomInstallStatus();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [customProviderInstallState?.installId, customProviderInstallState?.state]);
 
   const pianoTrack = useMemo(() => {
     return visibleTracks.find((track) => track.instrument === "piano") ?? null;
@@ -887,6 +1345,176 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }));
   }
 
+  async function handleInstallProviderOption(
+    preferenceKey: keyof ProviderPreferences,
+    option: RuntimeProviderOption,
+    installOptions: { useAfterInstall: boolean; forceReinstall: boolean }
+  ): Promise<void> {
+    const installKey = buildRuntimeOptionInstallKey(option);
+    setProviderInstallStates((currentStates) => ({
+      ...currentStates,
+      [installKey]: {
+        state: "starting",
+        message: `Preparing ${option.displayName}.`,
+        failureReason: undefined,
+        actionableSteps: [],
+        preferenceKey,
+        useAfterInstall: installOptions.useAfterInstall,
+        targetProvider: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+      }
+    }));
+
+    try {
+      const response = await installEnhancedProvider(option.id, {
+        forceReinstall: installOptions.forceReinstall
+      });
+
+      if (response.status === "failed") {
+        setProviderInstallStates((currentStates) => ({
+          ...currentStates,
+          [installKey]: {
+            state: "failed",
+            message: response.message,
+            failureReason: response.failureReason ?? undefined,
+            actionableSteps: response.actionableSteps,
+            preferenceKey,
+            useAfterInstall: installOptions.useAfterInstall,
+            targetProvider: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+          }
+        }));
+        return;
+      }
+
+      if (response.status === "completed") {
+        setProviderInstallStates((currentStates) => ({
+          ...currentStates,
+          [installKey]: {
+            state: "completed",
+            message: response.message,
+            failureReason: undefined,
+            actionableSteps: response.actionableSteps,
+            preferenceKey,
+            useAfterInstall: installOptions.useAfterInstall,
+            targetProvider: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+          }
+        }));
+        if (installOptions.useAfterInstall) {
+          setProviderPreferences((currentPreferences) => ({
+            ...currentPreferences,
+            [preferenceKey]: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+          }));
+        }
+        await refreshRuntimeDiagnostics({ quiet: true });
+        return;
+      }
+
+      setProviderInstallStates((currentStates) => ({
+        ...currentStates,
+        [installKey]: {
+          state: "running",
+          installId: response.installId ?? undefined,
+          message: response.message,
+          failureReason: undefined,
+          actionableSteps: response.actionableSteps,
+          preferenceKey,
+          useAfterInstall: installOptions.useAfterInstall,
+          targetProvider: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+        }
+      }));
+    } catch (installError) {
+      setProviderInstallStates((currentStates) => ({
+        ...currentStates,
+        [installKey]: {
+          state: "failed",
+          message: installError instanceof Error ? installError.message : `Failed to install ${option.displayName}.`,
+          failureReason: "install_request_failed",
+          actionableSteps: ["Retry install from this option."],
+          preferenceKey,
+          useAfterInstall: installOptions.useAfterInstall,
+          targetProvider: option.provider as NonNullable<ProviderPreferences[keyof ProviderPreferences]>
+        }
+      }));
+    }
+  }
+
+  function handleCancelCustomProviderForm(): void {
+    setIsCustomProviderFormOpen(false);
+    setCustomProviderManifestUrl("");
+  }
+
+  async function handleCustomProviderInstall(): Promise<void> {
+    const manifestUrl = customProviderManifestUrl.trim();
+    if (!manifestUrl) {
+      setCustomProviderInstallState({
+        state: "failed",
+        message: "Enter a local file:// manifest URL. / 请输入本地 file:// manifest URL。",
+        failureReason: "manifest_url_required",
+        actionableSteps: ["Use a local file://...json manifest URL only."],
+        targetManifestUrl: ""
+      });
+      return;
+    }
+
+    setCustomProviderInstallState({
+      state: "starting",
+      message: "Preparing custom provider registration. / 正在准备自定义 provider 注册。",
+      failureReason: undefined,
+      actionableSteps: [],
+      targetManifestUrl: manifestUrl
+    });
+
+    try {
+      const payload: CustomProviderInstallRequest = {
+        sourceType: "manifest_url",
+        manifestUrl
+      };
+      const response = await installCustomProvider(payload);
+
+      if (response.status === "failed") {
+        setCustomProviderInstallState({
+          state: "failed",
+          message: getCompactInstallMessage(response.message),
+          failureReason: response.failureReason ?? undefined,
+          actionableSteps: response.actionableSteps,
+          targetManifestUrl: manifestUrl
+        });
+        return;
+      }
+
+      if (response.status === "completed") {
+        setCustomProviderInstallState({
+          state: "completed",
+          message: getCompactInstallMessage(response.message),
+          failureReason: undefined,
+          actionableSteps: response.actionableSteps,
+          targetManifestUrl: manifestUrl
+        });
+        await refreshRuntimeDiagnostics({ quiet: true });
+        setIsCustomProviderFormOpen(false);
+        return;
+      }
+
+      setCustomProviderInstallState({
+        state: "running",
+        installId: response.installId ?? undefined,
+        message: getCompactInstallMessage(response.message),
+        failureReason: undefined,
+        actionableSteps: response.actionableSteps,
+        targetManifestUrl: manifestUrl
+      });
+      setIsCustomProviderFormOpen(false);
+    } catch (installError) {
+      setCustomProviderInstallState({
+        state: "failed",
+        message: "Custom provider registration failed. / 自定义 provider 注册失败。",
+        failureReason: "install_request_failed",
+        actionableSteps: ["Use a local file://...json manifest URL and try again."],
+        targetManifestUrl: manifestUrl
+      });
+      setError(installError instanceof Error ? installError.message : "Failed to register the custom provider.");
+    }
+  }
+
   function handleMoveNote(_trackKey: string, draftNoteId: string, onsetSec: number): void {
     moveNote(draftNoteId, onsetSec);
   }
@@ -1152,15 +1780,30 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <summary>Advanced Runtime Options / 高级运行选项</summary>
                 <div className="runtime-options-body">
                   <p className="muted">
-                    Use stronger local providers when difficult songs produce weak or empty draft results.
+                    Built-in providers stay ready by default. Official enhanced providers are optional, and custom providers only register for diagnostics in this step.
                     <br />
-                    当复杂歌曲生成结果较弱或为空时，可尝试更强的本地 provider。
+                    内置 provider 默认即开即用；官方增强 provider 可按需安装；自定义 provider 在本阶段仅用于注册与诊断展示。
                   </p>
+                  <div className="runtime-options-toolbar">
+                    <button
+                      className="button tertiary button-tiny"
+                      type="button"
+                      disabled={isRefreshingRuntimeDiagnostics}
+                      onClick={() => void refreshRuntimeDiagnostics()}
+                    >
+                      {isRefreshingRuntimeDiagnostics ? "Refreshing... / 刷新中..." : "Refresh Availability / 刷新可用性"}
+                    </button>
+                  </div>
                   <div className="runtime-option-grid">
                     <RuntimeProviderPreferenceField
                       currentValue={providerPreferences.sourceSeparation}
                       fieldName="source-separation-provider"
+                      preferenceKey="sourceSeparation"
                       onChange={(value) => handleProviderPreferenceChange("sourceSeparation", value as "auto" | "development-copy" | "demucs")}
+                      onInstall={(preferenceKey, option, options) =>
+                        void handleInstallProviderOption(preferenceKey, option, options)
+                      }
+                      installStates={providerInstallStates}
                       options={sourceRuntimeProvider?.options}
                       selectedProviderLabel={sourceRuntimeProvider?.selectedProviderLabel}
                       title="Source Separation"
@@ -1169,7 +1812,12 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     <RuntimeProviderPreferenceField
                       currentValue={providerPreferences.pianoTranscription}
                       fieldName="piano-transcription-provider"
+                      preferenceKey="pianoTranscription"
                       onChange={(value) => handleProviderPreferenceChange("pianoTranscription", value as "auto" | "heuristic" | "basic-pitch")}
+                      onInstall={(preferenceKey, option, options) =>
+                        void handleInstallProviderOption(preferenceKey, option, options)
+                      }
+                      installStates={providerInstallStates}
                       options={pianoRuntimeProvider?.options}
                       selectedProviderLabel={pianoRuntimeProvider?.selectedProviderLabel}
                       title="Piano Transcription"
@@ -1178,13 +1826,102 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     <RuntimeProviderPreferenceField
                       currentValue={providerPreferences.drumTranscription}
                       fieldName="drum-transcription-provider"
-                      onChange={(value) => handleProviderPreferenceChange("drumTranscription", value as "auto" | "heuristic" | "madmom")}
+                      preferenceKey="drumTranscription"
+                      onChange={(value) => handleProviderPreferenceChange("drumTranscription", value as "auto" | "heuristic" | "demucs-drums")}
+                      onInstall={(preferenceKey, option, options) =>
+                        void handleInstallProviderOption(preferenceKey, option, options)
+                      }
+                      installStates={providerInstallStates}
                       options={drumRuntimeProvider?.options}
                       selectedProviderLabel={drumRuntimeProvider?.selectedProviderLabel}
                       title="Drum Transcription"
                       titleZh="鼓轨转谱"
                     />
                   </div>
+                  <section className="runtime-custom-section">
+                    <div className="runtime-custom-header">
+                      <div>
+                        <strong>Register custom provider / 注册自定义 provider</strong>
+                        <div className="muted runtime-custom-help">
+                          Local manifest URL only. Registers a diagnostic entry, not an execution-ready provider.
+                          <br />
+                          仅支持本地 manifest URL，且只接受本地 `file://...json` 路径。本阶段仅用于注册与诊断展示。
+                        </div>
+                      </div>
+                      <button
+                        className="button tertiary button-tiny"
+                        type="button"
+                        onClick={() => setIsCustomProviderFormOpen((currentOpen) => !currentOpen)}
+                      >
+                        {isCustomProviderFormOpen ? "Close / 收起" : "Register Custom Provider / 注册自定义 provider"}
+                      </button>
+                    </div>
+                    {isCustomProviderFormOpen ? (
+                      <div className="runtime-custom-form ornate-card">
+                        <div className="field">
+                          <label htmlFor="custom-provider-manifest-url">Local manifest URL only / 仅限本地 manifest URL</label>
+                          <input
+                            id="custom-provider-manifest-url"
+                            placeholder="file:///C:/path/to/provider-manifest.json"
+                            type="text"
+                            value={customProviderManifestUrl}
+                            onChange={(event) => setCustomProviderManifestUrl(event.target.value)}
+                          />
+                        </div>
+                        <div className="actions">
+                          <button className="button secondary button-tiny" type="button" onClick={() => void handleCustomProviderInstall()}>
+                            Confirm / 确认
+                          </button>
+                          <button className="button tertiary button-tiny" type="button" onClick={handleCancelCustomProviderForm}>
+                            Cancel / 取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {customProviderInstallState ? (
+                      <article
+                        className={`runtime-custom-status ${
+                          customProviderInstallState.state === "failed"
+                            ? "is-error"
+                            : customProviderInstallState.state === "completed"
+                              ? "is-success"
+                              : ""
+                        }`}
+                      >
+                        <strong>
+                          {customProviderInstallState.state === "completed"
+                            ? "Registered for diagnostics / 已注册用于诊断"
+                            : customProviderInstallState.state === "failed"
+                              ? "Registration failed / 注册失败"
+                              : "Registering... / 正在注册..."}
+                        </strong>
+                        <div className="muted">{customProviderInstallState.message}</div>
+                        <div className="muted">Not used by Auto or the main pipeline in this step. / 本阶段不会进入 Auto 或主流水线执行。</div>
+                        {customProviderInstallState.targetManifestUrl ? (
+                          <div className="muted">Manifest URL: {customProviderInstallState.targetManifestUrl}</div>
+                        ) : null}
+                        {getFirstActionableStep(customProviderInstallState.actionableSteps) ? (
+                          <div className="muted">
+                            Next step: {getFirstActionableStep(customProviderInstallState.actionableSteps)}
+                          </div>
+                        ) : null}
+                      </article>
+                    ) : null}
+                    <div className="runtime-custom-grid">
+                      <div className="runtime-custom-column">
+                        <h4>Custom Source Separation / 自定义源分离</h4>
+                        {sourceRuntimeProvider ? <RuntimeCustomProviderSection provider={sourceRuntimeProvider} /> : null}
+                      </div>
+                      <div className="runtime-custom-column">
+                        <h4>Custom Piano / 自定义钢琴转谱</h4>
+                        {pianoRuntimeProvider ? <RuntimeCustomProviderSection provider={pianoRuntimeProvider} /> : null}
+                      </div>
+                      <div className="runtime-custom-column">
+                        <h4>Custom Drums / 自定义鼓组转谱</h4>
+                        {drumRuntimeProvider ? <RuntimeCustomProviderSection provider={drumRuntimeProvider} /> : null}
+                      </div>
+                    </div>
+                  </section>
                   {runtimeDiagnosticsError ? <p className="error">{runtimeDiagnosticsError}</p> : null}
                 </div>
               </details>
@@ -1395,6 +2132,32 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               </div>
               <div className="result-meta-chip">{activeResult.bpm} BPM</div>
             </div>
+            <article className="note-card ornate-card runtime-provider-summary-card">
+              <strong>Provider Use Summary / Provider 使用摘要</strong>
+              <div className="runtime-provider-summary-lines">
+                {runtimeUsedProviderSummary.map((item) => {
+                  const modeLabel = item.requestedProvider === "auto" ? "Auto" : item.requestedLabel;
+                  const behaviorText = item.fallback
+                    ? "fallback to built-in"
+                    : item.autoPickedEnhanced
+                      ? "Auto picked optional enhanced"
+                      : item.requestedProvider === "auto"
+                        ? "Auto path"
+                        : "requested provider";
+
+                  return (
+                    <div key={item.key}>
+                      {item.label}: {item.usedLabel} (mode: {modeLabel}; {behaviorText})
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="muted runtime-provider-summary-help">
+                {runtimeUsedFallbackDetected
+                  ? "Fallback was detected in this result. / 本次结果检测到回退。"
+                  : "No fallback warning was detected in this result. / 本次结果未检测到回退警告。"}
+              </div>
+            </article>
             <div className="score-stack">
               <div className="score-primary-card ornate-card">
                 <h3>Piano Score / 钢琴乐谱</h3>
@@ -1639,6 +2402,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                           <strong>{provider.label}</strong>
                           <div>{provider.status === "ready" ? "Ready / 就绪" : "Needs Attention / 需要关注"}</div>
                           <div className="muted">{provider.message}</div>
+                          {provider.customProviders.length > 0 ? (
+                            <div className="muted">
+                              Custom registered: {provider.customProviders.length} / 已注册自定义 providers: {provider.customProviders.length}
+                            </div>
+                          ) : null}
                         </article>
                       ))}
                     </div>

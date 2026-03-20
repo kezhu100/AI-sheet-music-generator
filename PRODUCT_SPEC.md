@@ -44,7 +44,14 @@ Presentation priorities:
 - in the Project Library, opening a project should remain the clearest action while rename/duplicate/delete stay available with less visual weight
 - long score and drum results should stay inside stable preview readers with internal scrolling rather than stretching the full page
 - advanced runtime provider choices should be discoverable near upload/start, but kept inside a restrained product-style panel rather than a dominant engineering control row
+- optional enhanced provider options may expose compact inline install/retry status in that same runtime panel, without turning it into a package-management dashboard
+- optional enhanced provider copy should stay honest about local runtime requirements, and `Demucs Drums` should be described as a Demucs-plus-rules enhanced path rather than a guaranteed drum model
+- the same compact runtime area may also expose a narrow custom-provider registration flow for local `file://...json` manifest URLs only
+- custom-provider registration copy should clearly distinguish built-in, official enhanced, and custom registered states
+- generated results should expose a lightweight provider-used/fallback summary so Auto behavior stays understandable without opening developer-style diagnostics
 - the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
+- the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums
+- any future extra provider should come through a controlled custom-provider extension path rather than expanding the built-in official enhanced set
 
 ## User Story
 As a user, I want to upload audio, get a readable draft score, refine it locally, save my work, and export it without relying on the cloud.
@@ -62,6 +69,9 @@ A successful current product:
 ## UX Constraints
 - do not imply publication-grade engraving
 - do not imply cloud sync or public sharing
+- do not imply arbitrary third-party provider execution or universal plugin compatibility
+- do not imply that registered custom providers are automatically runnable in the main pipeline
+- do not blur `registered` with `installed and execution-ready` in the runtime/provider UI
 - keep accessibility, readability, and hierarchy strong even with the manuscript/fantasy visual direction
 - keep bilingual copy intentional and consistent rather than partial
 - prefer two-line English/Chinese presentation for major section headings, helper copy, and informational cards when it improves readability

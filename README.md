@@ -1,4 +1,4 @@
-# AI Sheet Music Generator
+﻿# AI Sheet Music Generator
 
 Turn audio into structured sheet music — locally, privately, and in a score-first workspace.  
 将音频转换为结构化乐谱 —— 本地运行、隐私优先，并以乐谱为核心工作流。
@@ -79,7 +79,19 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
   **支持基于 provider 的质量调节**
 
 - **Advanced runtime options with Auto defaults**  
-  **高级运行选项支持 Auto 默认策略**
+  **高级运行时选项（具有自动默认设置）**
+
+- **Optional enhanced providers install on demand from Runtime Options**  
+  **可选的增强型提供程序可在运行时选项中按需安装**
+
+- **Official enhanced providers stay fixed, while extra providers use a local custom manifest registration path**  
+  **官方增强型提供者保持不变，而额外的提供者则使用本地自定义的清单注册路径**
+
+- **Custom registration currently adds a local diagnostic entry only, not an execution-ready provider**  
+  **当前的自定义注册仅会添加一个本地诊断条目，而不会提供一个可直接执行的提供程序**
+
+- **Result view includes a compact provider-used/fallback summary**  
+  **结果视图包含了一个简洁的“提供者使用/备用方案”概要。**
 
 ---
 
@@ -204,7 +216,13 @@ This combination is what makes the project different: it is not just an AI demo,
   当前在钢琴与鼓较清晰的素材上效果最佳  
 
 - **Some providers are still heuristic or optional-runtime dependent**  
-  部分 provider 仍基于启发式方法或依赖可选运行环境  
+  **有些供应商仍依赖于启发式方法或运行时选项**
+
+- **`Demucs Drums` is the practical official enhanced drum path, using Demucs drum stem isolation plus lightweight rule-based onset detection**  
+  **`Demucs Drums` 是经过实际应用和优化的官方鼓音轨，它采用了Demucs drum stem隔离技术以及基于规则的轻量级起始点检测方法**
+
+- **Custom providers currently support local manifest registration only, not automatic execution selection**  
+  **目前，自定义提供程序仅支持本地清单注册，而不支持自动执行选择**  
 
 - **This is not a full DAW replacement**  
   这不是完整的 DAW 替代品  

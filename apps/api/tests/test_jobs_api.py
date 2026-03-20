@@ -34,7 +34,7 @@ class JobsApiTests(unittest.TestCase):
                     "providerPreferences": {
                         "sourceSeparation": "demucs",
                         "pianoTranscription": "basic-pitch",
-                        "drumTranscription": "madmom",
+                        "drumTranscription": "demucs-drums",
                     },
                 },
             )
@@ -44,7 +44,7 @@ class JobsApiTests(unittest.TestCase):
         _, _, provider_preferences = start_job_mock.call_args.args
         self.assertEqual(provider_preferences.source_separation, "demucs")
         self.assertEqual(provider_preferences.piano_transcription, "basic-pitch")
-        self.assertEqual(provider_preferences.drum_transcription, "madmom")
+        self.assertEqual(provider_preferences.drum_transcription, "demucs-drums")
 
 
 if __name__ == "__main__":

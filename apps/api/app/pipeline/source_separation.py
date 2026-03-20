@@ -17,6 +17,56 @@ class SourceSeparationProviderError(RuntimeError):
     pass
 
 
+def run_demucs_separation_command(
+    audio_path: Path,
+    *,
+    output_dir: Path,
+    python_executable: str | None = None,
+    model_name: str = "htdemucs",
+    device: str | None = None,
+) -> None:
+    resolved_python = python_executable or sys.executable
+    command = [
+        resolved_python,
+        "-m",
+        "demucs.separate",
+        "-n",
+        model_name,
+        "-o",
+        str(output_dir),
+    ]
+    if device:
+        command.extend(["-d", device])
+    command.append(str(audio_path))
+
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise SourceSeparationProviderError(
+            f"Demucs Python executable was not found at '{resolved_python}'."
+        ) from exc
+
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+        raise SourceSeparationProviderError(
+            f"Demucs separation failed with exit code {completed.returncode}: {detail}"
+        )
+
+
+def find_demucs_output_file(output_dir: Path, source_name: str) -> Path:
+    matches = sorted(output_dir.rglob(f"{source_name}.wav"))
+    if not matches:
+        raise SourceSeparationProviderError(
+            f"Demucs completed but did not produce the expected '{source_name}.wav' output."
+        )
+    return matches[0]
+
+
 class LocalDevelopmentSourceSeparationProvider(SourceSeparationProvider):
     provider_name = "local-development-separation"
 
@@ -74,39 +124,16 @@ class DemucsSourceSeparationProvider(SourceSeparationProvider):
     def separate(self, audio_path: Path, job_id: str) -> SourceSeparationRunResult:
         with TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "demucs-output"
-            command = [
-                self._python_executable,
-                "-m",
-                "demucs.separate",
-                "-n",
-                self._model_name,
-                "-o",
-                str(output_dir),
-            ]
-            if self._device:
-                command.extend(["-d", self._device])
-            command.append(str(audio_path))
+            run_demucs_separation_command(
+                audio_path,
+                output_dir=output_dir,
+                python_executable=self._python_executable,
+                model_name=self._model_name,
+                device=self._device,
+            )
 
-            try:
-                completed = subprocess.run(
-                    command,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-            except FileNotFoundError as exc:
-                raise SourceSeparationProviderError(
-                    f"Demucs Python executable was not found at '{self._python_executable}'."
-                ) from exc
-
-            if completed.returncode != 0:
-                detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
-                raise SourceSeparationProviderError(
-                    f"Demucs separation failed with exit code {completed.returncode}: {detail}"
-                )
-
-            drums_source = self._find_demucs_output(output_dir, self._drums_source_name)
-            piano_source = self._find_demucs_output(output_dir, self._piano_source_name)
+            drums_source = find_demucs_output_file(output_dir, self._drums_source_name)
+            piano_source = find_demucs_output_file(output_dir, self._piano_source_name)
 
             stem_specs = [
                 ("piano_stem", "piano", piano_source),
@@ -144,15 +171,6 @@ class DemucsSourceSeparationProvider(SourceSeparationProvider):
             stems=stems,
             warnings=warnings,
         )
-
-    def _find_demucs_output(self, output_dir: Path, source_name: str) -> Path:
-        matches = sorted(output_dir.rglob(f"{source_name}.wav"))
-        if not matches:
-            raise SourceSeparationProviderError(
-                f"Demucs completed but did not produce the expected '{source_name}.wav' output."
-            )
-        return matches[0]
-
 
 class FallbackSourceSeparationProvider(SourceSeparationProvider):
     def __init__(self, primary: SourceSeparationProvider, fallback: SourceSeparationProvider) -> None:

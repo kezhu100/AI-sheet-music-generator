@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 import sys
 from typing import Iterable, Optional
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import RuntimeDiagnostics, RuntimeProviderOption, RuntimeProviderStatus, RuntimeStorageStatus
+from app.models.schemas import (
+    ProviderCategory,
+    RuntimeDiagnostics,
+    RuntimeCustomProvider,
+    RuntimeProviderOption,
+    RuntimeProviderStatus,
+    RuntimeStorageStatus,
+)
 from app.pipeline.drum_transcription import (
+    DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET,
     DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
     DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
     DRUM_TRANSCRIPTION_PROVIDER_ML,
@@ -19,6 +26,15 @@ from app.pipeline.piano_transcription import (
     PIANO_TRANSCRIPTION_PROVIDER_ML,
 )
 from app.pipeline.source_separation import SOURCE_SEPARATION_PROVIDER_DEVELOPMENT, SOURCE_SEPARATION_PROVIDER_DEMUCS
+from app.services.provider_manifest import (
+    PROVIDER_CATEGORY_DRUM_TRANSCRIPTION,
+    PROVIDER_CATEGORY_PIANO_TRANSCRIPTION,
+    PROVIDER_CATEGORY_SOURCE_SEPARATION,
+    ProviderCapabilityManifest,
+    iter_manifests_for_category,
+)
+from app.services.custom_provider_registry import custom_provider_registry_service
+from app.services.python_runtime_probe import check_python_module
 
 
 @dataclass(frozen=True)
@@ -110,6 +126,7 @@ class RuntimeDiagnosticsService:
                 guidance=[],
                 optional=False,
                 options=self._build_source_options(settings),
+                customProviders=self._build_custom_provider_runtime_models(PROVIDER_CATEGORY_SOURCE_SEPARATION),
             )
 
         if selected == SOURCE_SEPARATION_PROVIDER_DEMUCS:
@@ -155,6 +172,7 @@ class RuntimeDiagnosticsService:
                 guidance=[],
                 optional=False,
                 options=self._build_piano_options(settings),
+                customProviders=self._build_custom_provider_runtime_models(PROVIDER_CATEGORY_PIANO_TRANSCRIPTION),
             )
 
         if selected in {PIANO_TRANSCRIPTION_PROVIDER_ML, PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH}:
@@ -200,22 +218,23 @@ class RuntimeDiagnosticsService:
                 guidance=[],
                 optional=False,
                 options=self._build_drum_options(settings),
+                customProviders=self._build_custom_provider_runtime_models(PROVIDER_CATEGORY_DRUM_TRANSCRIPTION),
             )
 
-        if selected in {DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM}:
+        if selected in {DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET, DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM}:
             return self._build_python_provider_status(
                 key="drum-transcription",
                 label="Drum transcription",
                 selected_provider=selected,
-                selected_label="madmom",
+                selected_label="Demucs Drums",
                 fallback_provider=fallback,
                 fallback_label=self._drum_provider_label(fallback),
-                python_executable=settings.drum_transcription_ml_python,
-                module_name="madmom",
+                python_executable=settings.drum_transcription_ml_python or settings.source_separation_demucs_python,
+                module_name="demucs",
                 optional_when_unselected=True,
                 install_guidance=[
-                    "Install madmom into the configured Python environment or switch DRUM_TRANSCRIPTION_PROVIDER back to heuristic.",
-                    "Set DRUM_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic to keep startup non-blocking when madmom is unavailable.",
+                    "Install Demucs into the configured Python environment or switch DRUM_TRANSCRIPTION_PROVIDER back to heuristic.",
+                    "Set DRUM_TRANSCRIPTION_FALLBACK_PROVIDER=heuristic to keep startup non-blocking when the enhanced drum path is unavailable.",
                 ],
                 options=self._build_drum_options(settings),
             )
@@ -261,6 +280,7 @@ class RuntimeDiagnosticsService:
                 guidance=[],
                 optional=optional_when_unselected,
                 options=options,
+                customProviders=self._build_custom_provider_runtime_models(self._provider_category_for_key(key)),
             )
 
         has_fallback = fallback_provider is not None and fallback_provider != selected_provider
@@ -280,6 +300,7 @@ class RuntimeDiagnosticsService:
                 guidance=guidance,
                 optional=optional_when_unselected,
                 options=options,
+                customProviders=self._build_custom_provider_runtime_models(self._provider_category_for_key(key)),
             )
 
         return RuntimeProviderStatus(
@@ -294,24 +315,11 @@ class RuntimeDiagnosticsService:
             guidance=guidance,
             optional=optional_when_unselected,
             options=options,
+            customProviders=self._build_custom_provider_runtime_models(self._provider_category_for_key(key)),
         )
 
     def _check_python_module(self, python_executable: str, module_name: str) -> tuple[bool, str]:
-        executable_path = Path(python_executable)
-        if not executable_path.exists():
-            return False, f"Python executable was not found at '{python_executable}'."
-
-        command = [python_executable, "-c", f"import {module_name}"]
-        try:
-            completed = subprocess.run(command, check=False, capture_output=True, text=True)
-        except OSError as exc:
-            return False, f"Could not run '{python_executable}': {exc}"
-
-        if completed.returncode == 0:
-            return True, "ok"
-
-        detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
-        return False, detail
+        return check_python_module(python_executable, module_name)
 
     def _unsupported_provider_status(
         self,
@@ -334,61 +342,116 @@ class RuntimeDiagnosticsService:
             guidance=["Update the provider environment variable to one of the documented supported providers."],
             optional=False,
             options=options,
+            customProviders=self._build_custom_provider_runtime_models(self._provider_category_for_key(key)),
         )
 
     def _build_source_options(self, settings: Settings) -> list[RuntimeProviderOption]:
-        demucs_available, demucs_detail = self._check_python_module(settings.source_separation_demucs_python or sys.executable, "demucs")
-        return [
-            RuntimeProviderOption(
-                provider=SOURCE_SEPARATION_PROVIDER_DEVELOPMENT,
-                label="Development copy",
-                available=True,
-                detail="Always available for local draft-first runs.",
-            ),
-            RuntimeProviderOption(
-                provider=SOURCE_SEPARATION_PROVIDER_DEMUCS,
-                label="Demucs",
-                available=demucs_available,
-                detail="Installed in the configured local Python runtime." if demucs_available else demucs_detail,
-            ),
-        ]
+        return self._build_provider_options(PROVIDER_CATEGORY_SOURCE_SEPARATION, settings)
 
     def _build_piano_options(self, settings: Settings) -> list[RuntimeProviderOption]:
-        basic_pitch_available, basic_pitch_detail = self._check_python_module(
-            settings.piano_transcription_ml_python or sys.executable,
-            "basic_pitch",
-        )
-        return [
-            RuntimeProviderOption(
-                provider=PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC,
-                label="Heuristic WAV",
-                available=True,
-                detail="Always available for local draft generation.",
-            ),
-            RuntimeProviderOption(
-                provider=PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH,
-                label="Basic Pitch",
-                available=basic_pitch_available,
-                detail="Installed in the configured local Python runtime." if basic_pitch_available else basic_pitch_detail,
-            ),
-        ]
+        return self._build_provider_options(PROVIDER_CATEGORY_PIANO_TRANSCRIPTION, settings)
 
     def _build_drum_options(self, settings: Settings) -> list[RuntimeProviderOption]:
-        madmom_available, madmom_detail = self._check_python_module(settings.drum_transcription_ml_python or sys.executable, "madmom")
-        return [
-            RuntimeProviderOption(
-                provider=DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
-                label="Heuristic WAV",
+        return self._build_provider_options(PROVIDER_CATEGORY_DRUM_TRANSCRIPTION, settings)
+
+    def _build_provider_options(self, category: ProviderCategory, settings: Settings) -> list[RuntimeProviderOption]:
+        options: list[RuntimeProviderOption] = []
+        for manifest in iter_manifests_for_category(category):
+            options.append(self._build_provider_option(manifest, settings))
+        return options
+
+    def _build_provider_option(self, manifest: ProviderCapabilityManifest, settings: Settings) -> RuntimeProviderOption:
+        if manifest.built_in:
+            status_text = "Built-in local baseline provider is ready."
+            return RuntimeProviderOption(
+                id=manifest.id,
+                category=manifest.category,
+                displayName=manifest.display_name,
+                providerLayer=manifest.provider_layer,
+                builtIn=True,
+                optionalEnhanced=False,
+                provider=manifest.id,
+                label=manifest.display_name,
+                installed=True,
                 available=True,
-                detail="Always available for local draft generation.",
-            ),
-            RuntimeProviderOption(
-                provider=DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
-                label="madmom",
-                available=madmom_available,
-                detail="Installed in the configured local Python runtime." if madmom_available else madmom_detail,
-            ),
-        ]
+                installable=False,
+                recommended=manifest.recommended,
+                missingReason=None,
+                helpText=manifest.help_text,
+                statusText=status_text,
+                actionableSteps=list(manifest.actionable_steps),
+                detail=status_text,
+            )
+
+        executable = self._python_executable_for_category(manifest.category, settings)
+        executable_path = Path(executable)
+        if not executable_path.exists():
+            missing_reason = f"Python executable was not found at '{executable}'."
+            return RuntimeProviderOption(
+                id=manifest.id,
+                category=manifest.category,
+                displayName=manifest.display_name,
+                providerLayer=manifest.provider_layer,
+                builtIn=False,
+                optionalEnhanced=manifest.official_enhanced,
+                provider=manifest.id,
+                label=manifest.display_name,
+                installed=False,
+                available=False,
+                installable=False,
+                recommended=manifest.recommended,
+                missingReason=missing_reason,
+                helpText=manifest.help_text,
+                statusText=missing_reason,
+                actionableSteps=list(manifest.actionable_steps),
+                detail=missing_reason,
+            )
+
+        installed, detail = self._check_python_module(executable, manifest.module_name or "")
+        if installed:
+            status_text = "Installed in the configured local Python runtime."
+        elif manifest.id == "demucs-drums":
+            status_text = "Not installed yet. Demucs is required for the enhanced drum stem plus onset path."
+        else:
+            status_text = detail
+        return RuntimeProviderOption(
+            id=manifest.id,
+            category=manifest.category,
+            displayName=manifest.display_name,
+            providerLayer=manifest.provider_layer,
+            builtIn=False,
+            optionalEnhanced=manifest.official_enhanced,
+            provider=manifest.id,
+            label=manifest.display_name,
+            installed=installed,
+            available=installed,
+            installable=True,
+            recommended=manifest.recommended,
+            missingReason=None if installed else detail,
+            helpText=manifest.help_text,
+            statusText=status_text,
+            actionableSteps=list(manifest.actionable_steps),
+            detail=detail if not installed else status_text,
+        )
+
+    def _python_executable_for_category(self, category: ProviderCategory, settings: Settings) -> str:
+        if category == PROVIDER_CATEGORY_SOURCE_SEPARATION:
+            return settings.source_separation_demucs_python or sys.executable
+        if category == PROVIDER_CATEGORY_PIANO_TRANSCRIPTION:
+            return settings.piano_transcription_ml_python or sys.executable
+        if category == PROVIDER_CATEGORY_DRUM_TRANSCRIPTION:
+            return settings.drum_transcription_ml_python or settings.source_separation_demucs_python or sys.executable
+        return sys.executable
+
+    def _build_custom_provider_runtime_models(self, category: ProviderCategory) -> list[RuntimeCustomProvider]:
+        return custom_provider_registry_service.list_runtime_models(category)
+
+    def _provider_category_for_key(self, key: str) -> ProviderCategory:
+        if key == "source-separation":
+            return PROVIDER_CATEGORY_SOURCE_SEPARATION
+        if key == "piano-transcription":
+            return PROVIDER_CATEGORY_PIANO_TRANSCRIPTION
+        return PROVIDER_CATEGORY_DRUM_TRANSCRIPTION
 
     def _source_provider_label(self, provider: Optional[str]) -> Optional[str]:
         mapping = {
@@ -408,8 +471,9 @@ class RuntimeDiagnosticsService:
     def _drum_provider_label(self, provider: Optional[str]) -> Optional[str]:
         mapping = {
             DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC: "Heuristic WAV",
-            DRUM_TRANSCRIPTION_PROVIDER_ML: "madmom",
-            DRUM_TRANSCRIPTION_PROVIDER_MADMOM: "madmom",
+            DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET: "Demucs Drums",
+            DRUM_TRANSCRIPTION_PROVIDER_ML: "Demucs Drums",
+            DRUM_TRANSCRIPTION_PROVIDER_MADMOM: "Demucs Drums",
         }
         return mapping.get(provider, provider) if provider else None
 

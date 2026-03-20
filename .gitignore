@@ -10,3 +10,28 @@ __pycache__/
 .mypy_cache/
 .venv/
 apps/api/data/
+*.tsbuildinfo
+
+# Python envs
+venv/
+.venv/
+**/venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Frontend / build
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local runtime data
+apps/api/data/
+data/
+*.log

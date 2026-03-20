@@ -19,6 +19,8 @@ The current product includes:
 ## Current Milestone
 - Phase 14L is complete for local deployment, one-command startup, and runtime diagnostics
 - Phase 14.5 is complete for product polish, workspace hierarchy refinement, bilingual cleanup, and visual direction upgrade
+- provider foundation step is now added for optional enhanced-provider productization on the backend side
+- provider foundation step now also includes a controlled custom-provider registration path on the backend side
 
 ## Phase 14.5 Outcome
 Phase 14.5 does not change the backend architecture or persistence model.
@@ -47,6 +49,9 @@ These remain unchanged:
 - original completed result, saved latest draft, and in-session draft stay separate
 - `JobResult` remains the core normalized contract
 - provider-based backend boundaries remain intact
+- built-in provider defaults and fallback behavior remain the baseline runtime path
+- the fixed official enhanced-provider set remains explicit: demucs, basic-pitch, demucs-drums
+- future extra providers should arrive through the controlled custom-provider path rather than as new built-in official enhanced providers
 
 ## Current Frontend Structure
 The main workspace is now organized as:
@@ -58,6 +63,18 @@ The main workspace is now organized as:
 6. Advanced Details (collapsed by default)
 
 Advanced Details contains runtime/provider summaries, stems, warnings, and raw note-detail surfaces that are still useful but should not dominate the main path.
+
+Advanced Runtime Options now also supports compact inline install actions for optional enhanced providers, with backend-backed status polling and refresh, while keeping `Auto` as the default path.
+A lightweight result-side provider summary now makes Auto selection and fallback outcomes easier to understand without opening debug-style views.
+The same compact runtime area can now also accept a local `file://...json` custom manifest URL for backend registration, while keeping custom providers diagnostic-only and not execution-ready in this phase.
+For the fixed official enhanced set, `demucs-drums` now provides the practical enhanced drum path by reusing Demucs stem isolation plus lightweight rule-based onset detection, while the built-in heuristic drum provider remains the stable fallback.
+
+Backend provider scope is now intentionally split:
+- built-in base providers remain the default runnable path
+- the fixed official enhanced-provider set is only demucs, basic-pitch, and demucs-drums
+- any future extra provider is expected to come through a controlled custom-provider extension path
+- the first custom-provider path is manifest-driven and local-first, using a validated local `file://` manifest URL and app-managed local storage
+- custom registration currently does not add a selectable provider to `Auto` or the main pipeline
 
 ## Known Constraints
 - mixed-audio quality still depends heavily on separation quality
@@ -71,3 +88,7 @@ Advanced Details contains runtime/provider summaries, stems, warnings, and raw n
 - preserve the current local-first product architecture
 - continue improving usability without breaking the current contract boundaries
 - keep desktop packaging optional in Phase 15L rather than mandatory
+- keep optional enhanced provider installs explicit, inspectable, and backend-owned, while refining compact frontend clarity in-place
+- keep custom-provider registration explicit, backend-owned, and narrowly controlled rather than turning the app into a generic plugin executor
+
+

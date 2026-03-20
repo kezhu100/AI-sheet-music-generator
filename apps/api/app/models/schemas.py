@@ -14,9 +14,15 @@ JobStatus = Literal["queued", "processing", "failed", "completed"]
 ExportFormat = Literal["midi", "musicxml"]
 RuntimeSeverity = Literal["ready", "degraded", "blocking"]
 RuntimeCheckStatus = Literal["ready", "optional-missing", "degraded-fallback", "blocking-misconfigured"]
+ProviderCategory = Literal["source-separation", "piano-transcription", "drum-transcription"]
+ProviderLayer = Literal["built_in_base", "official_enhanced", "custom"]
+ProviderInstallActionStatus = Literal["started", "completed", "failed"]
+ProviderInstallState = Literal["started", "running", "completed", "failed"]
+CustomProviderInstallSourceType = Literal["manifest_url"]
+CustomProviderSourceTransport = Literal["file"]
 SourceSeparationProviderPreference = Literal["auto", "development-copy", "demucs"]
 PianoTranscriptionProviderPreference = Literal["auto", "heuristic", "basic-pitch"]
-DrumTranscriptionProviderPreference = Literal["auto", "heuristic", "madmom"]
+DrumTranscriptionProviderPreference = Literal["auto", "heuristic", "demucs-drums"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
 MAX_MIDI_NOTE = 127
@@ -537,9 +543,41 @@ class RuntimeStorageStatus(BaseModel):
 
 
 class RuntimeProviderOption(BaseModel):
+    id: str
+    category: ProviderCategory
+    display_name: str = Field(alias="displayName")
+    provider_layer: ProviderLayer = Field(alias="providerLayer")
+    built_in: bool = Field(alias="builtIn")
+    optional_enhanced: bool = Field(alias="optionalEnhanced")
     provider: str
     label: str
+    installed: bool
     available: bool
+    installable: bool
+    recommended: bool
+    missing_reason: Optional[str] = Field(default=None, alias="missingReason")
+    help_text: str = Field(alias="helpText")
+    status_text: str = Field(alias="statusText")
+    actionable_steps: List[str] = Field(default_factory=list, alias="actionableSteps")
+    detail: str
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class RuntimeCustomProvider(BaseModel):
+    provider_id: str = Field(alias="providerId")
+    category: ProviderCategory
+    display_name: str = Field(alias="displayName")
+    provider_layer: ProviderLayer = Field(alias="providerLayer")
+    source_type: CustomProviderInstallSourceType = Field(alias="sourceType")
+    source_transport: CustomProviderSourceTransport = Field(alias="sourceTransport")
+    provider_version: str = Field(alias="providerVersion")
+    manifest_url: str = Field(alias="manifestUrl")
+    manifest_path: str = Field(alias="manifestPath")
+    installed: bool
+    available: bool
+    asset_count: int = Field(alias="assetCount")
+    status_text: str = Field(alias="statusText")
     detail: str
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
@@ -557,6 +595,7 @@ class RuntimeProviderStatus(BaseModel):
     guidance: List[str]
     optional: bool
     options: List[RuntimeProviderOption]
+    custom_providers: List[RuntimeCustomProvider] = Field(default_factory=list, alias="customProviders")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -569,5 +608,75 @@ class RuntimeDiagnostics(BaseModel):
     storage: List[RuntimeStorageStatus]
     providers: List[RuntimeProviderStatus]
     constraints: List[str]
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProviderInstallRequest(BaseModel):
+    forceReinstall: bool = False
+
+    model_config = {"extra": "forbid"}
+
+
+class CustomProviderInstallRequest(BaseModel):
+    source_type: CustomProviderInstallSourceType = Field(alias="sourceType")
+    manifest_url: str = Field(alias="manifestUrl")
+    force_reinstall: bool = Field(default=False, alias="forceReinstall")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("manifest_url")
+    @classmethod
+    def validate_manifest_url(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("manifestUrl must not be empty.")
+        return trimmed
+
+
+class ProviderInstallActionResponse(BaseModel):
+    status: ProviderInstallActionStatus
+    provider_id: str = Field(alias="providerId")
+    category: Optional[ProviderCategory] = None
+    install_id: Optional[str] = Field(default=None, alias="installId")
+    message: str
+    failure_reason: Optional[str] = Field(default=None, alias="failureReason")
+    actionable_steps: List[str] = Field(default_factory=list, alias="actionableSteps")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProviderInstallRecord(BaseModel):
+    install_id: str = Field(alias="installId")
+    provider_id: str = Field(alias="providerId")
+    category: ProviderCategory
+    provider_layer: ProviderLayer = Field(alias="providerLayer")
+    state: ProviderInstallState
+    started_at: datetime = Field(alias="startedAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    completed_at: Optional[datetime] = Field(default=None, alias="completedAt")
+    message: str
+    failure_reason: Optional[str] = Field(default=None, alias="failureReason")
+    actionable_steps: List[str] = Field(default_factory=list, alias="actionableSteps")
+    log_path: Optional[str] = Field(default=None, alias="logPath")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProviderInstallStatusResponse(BaseModel):
+    status: Literal["ok"] = "ok"
+    install: ProviderInstallRecord
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class CustomProviderInstallActionResponse(BaseModel):
+    status: ProviderInstallActionStatus
+    provider_id: Optional[str] = Field(default=None, alias="providerId")
+    category: Optional[ProviderCategory] = None
+    install_id: Optional[str] = Field(default=None, alias="installId")
+    message: str
+    failure_reason: Optional[str] = Field(default=None, alias="failureReason")
+    actionable_steps: List[str] = Field(default_factory=list, alias="actionableSteps")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}

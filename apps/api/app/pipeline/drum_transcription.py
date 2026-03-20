@@ -1,28 +1,30 @@
 from __future__ import annotations
 
 import audioop
-import json
 import math
 import struct
-import subprocess
 import sys
 import wave
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from tempfile import TemporaryDirectory
+from typing import List, Optional
 
 from app.core.config import Settings
 from app.models.schemas import NoteEvent
 from app.pipeline.interfaces import DrumTranscriptionProvider, SourceStem, TranscriptionResult
+from app.pipeline.source_separation import (
+    SourceSeparationProviderError,
+    find_demucs_output_file,
+    run_demucs_separation_command,
+)
 
 DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC = "heuristic"
+DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET = "demucs-drums"
 DRUM_TRANSCRIPTION_PROVIDER_ML = "ml"
 DRUM_TRANSCRIPTION_PROVIDER_MADMOM = "madmom"
-
-DRUM_MIDI_BY_LABEL = {
-    "kick": 36,
-    "snare": 38,
-    "hi-hat": 42,
+LEGACY_ENHANCED_DRUM_PROVIDER_IDS = {
+    DRUM_TRANSCRIPTION_PROVIDER_ML,
+    DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
 }
 
 
@@ -263,27 +265,33 @@ class HeuristicWavDrumTranscriptionProvider(DrumTranscriptionProvider):
         return bar, beat
 
 
-class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
-    provider_name = "madmom-drum-provider"
+class DemucsOnsetDrumTranscriptionProvider(DrumTranscriptionProvider):
+    provider_name = "demucs-onset-drum-provider"
 
     def __init__(
         self,
+        *,
         python_executable: Optional[str] = None,
+        model_name: str = "htdemucs",
+        device: Optional[str] = None,
+        drums_source_name: str = "drums",
         minimum_confidence: float = 0.35,
     ) -> None:
         self._python_executable = python_executable or sys.executable
+        self._model_name = model_name
+        self._device = device
+        self._drums_source_name = drums_source_name
         self._minimum_confidence = minimum_confidence
-        self._runner_path = Path(__file__).with_name("madmom_drum_runner.py")
         self._fallback_classifier = HeuristicWavDrumTranscriptionProvider()
 
     def transcribe(self, stem: SourceStem) -> TranscriptionResult:
         warnings = [
-            "Drum transcription attempted the stronger madmom-backed onset provider behind the existing provider contract.",
-            "madmom runtime availability depends on the configured Python environment and optional ML dependencies.",
+            "Drum transcription used Demucs drum stem isolation plus a lightweight rule-based onset detector.",
+            "This enhanced drum provider stays deterministic and local-first; dense fills, cymbal detail, and ghost notes can still be simplified.",
         ]
 
         try:
-            samples, sample_rate = self._fallback_classifier._load_wav_samples(stem.file_path)
+            samples, sample_rate, analysis_warnings = self._load_analysis_samples(stem)
         except UnsupportedDrumStemError as exc:
             warnings.append(str(exc))
             return TranscriptionResult(
@@ -293,14 +301,16 @@ class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
                 notes=[],
                 warnings=warnings,
             )
+        except SourceSeparationProviderError as exc:
+            raise DrumTranscriptionProviderError(str(exc)) from exc
 
-        raw_onsets = self._run_madmom(stem.file_path)
-        hits = self._build_hits_from_onsets(samples, sample_rate, raw_onsets)
+        warnings.extend(analysis_warnings)
+        hits = self._detect_demucs_hits(samples, sample_rate)
         notes = self._build_note_events(stem, samples, sample_rate, hits)
 
         if not notes:
             warnings.append(
-                "The madmom-backed drum provider did not return any normalized drum hits above the configured confidence threshold for this stem."
+                "The Demucs drum stem did not yield stable onset peaks above the current rule thresholds. The built-in heuristic drum provider remains the stable fallback."
             )
 
         return TranscriptionResult(
@@ -308,75 +318,105 @@ class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
             instrument="drums",
             source_stem=stem.stem_name,
             notes=notes,
-            warnings=warnings,
+            warnings=_dedupe_warnings(warnings),
         )
 
-    def _run_madmom(self, audio_path: Path) -> List[Any]:
-        with NamedTemporaryFile(suffix=".json", delete=False) as temp_file:
-            output_path = Path(temp_file.name)
-
-        command = [
-            self._python_executable,
-            str(self._runner_path),
-            "--input",
-            str(audio_path),
-            "--output",
-            str(output_path),
-        ]
-
-        try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
+    def _load_analysis_samples(self, stem: SourceStem) -> tuple[list[float], int, list[str]]:
+        if stem.file_path.suffix.lower() == ".wav" and stem.stem_asset.provider == "demucs-separation":
+            samples, sample_rate = self._fallback_classifier._load_wav_samples(stem.file_path)
+            return (
+                samples,
+                sample_rate,
+                ["Drum transcription reused the persisted Demucs drum stem from source separation."],
             )
-        except FileNotFoundError as exc:
-            raise DrumTranscriptionProviderError(
-                f"madmom Python executable was not found at '{self._python_executable}'."
-            ) from exc
 
-        try:
-            if completed.returncode != 0:
-                detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
-                raise DrumTranscriptionProviderError(
-                    f"madmom drum transcription failed with exit code {completed.returncode}: {detail}"
-                )
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "demucs-output"
+            run_demucs_separation_command(
+                stem.file_path,
+                output_dir=output_dir,
+                python_executable=self._python_executable,
+                model_name=self._model_name,
+                device=self._device,
+            )
+            drum_stem_path = find_demucs_output_file(output_dir, self._drums_source_name)
+            samples, sample_rate = self._fallback_classifier._load_wav_samples(drum_stem_path)
+            return (
+                samples,
+                sample_rate,
+                ["Drum transcription ran a local Demucs pass to isolate the drum stem before onset detection."],
+            )
 
-            payload = json.loads(output_path.read_text(encoding="utf-8"))
-            if not isinstance(payload, dict) or not isinstance(payload.get("onsets"), list):
-                raise DrumTranscriptionProviderError("madmom drum runner returned an invalid onset payload.")
-            return list(payload["onsets"])
-        finally:
-            output_path.unlink(missing_ok=True)
+    def _detect_demucs_hits(self, samples: list[float], sample_rate: int) -> list[tuple[int, int, float]]:
+        if not samples:
+            return []
 
-    def _build_hits_from_onsets(
-        self,
-        samples: list[float],
-        sample_rate: int,
-        raw_onsets: Iterable[Any],
-    ) -> list[tuple[int, int, float]]:
-        normalized_onsets: list[tuple[float, float]] = []
-        for raw_onset in raw_onsets:
-            coerced = self._coerce_onset(raw_onset)
-            if coerced is not None:
-                normalized_onsets.append(coerced)
+        window_size = max(256, int(sample_rate * 0.02))
+        hop_size = max(128, int(sample_rate * 0.005))
+        refractory_samples = max(hop_size, int(sample_rate * 0.07))
+        max_hit_samples = int(sample_rate * 0.14)
+        min_hit_samples = int(sample_rate * 0.05)
+        backtrack_frames = max(2, int(round(0.02 / max(0.001, hop_size / sample_rate))))
 
-        normalized_onsets.sort(key=lambda item: item[0])
+        frame_levels: list[tuple[int, float, float, float]] = []
+        previous_level = 0.0
+        previous_high = 0.0
+        max_strength = 0.0
+
+        for start in range(0, len(samples), hop_size):
+            end = min(len(samples), start + window_size)
+            if end <= start:
+                continue
+
+            frame = samples[start:end]
+            level = sum(abs(sample) for sample in frame) / len(frame)
+            high_level = self._estimate_high_band_level(frame)
+            low_level = max(0.0, level - high_level)
+            energy_rise = max(0.0, level - previous_level)
+            high_rise = max(0.0, high_level - previous_high)
+            onset_strength = (energy_rise * 0.55) + (high_rise * 0.45) + max(0.0, level - low_level) * 0.05
+            frame_levels.append((start, level, high_level, onset_strength))
+            max_strength = max(max_strength, onset_strength)
+            previous_level = level
+            previous_high = high_level
+
+        if max_strength <= 0.0:
+            return []
+
+        strength_threshold = max(0.01, max_strength * 0.32)
+        level_threshold = max(0.015, max(level for _, level, _, _ in frame_levels) * 0.18)
+        peak_indices: list[int] = []
+        last_peak_start = -refractory_samples
+
+        for index, (frame_start, level, _, onset_strength) in enumerate(frame_levels):
+            if level < level_threshold or onset_strength < strength_threshold:
+                continue
+
+            left_strength = frame_levels[index - 1][3] if index > 0 else onset_strength
+            right_strength = frame_levels[index + 1][3] if index + 1 < len(frame_levels) else onset_strength
+            if onset_strength < left_strength or onset_strength < right_strength:
+                continue
+            if frame_start - last_peak_start < refractory_samples:
+                continue
+
+            peak_indices.append(index)
+            last_peak_start = frame_start
+
         hits: list[tuple[int, int, float]] = []
+        for peak_position, frame_index in enumerate(peak_indices):
+            frame_start, _, _, _ = frame_levels[frame_index]
+            backtrack_start = max(0, frame_index - backtrack_frames)
+            candidate_frames = frame_levels[backtrack_start : frame_index + 1]
+            best_frame = min(candidate_frames, key=lambda item: item[1])
+            start_sample = best_frame[0]
 
-        for index, (onset_sec, onset_confidence) in enumerate(normalized_onsets):
-            start_sample = max(0, int(round(onset_sec * sample_rate)))
-            next_onset_sec = normalized_onsets[index + 1][0] if index + 1 < len(normalized_onsets) else None
-            max_hit_sec = 0.14
-            min_hit_sec = 0.05
-            if next_onset_sec is None:
-                duration_sec = max_hit_sec
-            else:
-                duration_sec = min(max_hit_sec, max(min_hit_sec, next_onset_sec - onset_sec - 0.01))
-
-            end_sample = min(len(samples), start_sample + int(round(duration_sec * sample_rate)))
-            if end_sample - start_sample < max(1, int(round(0.05 * sample_rate))):
+            next_start = (
+                frame_levels[peak_indices[peak_position + 1]][0]
+                if peak_position + 1 < len(peak_indices)
+                else min(len(samples), frame_start + max_hit_samples)
+            )
+            end_sample = min(len(samples), max(start_sample + min_hit_samples, min(frame_start + max_hit_samples, next_start)))
+            if end_sample <= start_sample:
                 continue
 
             segment = samples[start_sample:end_sample]
@@ -384,8 +424,7 @@ class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
             if peak_level <= 0.0:
                 continue
 
-            peak_level = min(1.0, max(peak_level, onset_confidence))
-            hits.append((start_sample, end_sample, peak_level))
+            hits.append((start_sample, end_sample, min(1.0, peak_level)))
 
         return hits
 
@@ -429,26 +468,13 @@ class MadmomDrumTranscriptionProvider(DrumTranscriptionProvider):
         notes.sort(key=lambda note: (note.onset_sec, note.midi_note or 0, note.id))
         return notes
 
-    def _coerce_onset(self, raw_onset: Any) -> Optional[tuple[float, float]]:
-        onset_sec: Optional[float] = None
-        confidence: Optional[float] = None
-
-        if isinstance(raw_onset, dict):
-            onset_sec = _coerce_float(raw_onset.get("onsetSec", raw_onset.get("time", raw_onset.get("onset"))))
-            confidence = _coerce_float(raw_onset.get("confidence", raw_onset.get("strength")))
-        elif isinstance(raw_onset, Sequence) and not isinstance(raw_onset, (str, bytes, bytearray)):
-            if len(raw_onset) >= 1:
-                onset_sec = _coerce_float(raw_onset[0])
-            if len(raw_onset) >= 2:
-                confidence = _coerce_float(raw_onset[1])
-        else:
-            onset_sec = _coerce_float(raw_onset)
-
-        if onset_sec is None or onset_sec < 0:
-            return None
-
-        safe_confidence = 0.8 if confidence is None else max(0.0, min(1.0, confidence))
-        return onset_sec, safe_confidence
+    def _estimate_high_band_level(self, frame: list[float]) -> float:
+        low_pass_value = 0.0
+        high_total = 0.0
+        for sample in frame:
+            low_pass_value = (low_pass_value * 0.95) + (sample * 0.05)
+            high_total += abs(sample - low_pass_value)
+        return high_total / max(1, len(frame))
 
 
 class FallbackDrumTranscriptionProvider(DrumTranscriptionProvider):
@@ -490,22 +516,16 @@ def build_drum_transcription_provider(settings: Settings) -> DrumTranscriptionPr
 def _create_provider(provider_id: str, settings: Settings) -> DrumTranscriptionProvider:
     if provider_id == DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC:
         return HeuristicWavDrumTranscriptionProvider()
-    if provider_id in {DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM}:
-        return MadmomDrumTranscriptionProvider(
-            python_executable=settings.drum_transcription_ml_python,
+    if provider_id == DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET or provider_id in LEGACY_ENHANCED_DRUM_PROVIDER_IDS:
+        return DemucsOnsetDrumTranscriptionProvider(
+            python_executable=settings.drum_transcription_ml_python or settings.source_separation_demucs_python,
+            model_name=settings.source_separation_demucs_model,
+            device=settings.source_separation_demucs_device,
+            drums_source_name=settings.source_separation_demucs_drums_source,
             minimum_confidence=settings.drum_transcription_ml_min_confidence,
         )
 
     raise ValueError(f"Unsupported drum transcription provider '{provider_id}'.")
-
-
-def _coerce_float(value: Any) -> Optional[float]:
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _dedupe_warnings(warnings: List[str]) -> List[str]:

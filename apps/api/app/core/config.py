@@ -8,6 +8,23 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+def get_default_local_cors_origins() -> List[str]:
+    return [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+
+
+def parse_cors_origins(raw_value: Optional[str]) -> List[str]:
+    if not raw_value:
+        return get_default_local_cors_origins()
+
+    parsed_origins = [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+    return parsed_origins or get_default_local_cors_origins()
+
+
 class Settings(BaseModel):
     app_name: str = "AI Sheet Music Generator API"
     api_prefix: str = "/api/v1"
@@ -17,10 +34,17 @@ class Settings(BaseModel):
     stems_dir: Path = Path(__file__).resolve().parents[2] / "data" / "stems"
     drafts_dir: Path = Path(__file__).resolve().parents[2] / "data" / "drafts"
     projects_dir: Path = Path(__file__).resolve().parents[2] / "data" / "projects"
+    provider_runtime_dir: Path = Path(__file__).resolve().parents[2] / "data" / "providers"
+    provider_install_logs_dir: Path = Path(__file__).resolve().parents[2] / "data" / "providers" / "logs"
+    provider_install_cache_dir: Path = Path(__file__).resolve().parents[2] / "data" / "providers" / "cache"
+    provider_install_state_file: Path = Path(__file__).resolve().parents[2] / "data" / "providers" / "install-state.json"
+    custom_provider_registry_dir: Path = Path(__file__).resolve().parents[2] / "data" / "providers" / "custom"
+    custom_provider_registry_file: Path = Path(__file__).resolve().parents[2] / "data" / "providers" / "custom-registry.json"
     max_upload_size_bytes: int = 200 * 1024 * 1024
     upload_stream_chunk_size_bytes: int = 1024 * 1024
     ffmpeg_executable: Optional[str] = None
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    cors_origins: List[str] = get_default_local_cors_origins()
+    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     source_separation_provider: str = "development-copy"
     source_separation_fallback_provider: Optional[str] = None
     source_separation_demucs_python: Optional[str] = None
@@ -44,6 +68,8 @@ def get_settings() -> Settings:
         max_upload_size_bytes=int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(200 * 1024 * 1024))),
         upload_stream_chunk_size_bytes=int(os.getenv("UPLOAD_STREAM_CHUNK_SIZE_BYTES", str(1024 * 1024))),
         ffmpeg_executable=os.getenv("FFMPEG_EXECUTABLE"),
+        cors_origins=parse_cors_origins(os.getenv("CORS_ORIGINS")),
+        cors_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"),
         source_separation_provider=os.getenv("SOURCE_SEPARATION_PROVIDER", "development-copy"),
         source_separation_fallback_provider=os.getenv("SOURCE_SEPARATION_FALLBACK_PROVIDER"),
         source_separation_demucs_python=os.getenv("SOURCE_SEPARATION_DEMUCS_PYTHON"),
@@ -65,4 +91,8 @@ def get_settings() -> Settings:
     settings.stems_dir.mkdir(parents=True, exist_ok=True)
     settings.drafts_dir.mkdir(parents=True, exist_ok=True)
     settings.projects_dir.mkdir(parents=True, exist_ok=True)
+    settings.provider_runtime_dir.mkdir(parents=True, exist_ok=True)
+    settings.provider_install_logs_dir.mkdir(parents=True, exist_ok=True)
+    settings.provider_install_cache_dir.mkdir(parents=True, exist_ok=True)
+    settings.custom_provider_registry_dir.mkdir(parents=True, exist_ok=True)
     return settings

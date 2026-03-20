@@ -2,6 +2,112 @@
 
 ## Decision Log
 
+### 2026-03-21
+Decision:
+- Replace `madmom` as the practical official enhanced drum path with `demucs-drums`, which reuses Demucs stem isolation plus deterministic rule-based onset detection.
+
+Context:
+- Keep the official enhanced-provider layering intact while making the enhanced drum path more installable and maintainable inside the existing local-first backend.
+- Product scope still requires explicit backend-owned install logic and compact UI wording without turning provider installs into a generic package manager.
+
+Chosen option:
+- Keep the built-in heuristic drum provider as the stable fallback and do not change `Auto`, `JobResult`, or the main pipeline shape.
+- Reuse the existing Demucs integration rather than adding a separate heavy drum dependency.
+- Keep install logs and structured install status intact.
+- Surface concise metadata and UI copy that makes `Demucs Drums` the enhanced path and the built-in heuristic drum provider the stable fallback.
+
+Tradeoffs:
+- Keep the rule-based onset detector intentionally lightweight and deterministic; it improves maintainability, not guaranteed full drum notation accuracy.
+
+### 2026-03-20
+Decision:
+- Surface custom-provider registration inside the existing Advanced Runtime Options area instead of creating a separate provider-management screen.
+
+Context:
+- The backend now exposes a narrow custom-provider registration path, but product constraints still require the runtime/provider UX to stay compact and non-dashboard-like.
+- Custom providers are not execution-ready in this phase, so the UI needed to emphasize registration and diagnostics rather than selection semantics.
+
+Chosen option:
+- Add a small "Add custom provider" flow directly in the existing runtime options panel.
+- Keep source type fixed to the backend-supported manifest URL path.
+- Accept only a local `file://...json` manifest URL in the UI copy and input flow.
+- Reuse the existing install-status polling path and refresh runtime diagnostics after completion.
+- Render registered custom providers in a distinct compact section, clearly separate from the fixed official enhanced options.
+
+Tradeoffs:
+- This keeps the product surface focused and architecture-aligned, but detailed management features such as edit/remove/log browsing remain deferred.
+- The runtime copy must stay explicit that custom registration is diagnostic-only and does not make a provider execution-ready.
+
+### 2026-03-20
+Decision:
+- Fix the official enhanced-provider set to demucs, basic-pitch, and demucs-drums, and route future extra providers through a controlled custom manifest registration path instead of adding more built-in official enhanced providers.
+
+Context:
+- The backend already supported optional enhanced provider installs for the current official set, but there was no explicit architectural distinction between "official enhanced" and future third-party/custom extensions.
+- Product scope required preserving `Auto`, preserving the current compact runtime UX direction, and avoiding a generic arbitrary-code execution installer.
+
+Chosen option:
+- Mark built-in base providers, official enhanced providers, and custom providers distinctly in runtime/provider metadata.
+- Keep the official enhanced set fixed and explicit: demucs, basic-pitch, demucs-drums.
+- Add a backend-owned custom-provider registry stored under local app data.
+- Add a separate custom install request path that currently accepts only a local `file://` manifest URL, validates manifest structure and declared local assets, and copies those files into app-managed storage.
+- Surface registered custom providers distinctly in runtime diagnostics without wiring them into the main Auto pipeline in this step.
+
+Tradeoffs:
+- This keeps the backend safe and reviewable, but it intentionally does not create a generic plugin marketplace or a fully runtime-selectable custom-provider execution path yet.
+- Restricting the first custom source to local `file://` manifest URLs is narrower than a remote URL design, but it preserves the app's local-first posture and avoids broad installer risk in this phase.
+
+### 2026-03-20
+Decision:
+- Keep optional enhanced-provider UX polish in-place inside existing Advanced Runtime Options and result surfaces, with no separate management page.
+
+Context:
+- Install triggers and status polling were already implemented, but wording and fallback visibility still felt too engineering-heavy for normal product use.
+
+Chosen option:
+- Tighten install/retry/failure copy to stay compact and action-oriented.
+- Keep failure guidance to the shortest actionable step instead of dumping long lists.
+- Add a lightweight result-side summary showing requested mode vs provider actually used, including fallback detection hints.
+
+Tradeoffs:
+- This improves day-to-day clarity without scope growth, but full install log/history viewing remains deferred to advanced-only future work.
+
+### 2026-03-20
+Decision:
+- Implement optional enhanced-provider install UX directly inside existing Advanced Runtime Options provider-selection cards, with compact inline actions and backend status polling.
+
+Context:
+- Backend install and diagnostics foundations were already in place, but users still needed to leave provider selection semantics mentally to understand how to install unavailable enhanced providers.
+- Product constraints required keeping the runtime panel compact and avoiding a separate package-manager style admin screen.
+
+Chosen option:
+- Keep `Auto` prominent and unchanged as the default.
+- Keep built-in provider options simple and immediately selectable.
+- Add inline `Install`, `Retry Install`, and `Install & Use` actions only for optional enhanced providers when unavailable.
+- Poll backend install status in a compact way and refresh runtime availability after completion.
+
+Tradeoffs:
+- This keeps scope tight and user flow clear, but detailed install history/log UI is deferred.
+
+### 2026-03-20
+Decision:
+- Add an additive backend provider-capability and install-management foundation for optional enhanced providers, while preserving current defaults and fallback behavior.
+
+Context:
+- Runtime diagnostics already exposed selected provider and availability at a basic level, but productized optional stronger providers needed explicit metadata, install state, and backend-owned install actions.
+- The app must stay local-first and should not force heavy model/runtime downloads during normal install/startup.
+
+Chosen option:
+- Keep the existing built-in provider layer unchanged as default behavior.
+- Introduce provider capability manifests for known options (including demucs, basic-pitch, demucs-drums).
+- Extend runtime diagnostics provider options with additive metadata (installed, available, installable, missing reason, help/status text, layer flags, recommendation).
+- Add explicit backend install actions plus install-status tracking with structured started/completed/failed responses and actionable failure reasons.
+- Keep install state/log ownership on backend-local filesystem paths.
+
+Tradeoffs:
+- Adds backend runtime metadata/installation complexity, but keeps the pipeline contract stable and avoids frontend-buried install logic.
+- Installation remains environment-sensitive (local Python + package compatibility), so failures are surfaced with structured guidance rather than hidden retries.
+
 ### 2026-03-20
 Decision:
 - Fill the existing pipeline gap with a small backend-local ffmpeg preprocessing stage instead of redesigning provider boundaries or changing the draft/result architecture.
@@ -134,3 +240,5 @@ Chosen option:
 
 Tradeoffs:
 - The result is more distinctive and better aligned across pages, but it intentionally abstracts the artwork into CSS layers and decorative overlays instead of showing a literal full-screen fantasy scene.
+
+

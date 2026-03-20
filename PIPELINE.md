@@ -1,18 +1,5 @@
-audio upload
- ↓
-audio normalization
- ↓
-source separation
- ↓
-transcription
- ↓
-post_processing
- ↓
-tracks
- ↓
-(export phase6)
- ↓
-preview rendering (phase7)
+﻿audio upload
+ upload -> job creation -> source separation -> transcription -> post-processing -> JobResult
 
 Phase 8 editing update:
 - after `tracks`, the frontend now clones a draft result for manual note correction before export
@@ -52,7 +39,7 @@ Phase 11B piano transcription update:
 Phase 11C drum transcription update:
 - the transcription stage now selects the drum backend explicitly through configuration instead of always using the heuristic WAV provider
 - `heuristic` remains available for local development and deterministic fallback
-- `ml` and `madmom` can be enabled as stronger drum backends when madmom is installed in the configured Python environment
+- `demucs-drums` is the practical enhanced drum backend, reusing Demucs drum-stem isolation plus deterministic onset rules when Demucs is installed in the configured Python environment
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized drum note events still flow into the same post-processing stage and the same `JobResult` structure
 - the stronger drum path keeps output mapped to the stable `kick`, `snare`, and `hi-hat` lanes expected by the current editor workflow
@@ -116,3 +103,13 @@ Phase 13L local project system update:
 - import restores that package into the managed local library as a new independent local project instance with a fresh local `projectId`
 - imported original-result and saved-draft artifacts remain separate, and imported draft note ids are re-namespaced to the new local project id
 - missing optional packaged assets are surfaced honestly; Phase 13L still does not recover in-progress background job execution
+
+Provider foundation update:
+- the main transcription pipeline remains unchanged: upload -> normalization -> separation -> transcription -> post-processing -> normalized `JobResult`
+- built-in base providers remain the default out-of-the-box execution path
+- the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums
+- official enhanced providers still use the existing explicit backend install flow
+- custom providers now have a separate backend registration path based on a validated local `file://` manifest URL plus app-managed local asset storage
+- in this step, custom providers are surfaced in runtime diagnostics only; they are not yet wired into the main provider-selection execution path or `Auto` pipeline behavior
+
+

@@ -10,12 +10,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import Settings
 from app.models.schemas import StemAsset
 from app.pipeline.drum_transcription import (
+    DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET,
     DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
     DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
     DRUM_TRANSCRIPTION_PROVIDER_ML,
+    DemucsOnsetDrumTranscriptionProvider,
     FallbackDrumTranscriptionProvider,
     HeuristicWavDrumTranscriptionProvider,
-    MadmomDrumTranscriptionProvider,
     build_drum_transcription_provider,
 )
 from app.pipeline.interfaces import SourceStem
@@ -23,40 +24,34 @@ from app.pipeline.interfaces import SourceStem
 
 class DrumTranscriptionProviderSelectionTests(unittest.TestCase):
     def test_build_drum_provider_uses_explicit_heuristic_provider(self) -> None:
-        provider = build_drum_transcription_provider(
-            Settings(
-                drum_transcription_provider=DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
-            )
-        )
-
+        provider = build_drum_transcription_provider(Settings(drum_transcription_provider=DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC))
         self.assertIsInstance(provider, HeuristicWavDrumTranscriptionProvider)
 
-    def test_build_drum_provider_wraps_ml_provider_with_configured_fallback(self) -> None:
+    def test_build_drum_provider_wraps_enhanced_provider_with_configured_fallback(self) -> None:
         provider = build_drum_transcription_provider(
             Settings(
-                drum_transcription_provider=DRUM_TRANSCRIPTION_PROVIDER_ML,
+                drum_transcription_provider=DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET,
                 drum_transcription_fallback_provider=DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC,
             )
         )
-
         self.assertIsInstance(provider, FallbackDrumTranscriptionProvider)
 
-    def test_ml_provider_normalizes_drum_hits_into_noteevent_shape(self) -> None:
-        provider = StubMadmomDrumProvider(
-            onsets=[
-                {"onsetSec": 0.1, "confidence": 0.95},
-                [0.7, 0.7],
-                1.4,
-                {"onsetSec": -0.1, "confidence": 0.8},
-            ]
-        )
+    def test_legacy_provider_aliases_resolve_to_demucs_onset_provider(self) -> None:
+        for provider_id in (DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET, DRUM_TRANSCRIPTION_PROVIDER_ML, DRUM_TRANSCRIPTION_PROVIDER_MADMOM):
+            provider = build_drum_transcription_provider(Settings(drum_transcription_provider=provider_id))
+            if isinstance(provider, FallbackDrumTranscriptionProvider):
+                self.fail("Legacy alias unexpectedly returned a fallback wrapper.")
+            self.assertIsInstance(provider, DemucsOnsetDrumTranscriptionProvider)
+
+    def test_demucs_onset_provider_normalizes_hits_into_noteevent_shape(self) -> None:
+        provider = DemucsOnsetDrumTranscriptionProvider(python_executable="Z:/not-used/python.exe")
 
         with TemporaryDirectory() as temp_dir:
             stem_path = Path(temp_dir) / "drums.wav"
             self._write_test_stem(stem_path)
-            result = provider.transcribe(_build_source_stem(stem_path))
+            result = provider.transcribe(_build_source_stem(stem_path, source_provider="demucs-separation"))
 
-        self.assertEqual(result.provider_name, "madmom-drum-provider")
+        self.assertEqual(result.provider_name, "demucs-onset-drum-provider")
         self.assertEqual(result.instrument, "drums")
         self.assertEqual(result.source_stem, "drum_stem")
         self.assertGreaterEqual(len(result.notes), 3)
@@ -68,29 +63,27 @@ class DrumTranscriptionProviderSelectionTests(unittest.TestCase):
         self.assertTrue(all(note.midi_note is not None for note in result.notes))
         self.assertTrue(all(note.velocity is not None for note in result.notes))
         self.assertTrue(all(note.confidence is not None for note in result.notes))
-        self.assertTrue(all(note.bar is not None for note in result.notes))
-        self.assertTrue(all(note.beat is not None for note in result.notes))
+        self.assertTrue(any("persisted Demucs drum stem" in warning for warning in result.warnings))
 
-    def test_ml_provider_falls_back_to_heuristic_when_runtime_is_unavailable(self) -> None:
+    def test_enhanced_provider_falls_back_to_heuristic_when_demucs_runtime_is_unavailable(self) -> None:
         provider = FallbackDrumTranscriptionProvider(
-            primary=MadmomDrumTranscriptionProvider(python_executable="Z:/missing/python.exe"),
+            primary=DemucsOnsetDrumTranscriptionProvider(python_executable="Z:/missing/python.exe"),
             fallback=HeuristicWavDrumTranscriptionProvider(),
         )
 
         with TemporaryDirectory() as temp_dir:
             stem_path = Path(temp_dir) / "drums.wav"
             self._write_test_stem(stem_path)
-            result = provider.transcribe(_build_source_stem(stem_path))
+            result = provider.transcribe(_build_source_stem(stem_path, source_provider="local-development-separation"))
 
         self.assertEqual(result.provider_name, "heuristic-wav-drum-provider")
-        self.assertIn("Configured drum transcription provider 'madmom-drum-provider' was unavailable", result.warnings[0])
+        self.assertIn("Configured drum transcription provider 'demucs-onset-drum-provider' was unavailable", result.warnings[0])
         self.assertIn(
             "Drum transcription is now a real heuristic MVP provider that consumes the persisted drum stem and currently supports only uncompressed PCM .wav stems.",
             result.warnings,
         )
 
     def _write_test_stem(self, target_path: Path) -> None:
-        import math
         import wave
 
         sample_rate = 44100
@@ -117,11 +110,7 @@ class DrumTranscriptionProviderSelectionTests(unittest.TestCase):
     def _build_drum_hit(self, label: str, sample_rate: int, amplitude: int) -> list[int]:
         import math
 
-        duration_lookup = {
-            "kick": 0.12,
-            "snare": 0.1,
-            "hihat": 0.05,
-        }
+        duration_lookup = {"kick": 0.12, "snare": 0.1, "hihat": 0.05}
         duration_sec = duration_lookup[label]
         hit_samples = int(sample_rate * duration_sec)
         output: list[int] = []
@@ -149,16 +138,7 @@ class DrumTranscriptionProviderSelectionTests(unittest.TestCase):
         return output
 
 
-class StubMadmomDrumProvider(MadmomDrumTranscriptionProvider):
-    def __init__(self, onsets: list[object]) -> None:
-        super().__init__(python_executable=sys.executable)
-        self._onsets = onsets
-
-    def _run_madmom(self, audio_path: Path) -> list[object]:
-        return list(self._onsets)
-
-
-def _build_source_stem(stem_path: Path) -> SourceStem:
+def _build_source_stem(stem_path: Path, *, source_provider: str) -> SourceStem:
     return SourceStem(
         stem_name="drum_stem",
         instrument_hint="drums",
@@ -166,7 +146,7 @@ def _build_source_stem(stem_path: Path) -> SourceStem:
         stem_asset=StemAsset(
             stemName="drum_stem",
             instrumentHint="drums",
-            provider=DRUM_TRANSCRIPTION_PROVIDER_MADMOM,
+            provider=source_provider,
             storedPath="data/stems/job-test/drums.wav",
             fileName=stem_path.name,
             fileFormat=stem_path.suffix.lstrip("."),

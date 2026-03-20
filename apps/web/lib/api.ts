@@ -1,6 +1,8 @@
 import type {
   AnalyzeDraftRequest,
   AnalyzeDraftResponse,
+  CustomProviderInstallActionResponse,
+  CustomProviderInstallRequest,
   CreateJobRequest,
   DuplicateProjectRequest,
   ExportProjectRequest,
@@ -9,6 +11,9 @@ import type {
   ProjectDeleteResponse,
   ProjectListResponse,
   ProjectPackagingResponse,
+  ProviderInstallActionResponse,
+  ProviderInstallRequest,
+  ProviderInstallStatusResponse,
   JobExportRequest,
   JobResponse,
   OpenLocalProjectRequest,
@@ -114,6 +119,44 @@ export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnosticsRespons
   });
 
   return parseJson<RuntimeDiagnosticsResponse>(response);
+}
+
+export async function installEnhancedProvider(
+  providerId: string,
+  payload: ProviderInstallRequest = {}
+): Promise<ProviderInstallActionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runtime/providers/${providerId}/install`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return parseJson<ProviderInstallActionResponse>(response);
+}
+
+export async function getProviderInstallStatus(installId: string): Promise<ProviderInstallStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runtime/providers/install/${installId}`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  return parseJson<ProviderInstallStatusResponse>(response);
+}
+
+export async function installCustomProvider(
+  payload: CustomProviderInstallRequest
+): Promise<CustomProviderInstallActionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/runtime/providers/custom/install`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return parseJson<CustomProviderInstallActionResponse>(response);
 }
 
 export async function openLocalProject(path: string): Promise<ProjectPackagingResponse> {

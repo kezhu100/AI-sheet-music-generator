@@ -23,7 +23,7 @@ export interface CreateJobRequest {
 
 export type SourceSeparationProviderPreference = "auto" | "development-copy" | "demucs";
 export type PianoTranscriptionProviderPreference = "auto" | "heuristic" | "basic-pitch";
-export type DrumTranscriptionProviderPreference = "auto" | "heuristic" | "madmom";
+export type DrumTranscriptionProviderPreference = "auto" | "heuristic" | "demucs-drums";
 
 export interface ProviderPreferences {
   sourceSeparation?: SourceSeparationProviderPreference;
@@ -221,6 +221,12 @@ export interface ProjectPackagingResponse {
 
 export type RuntimeSeverity = "ready" | "degraded" | "blocking";
 export type RuntimeCheckStatus = "ready" | "optional-missing" | "degraded-fallback" | "blocking-misconfigured";
+export type ProviderCategory = "source-separation" | "piano-transcription" | "drum-transcription";
+export type ProviderLayer = "built_in_base" | "official_enhanced" | "custom";
+export type ProviderInstallActionStatus = "started" | "completed" | "failed";
+export type ProviderInstallState = "started" | "running" | "completed" | "failed";
+export type CustomProviderInstallSourceType = "manifest_url";
+export type CustomProviderSourceTransport = "file";
 
 export interface RuntimeStorageStatus {
   key: string;
@@ -242,12 +248,43 @@ export interface RuntimeProviderStatus {
   guidance: string[];
   optional: boolean;
   options: RuntimeProviderOption[];
+  customProviders: RuntimeCustomProvider[];
 }
 
 export interface RuntimeProviderOption {
+  id: string;
+  category: ProviderCategory;
+  displayName: string;
+  providerLayer: ProviderLayer;
+  builtIn: boolean;
+  optionalEnhanced: boolean;
   provider: string;
   label: string;
+  installed: boolean;
   available: boolean;
+  installable: boolean;
+  recommended: boolean;
+  missingReason?: string | null;
+  helpText: string;
+  statusText: string;
+  actionableSteps: string[];
+  detail: string;
+}
+
+export interface RuntimeCustomProvider {
+  providerId: string;
+  category: ProviderCategory;
+  displayName: string;
+  providerLayer: ProviderLayer;
+  sourceType: CustomProviderInstallSourceType;
+  sourceTransport: CustomProviderSourceTransport;
+  providerVersion: string;
+  manifestUrl: string;
+  manifestPath: string;
+  installed: boolean;
+  available: boolean;
+  assetCount: number;
+  statusText: string;
   detail: string;
 }
 
@@ -259,6 +296,56 @@ export interface RuntimeDiagnosticsResponse {
   storage: RuntimeStorageStatus[];
   providers: RuntimeProviderStatus[];
   constraints: string[];
+}
+
+export interface ProviderInstallRequest {
+  forceReinstall?: boolean;
+}
+
+export interface CustomProviderInstallRequest {
+  sourceType: CustomProviderInstallSourceType;
+  manifestUrl: string;
+  forceReinstall?: boolean;
+}
+
+export interface ProviderInstallActionResponse {
+  status: ProviderInstallActionStatus;
+  providerId: string;
+  category?: ProviderCategory | null;
+  installId?: string | null;
+  message: string;
+  failureReason?: string | null;
+  actionableSteps: string[];
+}
+
+export interface ProviderInstallRecord {
+  installId: string;
+  providerId: string;
+  category: ProviderCategory;
+  providerLayer: ProviderLayer;
+  state: ProviderInstallState;
+  startedAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+  message: string;
+  failureReason?: string | null;
+  actionableSteps: string[];
+  logPath?: string | null;
+}
+
+export interface ProviderInstallStatusResponse {
+  status: "ok";
+  install: ProviderInstallRecord;
+}
+
+export interface CustomProviderInstallActionResponse {
+  status: ProviderInstallActionStatus;
+  providerId?: string | null;
+  category?: ProviderCategory | null;
+  installId?: string | null;
+  message: string;
+  failureReason?: string | null;
+  actionableSteps: string[];
 }
 
 export interface JobProgress {
