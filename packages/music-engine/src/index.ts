@@ -3,6 +3,7 @@ export {
   addNote,
   applyCorrectionSuggestion,
   areJobResultsEqual,
+  buildDraftComparisonBaseline,
   buildDraftNoteId,
   cloneJobResult,
   DEFAULT_DRUM_MIDI_NOTE,

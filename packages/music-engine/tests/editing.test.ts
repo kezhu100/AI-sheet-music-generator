@@ -3,6 +3,8 @@ import type { JobResult } from "@ai-sheet-music-generator/shared-types";
 import {
   addNote,
   applyCorrectionSuggestion,
+  areJobResultsEqual,
+  buildDraftComparisonBaseline,
   buildDraftNoteId,
   deleteNote,
   deleteNotes,
@@ -98,6 +100,26 @@ runTest("resetDraftFromOriginal can namespace draft note ids for duplicated proj
     draft.tracks[0].notes[0].draftNoteId,
     buildDraftNoteId(getTrackKey(draft.tracks[0]), "piano-a", "duplicate-project")
   );
+});
+
+runTest("buildDraftComparisonBaseline keeps a fresh namespaced draft clean on initialization", () => {
+  const original = createOriginalResult();
+  const namespacedDraft = resetDraftFromOriginal(original, { draftIdNamespace: "job-123" });
+  const baseline = buildDraftComparisonBaseline(original, null, { draftIdNamespace: "job-123" });
+
+  assert.ok(baseline);
+  assert.equal(areJobResultsEqual(namespacedDraft, baseline), true);
+});
+
+runTest("buildDraftComparisonBaseline avoids the legacy false dirty comparison on first load", () => {
+  const original = createOriginalResult();
+  const namespacedDraft = resetDraftFromOriginal(original, { draftIdNamespace: "job-123" });
+  const legacyBaseline = resetDraftFromOriginal(original);
+  const fixedBaseline = buildDraftComparisonBaseline(original, null, { draftIdNamespace: "job-123" });
+
+  assert.equal(areJobResultsEqual(namespacedDraft, legacyBaseline), false);
+  assert.ok(fixedBaseline);
+  assert.equal(areJobResultsEqual(namespacedDraft, fixedBaseline), true);
 });
 
 runTest("selectNote finds notes by draftNoteId", () => {

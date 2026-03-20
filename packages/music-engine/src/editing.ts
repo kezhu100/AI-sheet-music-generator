@@ -70,6 +70,22 @@ export interface CloneJobResultOptions {
   draftIdNamespace?: string;
 }
 
+export function buildDraftComparisonBaseline(
+  originalResult: JobResult | null,
+  savedDraftResult: JobResult | null,
+  options?: CloneJobResultOptions
+): JobResult | null {
+  if (savedDraftResult) {
+    return savedDraftResult;
+  }
+
+  if (!originalResult) {
+    return null;
+  }
+
+  return resetDraftFromOriginal(originalResult, options);
+}
+
 export function cloneJobResult(result: JobResult, options?: CloneJobResultOptions): JobResult {
   return {
     ...result,

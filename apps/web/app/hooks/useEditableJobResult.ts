@@ -5,6 +5,7 @@ import {
   addNote,
   applyCorrectionSuggestion,
   areJobResultsEqual,
+  buildDraftComparisonBaseline,
   cloneJobResult,
   deleteNotes,
   moveNotesByDelta,
@@ -169,7 +170,9 @@ export function useEditableJobResult(
   }, [jobId, result, savedDraft]);
 
   const activeResult = draftResult ?? result ?? null;
-  const baselineDraftResult = savedDraftResult ?? (originalResult ? resetDraftFromOriginal(originalResult) : null);
+  const baselineDraftResult = buildDraftComparisonBaseline(originalResult, savedDraftResult, {
+    draftIdNamespace: jobId ?? undefined
+  });
   const isDraftDirty = useMemo(
     () => !areJobResultsEqual(draftResult, baselineDraftResult),
     [baselineDraftResult, draftResult]

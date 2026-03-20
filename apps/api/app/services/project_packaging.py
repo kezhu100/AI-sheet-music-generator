@@ -428,19 +428,61 @@ class ProjectPackagingService:
             return None
 
     def _resolve_fallback_source_path(self, stored_path: str, source_root: Optional[Path]) -> Optional[Path]:
-        candidate_paths: list[Path] = []
         if source_root is not None:
-            candidate_paths.append(source_root / Path(stored_path).name)
-            candidate_paths.append(source_root / stored_path)
-            candidate_paths.append(source_root.parent / stored_path)
-        candidate_paths.append(self._settings.project_root / stored_path)
+            resolved_source_root = source_root.resolve(strict=True)
+            stored_path_value = self._validate_manifest_asset_path(stored_path, resolved_source_root)
 
-        for candidate in candidate_paths:
-            try:
-                if candidate.exists():
-                    return candidate
-            except OSError:
-                continue
+            candidate_paths = [
+                resolved_source_root / Path(stored_path_value).name,
+                resolved_source_root / stored_path_value,
+            ]
+            for candidate in candidate_paths:
+                resolved_candidate = self._resolve_candidate_within_root(candidate, resolved_source_root)
+                if resolved_candidate is not None:
+                    return resolved_candidate
+
+        project_root_candidate = self._settings.project_root / stored_path
+        try:
+            if project_root_candidate.exists():
+                return project_root_candidate
+        except OSError:
+            return None
+        return None
+
+    def _validate_manifest_asset_path(self, stored_path: str, source_root: Path) -> str:
+        trimmed_path = stored_path.strip()
+        if not trimmed_path:
+            raise ProjectPackagingError("Invalid manifest asset path: path must not be empty.")
+
+        manifest_asset_path = Path(trimmed_path)
+        if manifest_asset_path.is_absolute():
+            raise ProjectPackagingError(
+                "Invalid manifest asset path: asset paths must stay within the selected local project folder."
+            )
+
+        resolved_manifest_path = (source_root / manifest_asset_path).resolve(strict=False)
+        try:
+            resolved_manifest_path.relative_to(source_root)
+        except ValueError as exc:
+            raise ProjectPackagingError(
+                "Invalid manifest asset path: asset paths must stay within the selected local project folder."
+            ) from exc
+
+        return trimmed_path
+
+    def _resolve_candidate_within_root(self, candidate: Path, source_root: Path) -> Optional[Path]:
+        try:
+            resolved_candidate = candidate.resolve(strict=False)
+            resolved_candidate.relative_to(source_root)
+        except (OSError, ValueError):
+            return None
+
+        try:
+            if resolved_candidate.exists():
+                return resolved_candidate
+        except OSError:
+            return None
+
         return None
 
     def _build_stem_archive_name(self, stem_name: str, file_name: str) -> str:
