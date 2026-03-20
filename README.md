@@ -88,7 +88,7 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 ```bash
 npm install
 npm run app
-
+```
 Local dependency note / 本地依赖说明：
 
 npm install now brings in a project-local ffmpeg binary automatically for compressed or non-PCM inputs
@@ -122,7 +122,7 @@ Open the local URL printed in the terminal.
 ```bash
 cd apps/api
 ./venv/Scripts/python -m pip install -r requirements-dev.txt
-
+```
 Required for backend API tests (e.g. httpx)
 用于运行后端 API 测试（例如 httpx）
 
@@ -176,6 +176,7 @@ packages/shared-types: shared request/response types
 
 packages/music-engine: music-domain utilities
 音乐处理逻辑模块
+```
 
 ## 🎯 Design Philosophy / 设计理念
 
