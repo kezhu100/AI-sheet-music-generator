@@ -77,6 +77,18 @@ Phase 11F AI-assisted correction update:
 - the frontend highlights notes with suggestions and lets the user apply a suggestion as one undoable draft edit through the existing editing helpers
 - the draft remains the single editable state, saved drafts still store only edited `JobResult` data, and the normalized `JobResult` schema remains unchanged
 
+Phase 11G local audio normalization update:
+- the documented normalization stage now performs real backend-local preprocessing instead of acting as a placeholder stage label only
+- the backend converts common input formats such as `.mp3`, `.m4a`, `.aac`, and `.flac` into a job-scoped PCM WAV intermediate before source separation and transcription
+- compatible PCM WAV uploads still work and are copied into the same normalized handoff location without unnecessary transcoding
+- preprocessing fails fast and clearly when `ffmpeg` is missing, the input is corrupt, or ffmpeg itself fails; downstream stages do not continue after normalization failure
+- the normalized intermediate stays backend-owned and job-scoped, preserving the existing local-first boundary and the stable `JobResult` contract
+
+Phase 11H upload streaming reliability update:
+- upload persistence no longer buffers the entire source file in memory before writing it to disk
+- the backend now streams upload chunks directly into the existing local uploads directory
+- a configurable server-side max upload size is enforced during streaming, and oversized uploads fail with a clear 413-style API error after partial-file cleanup
+
 Phase 12 productization update:
 - job creation now also creates a filesystem-backed project manifest so the local project library can outlive API process memory
 - job progress, completion, failure, and draft-save events now update that project manifest rather than depending on the in-memory `job_store` for persisted project listing/detail

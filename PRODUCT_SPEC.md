@@ -15,6 +15,7 @@ The product remains:
 ## Current Product Scope
 Implemented product scope includes:
 - audio upload and job creation
+- backend-local normalization of common audio inputs into a stable PCM WAV intermediate
 - source separation, piano transcription, and drum transcription
 - score preview, drum notation preview, and piano-roll editing
 - draft editing with undo / redo and saved latest-draft persistence
@@ -51,6 +52,7 @@ As a user, I want to upload audio, get a readable draft score, refine it locally
 ## Success Criteria
 A successful current product:
 - completes end-to-end on supported local inputs
+- clearly handles missing local dependencies such as `ffmpeg` for compressed-input preprocessing
 - clearly emphasizes the generated score as the main outcome
 - preserves the original result while allowing saved and unsaved draft editing
 - exports valid MIDI and MusicXML

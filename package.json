@@ -19,5 +19,8 @@
     "test:music-engine": "npm run test --workspace @ai-sheet-music-generator/music-engine",
     "test:api": "node scripts/test-api.mjs",
     "validate": "npm run check:workspace-imports && npm run typecheck && npm run test:music-engine && npm run test:api"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
   }
 }

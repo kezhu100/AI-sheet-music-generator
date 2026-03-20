@@ -2,6 +2,24 @@
 
 ## Decision Log
 
+### 2026-03-20
+Decision:
+- Fill the existing pipeline gap with a small backend-local ffmpeg preprocessing stage instead of redesigning provider boundaries or changing the draft/result architecture.
+
+Context:
+- The docs already described an audio normalization stage before source separation and transcription, but the implementation was still passing raw uploads directly into downstream providers.
+- The default heuristic piano/drum paths work best on stable PCM WAV input, so compressed consumer formats could appear to complete while producing sparse or empty note data.
+
+Chosen option:
+- Add a dedicated backend audio preprocessing service that normalizes job input into a job-scoped PCM WAV intermediate.
+- Let already-compatible PCM WAV inputs pass through this stage without requiring ffmpeg transcoding.
+- Require a local `ffmpeg` install for compressed or otherwise unsupported inputs and fail fast with actionable error messages when it is missing or when transcoding fails.
+- Keep the normalized intermediate backend-owned and local-first, and leave `JobResult`, provider contracts, project persistence, and draft separation unchanged.
+
+Tradeoffs:
+- This materially improves local usability for common music files with a small patch-level change, but compressed-input support now depends on `ffmpeg` being present on the local machine.
+- The normalized intermediate adds one managed per-job file on disk, but it keeps downstream behavior predictable and avoids silently passing unsuitable input into heuristic providers.
+
 ### 2026-03-19
 Decision:
 - Treat Phase 14.5 as a product polish and workspace refinement pass on top of completed Phase 14L.

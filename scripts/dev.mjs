@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
@@ -19,6 +21,7 @@ const pythonExecutable = resolveApiPythonExecutable();
 const webCommand = createWebCommand();
 const apiCommand = createApiCommand(pythonExecutable);
 const preflightCommand = createPreflightCommand(pythonExecutable);
+const runtimeEnv = createRuntimeEnv();
 const rootNodeModulesPath = path.join(repoRoot, "node_modules");
 const defaultWebUrl = process.env.PORT ? `http://127.0.0.1:${process.env.PORT}` : "http://127.0.0.1:3000";
 const defaultWebPort = Number(new URL(defaultWebUrl).port);
@@ -156,6 +159,7 @@ async function runAppCheck() {
       pythonExecutable ? `${apiCommand.command} ${apiCommand.args.join(" ")}` : "missing apps/api/venv Python interpreter"
     }`
   );
+  console.log(`- ffmpeg: ${describeFfmpegSource(runtimeEnv.FFMPEG_EXECUTABLE)}`);
 
   if (!pythonExecutable) {
     printMissingPythonMessage("npm run app");
@@ -175,7 +179,7 @@ async function runPreflight() {
       stdio: "inherit",
       shell: false,
       windowsHide: true,
-      env: process.env
+      env: runtimeEnv
     });
 
     child.on("exit", (code) => resolve((code ?? 1) === 0));
@@ -196,7 +200,7 @@ function startProcess(name, command, childArgs, options) {
     stdio,
     shell: false,
     windowsHide: true,
-    env: process.env
+    env: runtimeEnv
   });
 
   if (isAppMode && name === "web") {
@@ -420,6 +424,7 @@ function printCheckSummary() {
       pythonExecutable ? `${apiCommand.command} ${apiCommand.args.join(" ")}` : "missing apps/api/venv Python interpreter"
     }`
   );
+  console.log(`- ffmpeg: ${describeFfmpegSource(runtimeEnv.FFMPEG_EXECUTABLE)}`);
 }
 
 function printMissingPythonMessage(commandName) {
@@ -439,6 +444,51 @@ function ensureWorkspaceDependenciesInstalled() {
   console.error(`Expected to find: ${rootNodeModulesPath}`);
   console.error("Run `npm install` from the repository root, then rerun `npm run app`.");
   process.exit(1);
+}
+
+function createRuntimeEnv() {
+  const localFfmpeg = resolveBundledFfmpegExecutable();
+  if (localFfmpeg) {
+    return {
+      ...process.env,
+      FFMPEG_EXECUTABLE: localFfmpeg,
+    };
+  }
+
+  const configuredFfmpeg = process.env.FFMPEG_EXECUTABLE?.trim();
+  if (configuredFfmpeg) {
+    console.warn(
+      `[startup] Bundled ffmpeg could not be resolved. Falling back to configured FFMPEG_EXECUTABLE: ${configuredFfmpeg}`
+    );
+    return process.env;
+  }
+
+  console.warn(
+    "[startup] Bundled ffmpeg could not be resolved. Falling back to a system ffmpeg on PATH if one is available."
+  );
+  return process.env;
+}
+
+function resolveBundledFfmpegExecutable() {
+  try {
+    const installer = require("@ffmpeg-installer/ffmpeg");
+    if (installer?.path && existsSync(installer.path)) {
+      return installer.path;
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`[startup] Unable to load bundled ffmpeg package: ${detail}`);
+  }
+
+  return null;
+}
+
+function describeFfmpegSource(ffmpegExecutable) {
+  if (ffmpegExecutable) {
+    return `FFMPEG_EXECUTABLE=${ffmpegExecutable}`;
+  }
+
+  return "system PATH fallback";
 }
 
 async function checkAppModePorts() {

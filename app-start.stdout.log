@@ -1,0 +1,30 @@
+Runtime preflight: ready
+Local app runtime is ready.
+[storage:ready] Uploads: Uploads directory is available for local filesystem persistence.
+[storage:ready] Stems: Stems directory is available for local filesystem persistence.
+[storage:ready] Drafts: Drafts directory is available for local filesystem persistence.
+[storage:ready] Projects: Projects directory is available for local filesystem persistence.
+[provider:ready] Source separation: The local development copy provider is available and keeps the app runnable without optional ML runtimes.
+[provider:ready] Piano transcription: The heuristic piano provider is available without optional ML runtimes.
+[provider:ready] Drum transcription: The heuristic drum provider is available without optional ML runtimes.
+Local-first runtime constraints:
+  - This app is local-first and expects the browser UI and API to run on the same machine.
+  - Stable project routes are local deployment routes only; they are not cloud share links or public publishing tokens.
+  - Projects, uploads, stems, and drafts stay on the local filesystem for this deployment.
+  - Cloud sync, multi-device sync, accounts, and background job recovery after API restart are not implemented.
+
+> @ai-sheet-music-generator/web@0.1.0 dev
+> next dev
+
+INFO:     127.0.0.1:64281 - "GET /api/v1/runtime HTTP/1.1" 200 OK
+[ready] API runtime is available at http://127.0.0.1:8000/api/v1/runtime
+   ▲ Next.js 15.5.12
+   - Local:        http://localhost:3000
+   - Network:      http://26.196.247.114:3000
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 1063ms (614 modules)
+[ready] web app is available at http://127.0.0.1:3000
+ GET / 200 in 1508ms

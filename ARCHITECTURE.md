@@ -59,15 +59,21 @@ Advanced Details contains runtime/provider summaries, stems, warnings, and note-
 The processing pipeline remains:
 1. upload audio
 2. create processing job
-3. source separation via the configured provider
-4. persist stems
-5. piano transcription via the configured provider
-6. drum transcription via the configured provider
-7. backend-owned post-processing and normalization
-8. deliver normalized `JobResult`
-9. clone to frontend draft for editing
-10. save/load latest draft separately when requested
-11. export MIDI or MusicXML from original or draft result
+3. backend-local audio normalization / ffmpeg transcoding into a job-scoped PCM WAV intermediate when needed
+4. source separation via the configured provider
+5. persist stems
+6. piano transcription via the configured provider
+7. drum transcription via the configured provider
+8. backend-owned post-processing and normalization
+9. deliver normalized `JobResult`
+10. clone to frontend draft for editing
+11. save/load latest draft separately when requested
+12. export MIDI or MusicXML from original or draft result
+
+Notes:
+- compatible PCM WAV uploads still pass through this stage without requiring ffmpeg transcoding
+- compressed/common consumer formats such as `.mp3`, `.m4a`, `.aac`, and `.flac` now rely on a local `ffmpeg` dependency rather than being passed raw into downstream providers
+- upload ingestion now streams files to local disk and enforces a configurable backend size limit before later pipeline stages begin
 
 ## Frontend / Backend Boundary
 Phase 14.5 preserves the current boundary:

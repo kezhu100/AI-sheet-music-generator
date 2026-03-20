@@ -122,6 +122,16 @@ runTest("buildDraftComparisonBaseline avoids the legacy false dirty comparison o
   assert.equal(areJobResultsEqual(namespacedDraft, fixedBaseline), true);
 });
 
+runTest("buildDraftComparisonBaseline does not mutate the input original result", () => {
+  const original = createOriginalResult();
+  const before = JSON.stringify(original);
+
+  void buildDraftComparisonBaseline(original, null, { draftIdNamespace: "job-123" });
+
+  assert.equal(JSON.stringify(original), before);
+  assert.equal(original.tracks[0].notes[0].draftNoteId, undefined);
+});
+
 runTest("selectNote finds notes by draftNoteId", () => {
   const draft = resetDraftFromOriginal(createOriginalResult());
   const draftNoteId = draft.tracks[0].notes[0].draftNoteId!;

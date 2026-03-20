@@ -8,6 +8,7 @@ AI Sheet Music Generator is a local-first browser application that converts audi
 
 The current product includes:
 - audio upload
+- local audio normalization to a stable PCM WAV intermediate for common music formats
 - provider-based source separation and transcription
 - score-first result review in the browser
 - draft editing and saved-draft persistence
@@ -60,6 +61,7 @@ Advanced Details contains runtime/provider summaries, stems, warnings, and raw n
 
 ## Known Constraints
 - mixed-audio quality still depends heavily on separation quality
+- common compressed inputs now rely on a local `ffmpeg` install for preprocessing; compatible PCM WAV inputs still work without it
 - generated notation remains a draft, not final engraving
 - score preview remains simplified rather than publication-grade notation
 - project workflows remain local-only

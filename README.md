@@ -88,7 +88,20 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 ```bash
 npm install
 npm run app
-```
+
+Local dependency note / 本地依赖说明：
+
+npm install now brings in a project-local ffmpeg binary automatically for compressed or non-PCM inputs
+npm install 会自动带上项目本地的 ffmpeg 可执行文件，用于压缩格式或非 PCM 音频输入
+
+On startup, the app resolves that bundled binary first, then falls back to FFMPEG_EXECUTABLE or a system ffmpeg on PATH if needed
+启动时会优先使用项目内置的 ffmpeg，如有需要，再回退到 FFMPEG_EXECUTABLE 或系统 ffmpeg
+
+The backend normalizes formats such as .mp3, .m4a, .aac, .flac, and compatible .wav into a PCM WAV intermediate
+后端会将 .mp3、.m4a、.aac、.flac 及兼容 .wav 转换为 PCM WAV 中间文件
+
+Audio uploads are streamed to local disk with a configurable size limit (default: 200 MB)
+音频上传采用流式写入本地磁盘，并支持大小限制（默认 200 MB）
 
 Then:
 
@@ -104,10 +117,23 @@ Open the local URL printed in the terminal.
 
 ---
 
+## 🧪 Development / Testing / 开发与测试（可选）
+
+```bash
+cd apps/api
+./venv/Scripts/python -m pip install -r requirements-dev.txt
+
+Required for backend API tests (e.g. httpx)
+用于运行后端 API 测试（例如 httpx）
+
+Not required for normal app usage
+普通使用无需安装
+
 ## 🧠 How It Works / 工作方式
 
 ```text
 audio
+  -> local ffmpeg normalization / PCM WAV handoff
   -> source separation
   -> piano / drum transcription
   -> post-processing
@@ -129,25 +155,27 @@ audio
 
 ---
 
-## 🏗 Project Structure / 项目结构
+## 🧱 Project Structure / 项目结构
 
 ```text
 apps/
   web/           Next.js frontend
-  api/           FastAPI local backend
+  api/           FastAPI backend
 packages/
-  shared-types/  shared DTOs and contracts
-  music-engine/  music-domain utilities
-```
+  shared-types/  shared DTOs
+  music-engine/  music logic
 
-- **`apps/web`**: score-first UI, project library, editing workflow  
-  **`apps/web`**：乐谱优先界面、项目库与编辑流程
-- **`apps/api`**: upload, jobs, runtime diagnostics, export  
-  **`apps/api`**：上传、任务、运行诊断与导出
-- **`packages/shared-types`**: shared request/response types  
-  **`packages/shared-types`**：共享请求与响应类型
+apps/web: score-first UI, project library, editing workflow
+前端界面、项目库与编辑流程
 
----
+apps/api: upload, jobs, runtime, export
+上传、任务处理、运行时与导出
+
+packages/shared-types: shared request/response types
+共享类型定义
+
+packages/music-engine: music-domain utilities
+音乐处理逻辑模块
 
 ## 🎯 Design Philosophy / 设计理念
 
@@ -170,21 +198,26 @@ This combination is what makes the project different: it is not just an AI demo,
 
 ## ⚠️ Current Limits / 当前限制
 
-- **Best results currently come from clearer piano + drum material**  
-  **当前在钢琴和鼓较清晰的素材上表现更好**
+- **Best results come from clearer piano + drum material**  
+  当前在钢琴与鼓较清晰的素材上效果最佳  
 
 - **Some providers are still heuristic or optional-runtime dependent**  
-  **部分 provider 仍基于启发式方法或依赖可选运行环境**
+  部分 provider 仍基于启发式方法或依赖可选运行环境  
 
 - **This is not a full DAW replacement**  
-  **它不是完整的 DAW 替代品**
+  这不是完整的 DAW 替代品  
+
+- **Compressed audio depends on local ffmpeg preprocessing**  
+  压缩音频依赖本地 ffmpeg 预处理  
+
+  The app prefers bundled ffmpeg, then falls back to `FFMPEG_EXECUTABLE` or system ffmpeg  
+  应用优先使用内置 ffmpeg，其次回退到系统 ffmpeg  
 
 - **No cloud sync, accounts, or sharing system**  
-  **暂不提供云同步、账号系统或分享功能**
+  暂不提供云同步、账号系统或分享功能  
 
 - **Score rendering is readable, not publication-grade engraving**  
-  **乐谱渲染以可读性为主，并非出版级排版**
-
+  乐谱渲染以可读性为主，并非出版级排版  
 ---
 
 ## 🛣 Roadmap / 路线图

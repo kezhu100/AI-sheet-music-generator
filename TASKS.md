@@ -3,6 +3,8 @@
 ## Completed Through Phase 14L
 - repository bootstrap
 - upload and job pipeline
+- streamed upload persistence with configurable server-side size guard
+- local ffmpeg-based audio normalization for common input formats
 - source separation
 - piano transcription
 - drum transcription
