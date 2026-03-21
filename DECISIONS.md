@@ -4,6 +4,23 @@
 
 ### 2026-03-21
 Decision:
+- Keep the normalized `JobResult` contract unchanged and add exporter-side grouping so piano and drums are exported as separate MIDI and MusicXML files for MuseScore handoff.
+
+Context:
+- The current result model already separates piano and drum tracks, but the main export flow still emitted one combined notation file by default.
+- Real MuseScore import feedback showed that the combined handoff path was too messy for the current piano/drum target workflow.
+
+Chosen option:
+- Preserve the combined export implementation as a compatible backend capability.
+- Add a small export-scope layer that filters the normalized result into piano-only or drums-only content at export time.
+- Expose separate piano/drum MIDI and MusicXML downloads in the current export UI instead of redesigning the workspace.
+- Recommend separate MusicXML handoff to MuseScore in product copy and docs.
+
+Tradeoffs:
+- This keeps code churn low and stays aligned with the current export-first architecture, but it does not attempt a richer multi-part score engraving system inside the browser or exporter.
+
+### 2026-03-21
+Decision:
 - Clarify the roadmap around lightweight verification before export and MuseScore as the final notation-editing environment.
 
 Context:

@@ -102,7 +102,7 @@ The processing pipeline remains:
 9. deliver normalized `JobResult`
 10. clone to frontend draft for editing
 11. save/load latest draft separately when requested
-12. export MIDI or MusicXML from original or draft result
+12. export piano-only or drums-only MIDI/MusicXML from original or draft result
 
 Notes:
 - compatible PCM WAV uploads still pass through this stage without requiring ffmpeg transcoding
@@ -114,11 +114,12 @@ Phase 14.5 preserves the current boundary:
 - the backend still owns runtime diagnostics, persistence, and export generation
 - the frontend still owns preview rendering, draft editing interactions, and workspace composition
 - the web app consumes normalized backend results rather than backend storage details
+- exporter-side grouping now derives separate piano-only or drums-only files from the normalized `JobResult` without changing the shared result contract
 
 The verification/handoff refinement keeps the same boundary:
 - the backend may expose persisted local stems for read-only browser audition without changing `JobResult`
 - the frontend may use those persisted assets for compact verification playback only
-- export stays backend-owned, and MuseScore handoff remains download-based rather than OS-launch-based
+- export stays backend-owned, and MuseScore handoff remains download-based rather than OS-launch-based, with separate piano/drum MusicXML as the recommended path
 
 Provider install behavior follows the same boundary:
 - install logic is backend-owned and explicit

@@ -5,6 +5,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from app.models.schemas import JobResult, NoteEvent, TrackResult
+from app.services.export_variants import ExportScope, build_export_suffix
 from app.pipeline.timing import seconds_to_beats
 
 
@@ -66,10 +67,10 @@ def build_musicxml_file(result: JobResult) -> bytes:
     return declaration + doctype + xml_body
 
 
-def build_musicxml_filename(project_name: str) -> str:
+def build_musicxml_filename(project_name: str, scope: ExportScope = "combined") -> str:
     stem = Path(project_name).stem.strip() or "ai-sheet-music-generator"
     safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in stem)
-    return f"{safe_name}.musicxml"
+    return f"{safe_name}{build_export_suffix(scope)}.musicxml"
 
 
 def _build_part_descriptor(index: int, track: TrackResult) -> MusicXmlPart:

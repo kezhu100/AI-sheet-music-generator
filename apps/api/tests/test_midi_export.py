@@ -12,7 +12,9 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+from app.models.schemas import JobResult
 from app.pipeline.development_pipeline import build_development_pipeline
+from app.services.export_variants import build_export_result
 from app.services.job_store import job_store
 from app.services.midi_export import build_midi_file, build_midi_filename
 
@@ -27,6 +29,24 @@ class MidiExportTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(midi_bytes[10:12], byteorder="big"), 3)
         self.assertIn(b"MTrk", midi_bytes)
 
+    def test_piano_only_midi_export_excludes_drum_channel_events(self) -> None:
+        result = self._build_manual_result()
+
+        midi_bytes = build_midi_file(build_export_result(result, "piano"))
+
+        self.assertEqual(int.from_bytes(midi_bytes[10:12], byteorder="big"), 2)
+        self.assertIn(bytes([0x90, 60]), midi_bytes)
+        self.assertNotIn(bytes([0x99, 36]), midi_bytes)
+
+    def test_drums_only_midi_export_excludes_piano_channel_events(self) -> None:
+        result = self._build_manual_result()
+
+        midi_bytes = build_midi_file(build_export_result(result, "drums"))
+
+        self.assertEqual(int.from_bytes(midi_bytes[10:12], byteorder="big"), 2)
+        self.assertIn(bytes([0x99, 36]), midi_bytes)
+        self.assertNotIn(bytes([0x90, 60]), midi_bytes)
+
     def test_export_endpoint_returns_midi_download(self) -> None:
         result = self._build_result()
         job = job_store.create("upload-midi-test")
@@ -39,6 +59,17 @@ class MidiExportTests(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/midi")
         self.assertIn(build_midi_filename(result.project_name), response.headers["content-disposition"])
         self.assertEqual(response.content[:4], b"MThd")
+
+    def test_export_endpoint_supports_piano_only_scope(self) -> None:
+        result = self._build_manual_result()
+        job = job_store.create("upload-midi-scope-test")
+        job_store.complete(job.id, result)
+
+        response = TestClient(app).get(f"/api/v1/jobs/{job.id}/exports/midi?scope=piano")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(build_midi_filename(result.project_name, "piano"), response.headers["content-disposition"])
+        self.assertEqual(int.from_bytes(response.content[10:12], byteorder="big"), 2)
 
     def test_post_export_endpoint_uses_result_override(self) -> None:
         result = self._build_result()
@@ -55,6 +86,72 @@ class MidiExportTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, build_midi_file(edited_result))
+
+    def _build_manual_result(self) -> JobResult:
+        return JobResult.model_validate(
+            {
+                "projectName": "separate-export-demo",
+                "bpm": 120,
+                "warnings": [],
+                "stems": [
+                    {
+                        "stemName": "piano_stem",
+                        "instrumentHint": "piano",
+                        "provider": "demucs",
+                        "storedPath": "data/stems/piano.wav",
+                        "fileName": "piano.wav",
+                        "fileFormat": "wav",
+                        "sizeBytes": 128,
+                    },
+                    {
+                        "stemName": "drum_stem",
+                        "instrumentHint": "drums",
+                        "provider": "demucs",
+                        "storedPath": "data/stems/drums.wav",
+                        "fileName": "drums.wav",
+                        "fileFormat": "wav",
+                        "sizeBytes": 128,
+                    },
+                ],
+                "tracks": [
+                    {
+                        "instrument": "piano",
+                        "sourceStem": "piano_stem",
+                        "provider": "heuristic",
+                        "eventCount": 1,
+                        "notes": [
+                            {
+                                "id": "piano-note-1",
+                                "instrument": "piano",
+                                "pitch": 60,
+                                "onsetSec": 0.0,
+                                "offsetSec": 0.5,
+                                "velocity": 90,
+                                "sourceStem": "piano_stem",
+                            }
+                        ],
+                    },
+                    {
+                        "instrument": "drums",
+                        "sourceStem": "drum_stem",
+                        "provider": "heuristic",
+                        "eventCount": 1,
+                        "notes": [
+                            {
+                                "id": "drum-note-1",
+                                "instrument": "drums",
+                                "drumLabel": "kick",
+                                "midiNote": 36,
+                                "onsetSec": 0.25,
+                                "offsetSec": 0.35,
+                                "velocity": 100,
+                                "sourceStem": "drum_stem",
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
 
     def _build_result(self):
         with TemporaryDirectory() as temp_dir:

@@ -13,8 +13,8 @@ The current product includes:
 - lightweight result review in the browser
 - draft editing and saved-draft persistence for cleanup before export
 - region re-transcription and draft analysis
-- MIDI and MusicXML export
-- MuseScore handoff through MusicXML export
+- separate piano/drum MIDI and MusicXML export
+- MuseScore handoff through separate MusicXML export
 - local project reopen, import, and export workflows
 
 ## Current Milestone
@@ -86,7 +86,7 @@ Backend provider scope is now intentionally split:
 - browser preview remains simplified and verification-oriented rather than publication-grade notation
 - project workflows remain local-only
 - background job recovery is still deferred
-- MuseScore is the intended final notation polishing environment after export
+- MuseScore is the intended final notation polishing environment after separate piano/drum export
 
 ## Next Roadmap Direction
 - preserve the current local-first product architecture
@@ -100,7 +100,7 @@ Backend provider scope is now intentionally split:
 This roadmap direction clarifies the product center of gravity:
 - the browser UI is a verification surface, not a final notation editor
 - draft editing remains for quick fixes before export, not deep engraving work
-- MusicXML handoff to MuseScore is the intended final notation-editing path
+- separate piano/drum MusicXML handoff to MuseScore is the intended final notation-editing path
 - export quality and usability now matter more than richer in-browser notation rendering
 
 Near-term roadmap priorities under this direction:

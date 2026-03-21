@@ -50,7 +50,7 @@
 - [ ] add playback playhead synced with audio for quick review
 - [ ] limit the default verification window to a readable first 10-20 seconds
 - [ ] keep quick stem audition compact and easy to compare across piano/drum stems
-- [ ] keep the MusicXML-centered "Open in MuseScore" handoff obvious in the export flow
+- [x] make separate piano/drum MusicXML handoff obvious in the export flow
 
 ## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)

@@ -13,7 +13,9 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+from app.models.schemas import JobResult
 from app.pipeline.development_pipeline import build_development_pipeline
+from app.services.export_variants import build_export_result
 from app.services.job_store import job_store
 from app.services.musicxml_export import build_musicxml_file, build_musicxml_filename
 
@@ -29,6 +31,24 @@ class MusicXmlExportTests(unittest.TestCase):
         self.assertIsNotNone(xml_root.find("part-list"))
         self.assertGreaterEqual(len(xml_root.findall("part")), 2)
 
+    def test_piano_only_musicxml_export_excludes_percussion_notation(self) -> None:
+        result = self._build_manual_result()
+
+        xml_root = ET.fromstring(build_musicxml_file(build_export_result(result, "piano")))
+
+        self.assertEqual(len(xml_root.findall("part")), 1)
+        self.assertGreaterEqual(len(xml_root.findall(".//pitch")), 1)
+        self.assertEqual(len(xml_root.findall(".//unpitched")), 0)
+
+    def test_drums_only_musicxml_export_excludes_pitched_piano_notes(self) -> None:
+        result = self._build_manual_result()
+
+        xml_root = ET.fromstring(build_musicxml_file(build_export_result(result, "drums")))
+
+        self.assertEqual(len(xml_root.findall("part")), 1)
+        self.assertGreaterEqual(len(xml_root.findall(".//unpitched")), 1)
+        self.assertEqual(len(xml_root.findall(".//pitch")), 0)
+
     def test_export_endpoint_returns_musicxml_download(self) -> None:
         result = self._build_result()
         job = job_store.create("upload-musicxml-test")
@@ -41,6 +61,19 @@ class MusicXmlExportTests(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "application/vnd.recordare.musicxml+xml")
         self.assertIn(build_musicxml_filename(result.project_name), response.headers["content-disposition"])
         self.assertTrue(response.text.startswith('<?xml version="1.0" encoding="UTF-8"?>'))
+
+    def test_export_endpoint_supports_drums_only_scope(self) -> None:
+        result = self._build_manual_result()
+        job = job_store.create("upload-musicxml-scope-test")
+        job_store.complete(job.id, result)
+
+        response = TestClient(app).get(f"/api/v1/jobs/{job.id}/exports/musicxml?scope=drums")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(build_musicxml_filename(result.project_name, "drums"), response.headers["content-disposition"])
+        xml_root = ET.fromstring(response.content)
+        self.assertEqual(len(xml_root.findall("part")), 1)
+        self.assertGreaterEqual(len(xml_root.findall(".//unpitched")), 1)
 
     def test_post_export_endpoint_uses_result_override(self) -> None:
         result = self._build_result()
@@ -57,6 +90,72 @@ class MusicXmlExportTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, build_musicxml_file(edited_result))
+
+    def _build_manual_result(self) -> JobResult:
+        return JobResult.model_validate(
+            {
+                "projectName": "separate-export-demo",
+                "bpm": 120,
+                "warnings": [],
+                "stems": [
+                    {
+                        "stemName": "piano_stem",
+                        "instrumentHint": "piano",
+                        "provider": "demucs",
+                        "storedPath": "data/stems/piano.wav",
+                        "fileName": "piano.wav",
+                        "fileFormat": "wav",
+                        "sizeBytes": 128,
+                    },
+                    {
+                        "stemName": "drum_stem",
+                        "instrumentHint": "drums",
+                        "provider": "demucs",
+                        "storedPath": "data/stems/drums.wav",
+                        "fileName": "drums.wav",
+                        "fileFormat": "wav",
+                        "sizeBytes": 128,
+                    },
+                ],
+                "tracks": [
+                    {
+                        "instrument": "piano",
+                        "sourceStem": "piano_stem",
+                        "provider": "heuristic",
+                        "eventCount": 1,
+                        "notes": [
+                            {
+                                "id": "piano-note-1",
+                                "instrument": "piano",
+                                "pitch": 60,
+                                "onsetSec": 0.0,
+                                "offsetSec": 0.5,
+                                "velocity": 90,
+                                "sourceStem": "piano_stem",
+                            }
+                        ],
+                    },
+                    {
+                        "instrument": "drums",
+                        "sourceStem": "drum_stem",
+                        "provider": "heuristic",
+                        "eventCount": 1,
+                        "notes": [
+                            {
+                                "id": "drum-note-1",
+                                "instrument": "drums",
+                                "drumLabel": "kick",
+                                "midiNote": 36,
+                                "onsetSec": 0.25,
+                                "offsetSec": 0.35,
+                                "velocity": 100,
+                                "sourceStem": "drum_stem",
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
 
     def _build_result(self):
         with TemporaryDirectory() as temp_dir:

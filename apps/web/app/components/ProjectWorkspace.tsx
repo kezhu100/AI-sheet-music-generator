@@ -56,6 +56,9 @@ import { PianoScorePreview } from "./PianoScorePreview";
 import { TrackVisibilityControls } from "./TrackVisibilityControls";
 
 type WorkspaceMode = "home" | "project";
+type InstrumentExportScope = "piano" | "drums";
+type ExportModeName = "original" | "draft";
+type ExportFormatName = "midi" | "musicxml";
 
 interface ProjectWorkspaceProps {
   mode: WorkspaceMode;
@@ -128,6 +131,19 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   anchor.click();
   anchor.remove();
   window.URL.revokeObjectURL(url);
+}
+
+function buildInstrumentExportFileName(
+  baseName: string,
+  scope: InstrumentExportScope,
+  format: ExportFormatName
+): string {
+  const extension = format === "midi" ? "mid" : "musicxml";
+  return `${baseName}_${scope}.${extension}`;
+}
+
+function buildExportStateKey(modeName: ExportModeName, format: ExportFormatName, scope: InstrumentExportScope): string {
+  return `${modeName}:${format}:${scope}`;
 }
 
 interface RuntimeProviderInstallUiState {
@@ -521,10 +537,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
-  const [isExportingOriginalMidi, setIsExportingOriginalMidi] = useState(false);
-  const [isExportingDraftMidi, setIsExportingDraftMidi] = useState(false);
-  const [isExportingOriginalMusicXml, setIsExportingOriginalMusicXml] = useState(false);
-  const [isExportingDraftMusicXml, setIsExportingDraftMusicXml] = useState(false);
+  const [exportingStates, setExportingStates] = useState<Record<string, boolean>>({});
   const [savedDraft, setSavedDraft] = useState<JobDraftRecord | null>(initialProjectDetail?.savedDraft ?? null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -1067,6 +1080,27 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   }, [activeResult, job?.result]);
   const downloadBaseName =
     projectDetail?.projectName ?? activeResult?.projectName ?? job?.result?.projectName ?? "ai-sheet-music-generator";
+  function isExporting(modeName: ExportModeName, format: ExportFormatName, scope: InstrumentExportScope): boolean {
+    return exportingStates[buildExportStateKey(modeName, format, scope)] === true;
+  }
+
+  function setExporting(
+    modeName: ExportModeName,
+    format: ExportFormatName,
+    scope: InstrumentExportScope,
+    value: boolean
+  ): void {
+    const key = buildExportStateKey(modeName, format, scope);
+    setExportingStates((previous) => {
+      if (value) {
+        return { ...previous, [key]: true };
+      }
+
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+  }
   const auditionStemCards = useMemo(() => {
     if (!job?.id || !activeResult) {
       return [];
@@ -1256,7 +1290,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
   }
 
-  async function handleMidiExport(modeName: "original" | "draft"): Promise<void> {
+  async function handleMidiExport(modeName: ExportModeName, scope: InstrumentExportScope): Promise<void> {
     if (!job?.result) {
       setError("Complete a job before exporting MIDI.");
       return;
@@ -1268,27 +1302,19 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
 
     setError(null);
-    if (modeName === "original") {
-      setIsExportingOriginalMidi(true);
-    } else {
-      setIsExportingDraftMidi(true);
-    }
+    setExporting(modeName, "midi", scope, true);
 
     try {
-      const midiBlob = await downloadMidiExport(job.id, modeName === "draft" ? getCurrentDraftResult() : undefined);
-      triggerBlobDownload(midiBlob, `${downloadBaseName}-${modeName}.mid`);
+      const midiBlob = await downloadMidiExport(job.id, scope, modeName === "draft" ? getCurrentDraftResult() : undefined);
+      triggerBlobDownload(midiBlob, buildInstrumentExportFileName(downloadBaseName, scope, "midi"));
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MIDI.");
     } finally {
-      if (modeName === "original") {
-        setIsExportingOriginalMidi(false);
-      } else {
-        setIsExportingDraftMidi(false);
-      }
+      setExporting(modeName, "midi", scope, false);
     }
   }
 
-  async function handleMusicXmlExport(modeName: "original" | "draft"): Promise<boolean> {
+  async function handleMusicXmlExport(modeName: ExportModeName, scope: InstrumentExportScope): Promise<boolean> {
     if (!job?.result) {
       setError("Complete a job before exporting MusicXML.");
       return false;
@@ -1300,29 +1326,25 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
 
     setError(null);
-    if (modeName === "original") {
-      setIsExportingOriginalMusicXml(true);
-    } else {
-      setIsExportingDraftMusicXml(true);
-    }
+    setExporting(modeName, "musicxml", scope, true);
 
     try {
-      const musicXmlBlob = await downloadMusicXmlExport(job.id, modeName === "draft" ? getCurrentDraftResult() : undefined);
-      const fileName = `${downloadBaseName}-${modeName}.musicxml`;
+      const musicXmlBlob = await downloadMusicXmlExport(
+        job.id,
+        scope,
+        modeName === "draft" ? getCurrentDraftResult() : undefined
+      );
+      const fileName = buildInstrumentExportFileName(downloadBaseName, scope, "musicxml");
       triggerBlobDownload(musicXmlBlob, fileName);
       setMuseScoreHandoffMessage(
-        `Downloaded ${fileName}. Open it in MuseScore for final notation polishing. / 已下载 ${fileName}，请在 MuseScore 中打开并完成最终排版润色。`
+        `Downloaded ${fileName}. Open it in MuseScore as a separate ${scope} handoff for cleaner notation cleanup. / 已下载 ${fileName}，请将它作为独立的${scope === "piano" ? "钢琴" : "鼓"}文件导入 MuseScore，以减少混排问题并完成最终整理。`
       );
       return true;
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MusicXML.");
       return false;
     } finally {
-      if (modeName === "original") {
-        setIsExportingOriginalMusicXml(false);
-      } else {
-        setIsExportingDraftMusicXml(false);
-      }
+      setExporting(modeName, "musicxml", scope, false);
     }
   }
 
@@ -2168,10 +2190,12 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <button
                 className="button secondary"
                 type="button"
-                disabled={!activeResult || isExportingDraftMusicXml}
-                onClick={() => void handleMusicXmlExport("draft")}
+                disabled={!activeResult || isExporting("draft", "musicxml", "piano")}
+                onClick={() => void handleMusicXmlExport("draft", "piano")}
               >
-                {isExportingDraftMusicXml ? "Exporting... / 导出中..." : "Export Draft MusicXML / 导出草稿 MusicXML"}
+                {isExporting("draft", "musicxml", "piano")
+                  ? "Exporting... / 导出中..."
+                  : "Export Draft Piano MusicXML / 导出钢琴草稿 MusicXML"}
               </button>
             </div>
           </section>
@@ -2438,52 +2462,131 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     导出与交接
                   </h2>
                   <p className="muted section-help">
-                    MIDI and MusicXML are the core output. Use MuseScore for final notation polishing after this lightweight review step.
+                    MIDI and MusicXML are the core output. Export piano and drums separately for the cleanest MuseScore handoff after this lightweight review step.
                     <br />
-                    MIDI 与 MusicXML 是核心产出；完成这里的轻量复核后，建议转交 MuseScore 做最终排版润色。
+                    MIDI 与 MusicXML 是核心产出；完成这里的轻量复核后，建议将钢琴与鼓分开导出，再交给 MuseScore 做最终排版润色。
                   </p>
                 </div>
               </div>
               <div className="export-card-grid">
                 <article className="note-card ornate-card">
                   <strong>Current Draft / 当前草稿</strong>
+                  <div className="muted">
+                    Separate-by-instrument export is the recommended path for review-ready handoff. / 推荐按乐器分别导出，作为更稳妥的交接路径。
+                  </div>
                   <div className="actions">
-                    <button className="button" type="button" disabled={!activeResult || isExportingDraftMidi} onClick={() => void handleMidiExport("draft")}>
-                      {isExportingDraftMidi ? "Exporting MIDI... / 导出中..." : "Draft MIDI / 草稿 MIDI"}
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExporting("draft", "midi", "piano")}
+                      onClick={() => void handleMidiExport("draft", "piano")}
+                    >
+                      {isExporting("draft", "midi", "piano") ? "Exporting MIDI... / 导出中..." : "Piano MIDI / 钢琴 MIDI"}
                     </button>
-                    <button className="button" type="button" disabled={!activeResult || isExportingDraftMusicXml} onClick={() => void handleMusicXmlExport("draft")}>
-                      {isExportingDraftMusicXml ? "Exporting MusicXML... / 导出中..." : "Draft MusicXML / 草稿 MusicXML"}
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExporting("draft", "midi", "drums")}
+                      onClick={() => void handleMidiExport("draft", "drums")}
+                    >
+                      {isExporting("draft", "midi", "drums") ? "Exporting MIDI... / 导出中..." : "Drums MIDI / 鼓 MIDI"}
+                    </button>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExporting("draft", "musicxml", "piano")}
+                      onClick={() => void handleMusicXmlExport("draft", "piano")}
+                    >
+                      {isExporting("draft", "musicxml", "piano")
+                        ? "Exporting MusicXML... / 导出中..."
+                        : "Piano MusicXML / 钢琴 MusicXML"}
+                    </button>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExporting("draft", "musicxml", "drums")}
+                      onClick={() => void handleMusicXmlExport("draft", "drums")}
+                    >
+                      {isExporting("draft", "musicxml", "drums")
+                        ? "Exporting MusicXML... / 导出中..."
+                        : "Drums MusicXML / 鼓 MusicXML"}
                     </button>
                   </div>
                 </article>
                 <article className="note-card ornate-card">
                   <strong>Original Result / 原始结果</strong>
                   <div className="actions">
-                    <button className="button secondary" type="button" disabled={!job?.result || isExportingOriginalMidi} onClick={() => void handleMidiExport("original")}>
-                      {isExportingOriginalMidi ? "Exporting MIDI... / 导出中..." : "Original MIDI / 原始 MIDI"}
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!job?.result || isExporting("original", "midi", "piano")}
+                      onClick={() => void handleMidiExport("original", "piano")}
+                    >
+                      {isExporting("original", "midi", "piano")
+                        ? "Exporting MIDI... / 导出中..."
+                        : "Piano MIDI / 钢琴 MIDI"}
                     </button>
-                    <button className="button secondary" type="button" disabled={!job?.result || isExportingOriginalMusicXml} onClick={() => void handleMusicXmlExport("original")}>
-                      {isExportingOriginalMusicXml ? "Exporting MusicXML... / 导出中..." : "Original MusicXML / 原始 MusicXML"}
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!job?.result || isExporting("original", "midi", "drums")}
+                      onClick={() => void handleMidiExport("original", "drums")}
+                    >
+                      {isExporting("original", "midi", "drums")
+                        ? "Exporting MIDI... / 导出中..."
+                        : "Drums MIDI / 鼓 MIDI"}
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!job?.result || isExporting("original", "musicxml", "piano")}
+                      onClick={() => void handleMusicXmlExport("original", "piano")}
+                    >
+                      {isExporting("original", "musicxml", "piano")
+                        ? "Exporting MusicXML... / 导出中..."
+                        : "Piano MusicXML / 钢琴 MusicXML"}
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!job?.result || isExporting("original", "musicxml", "drums")}
+                      onClick={() => void handleMusicXmlExport("original", "drums")}
+                    >
+                      {isExporting("original", "musicxml", "drums")
+                        ? "Exporting MusicXML... / 导出中..."
+                        : "Drums MusicXML / 鼓 MusicXML"}
                     </button>
                   </div>
                 </article>
                 <article className="note-card ornate-card">
                   <strong>MuseScore Handoff / 交接 MuseScore</strong>
                   <div className="muted">
-                    Download the draft MusicXML, then open it in MuseScore for final notation editing and engraving. / 下载草稿 MusicXML，然后在 MuseScore 中完成最终记谱编辑与排版。
+                    Download separate draft MusicXML files for piano and drums, then import them into MuseScore for cleaner final notation editing. / 分别下载钢琴与鼓的草稿 MusicXML，再导入 MuseScore，可更干净地完成最终记谱编辑。
                   </div>
                   <div className="actions">
                     <button
                       className="button"
                       type="button"
-                      disabled={!activeResult || isExportingDraftMusicXml}
-                      onClick={() => void handleMusicXmlExport("draft")}
+                      disabled={!activeResult || isExporting("draft", "musicxml", "piano")}
+                      onClick={() => void handleMusicXmlExport("draft", "piano")}
                     >
-                      {isExportingDraftMusicXml ? "Preparing MuseScore handoff... / 准备交接中..." : "Open in MuseScore / 在 MuseScore 中打开"}
+                      {isExporting("draft", "musicxml", "piano")
+                        ? "Preparing Piano handoff... / 准备钢琴交接中..."
+                        : "Piano for MuseScore / 钢琴交给 MuseScore"}
+                    </button>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExporting("draft", "musicxml", "drums")}
+                      onClick={() => void handleMusicXmlExport("draft", "drums")}
+                    >
+                      {isExporting("draft", "musicxml", "drums")
+                        ? "Preparing Drums handoff... / 准备鼓谱交接中..."
+                        : "Drums for MuseScore / 鼓谱交给 MuseScore"}
                     </button>
                   </div>
                   <div className="muted">
-                    This downloads MusicXML only. No OS-level app launch is attempted. / 此操作仅下载 MusicXML，不会尝试系统级启动应用。
+                    This downloads separate MusicXML files only. No OS-level app launch is attempted. / 此操作只下载分开的 MusicXML 文件，不会尝试系统级启动应用。
                   </div>
                 </article>
                 <article className="note-card ornate-card">

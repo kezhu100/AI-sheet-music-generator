@@ -22,7 +22,7 @@ Implemented product scope includes:
 - draft editing with undo / redo and saved latest-draft persistence
 - region re-transcription
 - heuristic draft analysis suggestions
-- MIDI and MusicXML export
+- separate piano/drum MIDI and MusicXML export
 - local project library reopen flows
 - project import/export packaging
 - local runtime diagnostics
@@ -51,7 +51,7 @@ Presentation priorities:
 - the same compact runtime area may also expose a narrow custom-provider registration flow for local `file://...json` manifest URLs only
 - custom-provider registration copy should clearly distinguish built-in, official enhanced, and custom registered states
 - generated results should expose a lightweight provider-used/fallback summary so Auto behavior stays understandable without opening developer-style diagnostics
-- export and handoff should clearly recommend MuseScore as the final notation polishing environment
+- export and handoff should clearly recommend separate piano/drum files for MuseScore as the final notation polishing environment
 - the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
 - the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums
 - any future extra provider should come through a controlled custom-provider extension path rather than expanding the built-in official enhanced set
@@ -66,7 +66,7 @@ A successful current product:
 - clearly emphasizes export-ready transcription output over in-browser engraving
 - keeps browser-side editing positioned as review-and-fix before export
 - preserves the original result while allowing saved and unsaved draft editing
-- exports valid MIDI and MusicXML
+- exports valid piano-only and drums-only MIDI and MusicXML
 - makes MuseScore handoff obvious and honest
 - keeps local project workflows honest and understandable
 - presents advanced technical detail without cluttering the main path

@@ -78,8 +78,8 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 - **Project Library with local persistence**  
   **提供本地持久化的项目库**
 
-- **MIDI + MusicXML export**  
-  **支持导出 MIDI 与 MusicXML**
+- **Separate piano/drum MIDI + MusicXML export**  
+  **支持分别导出钢琴/鼓的 MIDI 与 MusicXML**
 
 - **MuseScore handoff for final polishing**  
   **支持交接到 MuseScore 进行最终排版润色**
@@ -160,7 +160,7 @@ audio
   -> post-processing
   -> lightweight preview + stem audition
   -> editable draft cleanup
-  -> MIDI / MusicXML export
+  -> separate piano / drums MIDI / MusicXML export
 ```
 
 - **Upload a song or stem**  
@@ -171,8 +171,8 @@ audio
   **通过轻量预览与分轨试听确认草稿可用性**
 - **Refine obvious issues in-browser**  
   **在浏览器内修正明显问题**
-- **Export clean structured output and finish in MuseScore**  
-  **导出结构化结果，并在 MuseScore 中完成最终整理**
+- **Export clean separated output and finish in MuseScore**  
+  **导出分开的结构化结果，并在 MuseScore 中完成最终整理**
 
 ---
 
@@ -247,14 +247,17 @@ This combination is what makes the project different: it is not just an AI demo,
 
 - **Browser preview is for verification, not final engraving**  
   浏览器预览用于校验，并非最终出版级排版  
+
+- **For MuseScore handoff, separate piano and drum export is recommended over one mixed notation file**  
+  **交给 MuseScore 时，推荐分别导出钢琴与鼓，而不是导出一个混合记谱文件**  
 ---
 
 ## 🛣 Roadmap / 路线图
 
 - **Lightweight Verification + MuseScore Handoff Direction**  
   **轻量校验 + MuseScore 交接方向**  
-  The browser UI is now a verification surface for review-and-fix-before-export, not a final notation editor. MusicXML handoff to MuseScore is the intended final editing path.  
-  浏览器界面现在用于导出前校验与快速修正，而不是最终记谱编辑器；MusicXML 交接到 MuseScore 是预期的最终编辑路径。  
+  The browser UI is now a verification surface for review-and-fix-before-export, not a final notation editor. Separate piano/drum MusicXML handoff to MuseScore is the intended final editing path.  
+  浏览器界面现在用于导出前校验与快速修正，而不是最终记谱编辑器；将钢琴/鼓分开的 MusicXML 交接到 MuseScore 是预期的最终编辑路径。  
 
 - **Better transcription models**  
   **更好的转谱模型**

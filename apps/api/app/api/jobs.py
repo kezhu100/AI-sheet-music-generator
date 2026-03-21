@@ -22,6 +22,7 @@ from app.models.schemas import (
 )
 from app.services.correction_analysis import CorrectionAnalysisService
 from app.services.draft_store import draft_store
+from app.services.export_variants import ExportScope, ExportVariantError, build_export_result
 from app.services.midi_export import MidiExportError, build_midi_file, build_midi_filename
 from app.services.musicxml_export import MusicXmlExportError, build_musicxml_file, build_musicxml_filename
 from app.services.region_retranscription import RegionRetranscriptionService
@@ -135,15 +136,15 @@ async def get_job_stem_asset(job_id: str, stem_name: str) -> FileResponse:
 
 
 @router.get("/{job_id}/exports/midi")
-async def export_job_midi(job_id: str) -> Response:
-    result = _get_export_result(job_id)
+async def export_job_midi(job_id: str, scope: ExportScope = "combined") -> Response:
+    result = _get_export_result(job_id, scope)
 
     try:
         midi_bytes = build_midi_file(result)
-    except MidiExportError as exc:
+    except (MidiExportError, ExportVariantError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    filename = build_midi_filename(result.project_name)
+    filename = build_midi_filename(result.project_name, scope)
     return Response(
         content=midi_bytes,
         media_type="audio/midi",
@@ -152,15 +153,15 @@ async def export_job_midi(job_id: str) -> Response:
 
 
 @router.post("/{job_id}/exports/midi")
-async def export_job_midi_override(job_id: str, payload: JobExportRequest) -> Response:
-    result = _get_export_result(job_id, payload)
+async def export_job_midi_override(job_id: str, payload: JobExportRequest, scope: ExportScope = "combined") -> Response:
+    result = _get_export_result(job_id, scope, payload)
 
     try:
         midi_bytes = build_midi_file(result)
-    except MidiExportError as exc:
+    except (MidiExportError, ExportVariantError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    filename = build_midi_filename(result.project_name)
+    filename = build_midi_filename(result.project_name, scope)
     return Response(
         content=midi_bytes,
         media_type="audio/midi",
@@ -169,15 +170,15 @@ async def export_job_midi_override(job_id: str, payload: JobExportRequest) -> Re
 
 
 @router.get("/{job_id}/exports/musicxml")
-async def export_job_musicxml(job_id: str) -> Response:
-    result = _get_export_result(job_id)
+async def export_job_musicxml(job_id: str, scope: ExportScope = "combined") -> Response:
+    result = _get_export_result(job_id, scope)
 
     try:
         musicxml_bytes = build_musicxml_file(result)
-    except MusicXmlExportError as exc:
+    except (MusicXmlExportError, ExportVariantError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    filename = build_musicxml_filename(result.project_name)
+    filename = build_musicxml_filename(result.project_name, scope)
     return Response(
         content=musicxml_bytes,
         media_type="application/vnd.recordare.musicxml+xml",
@@ -186,15 +187,15 @@ async def export_job_musicxml(job_id: str) -> Response:
 
 
 @router.post("/{job_id}/exports/musicxml")
-async def export_job_musicxml_override(job_id: str, payload: JobExportRequest) -> Response:
-    result = _get_export_result(job_id, payload)
+async def export_job_musicxml_override(job_id: str, payload: JobExportRequest, scope: ExportScope = "combined") -> Response:
+    result = _get_export_result(job_id, scope, payload)
 
     try:
         musicxml_bytes = build_musicxml_file(result)
-    except MusicXmlExportError as exc:
+    except (MusicXmlExportError, ExportVariantError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-    filename = build_musicxml_filename(result.project_name)
+    filename = build_musicxml_filename(result.project_name, scope)
     return Response(
         content=musicxml_bytes,
         media_type="application/vnd.recordare.musicxml+xml",
@@ -202,16 +203,23 @@ async def export_job_musicxml_override(job_id: str, payload: JobExportRequest) -
     )
 
 
-def _get_export_result(job_id: str, payload: JobExportRequest | None = None) -> JobResult:
+def _get_export_result(job_id: str, scope: ExportScope = "combined", payload: JobExportRequest | None = None) -> JobResult:
     job = _get_completed_job(job_id, allow_processing_result=True)
     if payload is not None and payload.result_override is not None:
         try:
-            return JobResult.model_validate(payload.result_override.model_dump(mode="python", by_alias=True))
+            base_result = JobResult.model_validate(payload.result_override.model_dump(mode="python", by_alias=True))
         except ValidationError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        try:
+            return build_export_result(base_result, scope)
+        except ExportVariantError as exc:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     if job.result is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available for export yet.")
-    return job.result
+    try:
+        return build_export_result(job.result, scope)
+    except ExportVariantError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
 def _get_completed_job(job_id: str, *, allow_processing_result: bool = False):

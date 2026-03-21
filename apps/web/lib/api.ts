@@ -41,6 +41,7 @@ function resolveApiBaseUrl(): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
+export type ExportScope = "combined" | "piano" | "drums";
 
 export function getJobStemAssetUrl(jobId: string, stemName: string): string {
   return `${API_BASE_URL}/api/v1/jobs/${encodeURIComponent(jobId)}/stems/${encodeURIComponent(stemName)}`;
@@ -279,15 +280,26 @@ export async function analyzeDraft(jobId: string, draftResult: JobResult): Promi
   return parseJson<AnalyzeDraftResponse>(response);
 }
 
-export async function downloadMidiExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {
-  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/midi`, resultOverride);
+export async function downloadMidiExport(
+  jobId: string,
+  scope: ExportScope = "combined",
+  resultOverride?: JobResult
+): Promise<Blob> {
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/midi`, scope, resultOverride);
 }
 
-export async function downloadMusicXmlExport(jobId: string, resultOverride?: JobResult): Promise<Blob> {
-  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/musicxml`, resultOverride);
+export async function downloadMusicXmlExport(
+  jobId: string,
+  scope: ExportScope = "combined",
+  resultOverride?: JobResult
+): Promise<Blob> {
+  return downloadExportBlob(`/api/v1/jobs/${jobId}/exports/musicxml`, scope, resultOverride);
 }
 
-async function downloadExportBlob(path: string, resultOverride?: JobResult): Promise<Blob> {
+async function downloadExportBlob(path: string, scope: ExportScope, resultOverride?: JobResult): Promise<Blob> {
+  const requestUrl = new URL(`${API_BASE_URL}${path}`);
+  requestUrl.searchParams.set("scope", scope);
+
   const requestOptions: RequestInit =
     resultOverride == null
       ? { method: "GET" }
@@ -299,7 +311,7 @@ async function downloadExportBlob(path: string, resultOverride?: JobResult): Pro
           body: JSON.stringify({ resultOverride } satisfies JobExportRequest)
         };
 
-  const response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
+  const response = await fetch(requestUrl.toString(), requestOptions);
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;

@@ -6,6 +6,7 @@ Phase 8 editing update:
 - the draft clone assigns stable `draftNoteId` values for note selection and editing actions
 - the draft passes through a normalization layer before export
 - MIDI and MusicXML export can consume either the original completed result or the current edited draft override
+- export now supports separate piano-only and drums-only MIDI/MusicXML outputs derived from the same normalized result
 - backend export override payloads are validated before the exporters run
 
 Phase 9 persistence update:

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.models.schemas import JobResult, NoteEvent, TrackResult
+from app.services.export_variants import ExportScope, build_export_suffix
 from app.pipeline.timing import beats_to_seconds, seconds_to_beats
 
 
@@ -38,10 +39,10 @@ def build_midi_file(result: JobResult) -> bytes:
     return b"".join(chunks)
 
 
-def build_midi_filename(project_name: str) -> str:
+def build_midi_filename(project_name: str, scope: ExportScope = "combined") -> str:
     stem = Path(project_name).stem.strip() or "ai-sheet-music-generator"
     safe_name = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in stem)
-    return f"{safe_name}.mid"
+    return f"{safe_name}{build_export_suffix(scope)}.mid"
 
 
 def _build_header(track_count: int) -> bytes:
