@@ -19,6 +19,7 @@ export interface UploadResponse {
 export interface CreateJobRequest {
   uploadId: string;
   providerPreferences?: ProviderPreferences;
+  processingPreferences?: ProcessingPreferences;
 }
 
 export type SourceSeparationProviderPreference = "auto" | "development-copy" | "demucs";
@@ -29,6 +30,17 @@ export interface ProviderPreferences {
   sourceSeparation?: SourceSeparationProviderPreference;
   pianoTranscription?: PianoTranscriptionProviderPreference;
   drumTranscription?: DrumTranscriptionProviderPreference;
+}
+
+export interface PianoFilterSettings {
+  enabled: boolean;
+  lowCutHz: number;
+  highCutHz: number;
+  cleanupStrength: number;
+}
+
+export interface ProcessingPreferences {
+  pianoFilter: PianoFilterSettings;
 }
 
 export interface NoteEvent {
@@ -157,6 +169,7 @@ export interface ProjectSummary {
   draftVersion?: number | null;
   draftSavedAt?: string | null;
   providerPreferences?: ProviderPreferences | null;
+  processingPreferences?: ProcessingPreferences | null;
   assets: ProjectAssetAvailability;
   sharePath: string;
   currentStage?: string | null;
@@ -202,6 +215,11 @@ export interface DuplicateProjectRequest {
 
 export interface ProjectDeleteResponse {
   status: "ok";
+}
+
+export interface ProjectRerunRequest {
+  providerPreferences?: ProviderPreferences | null;
+  processingPreferences?: ProcessingPreferences | null;
 }
 
 export interface OpenLocalProjectRequest {
@@ -363,6 +381,7 @@ export interface JobRecord {
   updatedAt: string;
   progress: JobProgress;
   providerPreferences?: ProviderPreferences | null;
+  processingPreferences?: ProcessingPreferences | null;
   result?: JobResult;
   error?: string;
 }

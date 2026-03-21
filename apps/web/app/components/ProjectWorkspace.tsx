@@ -20,6 +20,7 @@ import type {
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  ProcessingPreferences,
   ProviderInstallState,
   ProviderPreferences,
   ProjectDetail,
@@ -39,10 +40,12 @@ import {
   getJobStemAssetUrl,
   getJob,
   getJobDraft,
+  getProjectDetail,
   getProviderInstallStatus,
   getRuntimeDiagnostics,
   installCustomProvider,
   installEnhancedProvider,
+  rerunProject,
   saveJobDraft,
   renameProject,
   uploadAudio
@@ -69,6 +72,15 @@ const DEFAULT_PROVIDER_PREFERENCES: ProviderPreferences = {
   sourceSeparation: "auto",
   pianoTranscription: "auto",
   drumTranscription: "auto"
+};
+
+const DEFAULT_PROCESSING_PREFERENCES: ProcessingPreferences = {
+  pianoFilter: {
+    enabled: true,
+    lowCutHz: 45,
+    highCutHz: 7200,
+    cleanupStrength: 0.42
+  }
 };
 
 function renderBilingualText(text: string): ReactNode {
@@ -110,12 +122,6 @@ function getRuntimeProvider(
   key: RuntimeProviderStatus["key"]
 ): RuntimeProviderStatus | null {
   return diagnostics?.providers.find((provider) => provider.key === key) ?? null;
-}
-
-function buildCreateJobPayload(uploadId: string, providerPreferences: ProviderPreferences) {
-  const hasExplicitPreference = Object.values(providerPreferences).some((value) => value && value !== "auto");
-
-  return hasExplicitPreference ? { uploadId, providerPreferences } : { uploadId };
 }
 
 function buildRuntimeOptionInstallKey(option: RuntimeProviderOption): string {
@@ -447,6 +453,93 @@ function RuntimeProviderPreferenceField({
   );
 }
 
+interface PianoFilterSettingsPanelProps {
+  value: ProcessingPreferences["pianoFilter"];
+  disabled?: boolean;
+  onToggleEnabled: (enabled: boolean) => void;
+  onChangeNumber: (key: "lowCutHz" | "highCutHz" | "cleanupStrength", value: number) => void;
+}
+
+function PianoFilterSettingsPanel({
+  value,
+  disabled = false,
+  onToggleEnabled,
+  onChangeNumber
+}: PianoFilterSettingsPanelProps) {
+  return (
+    <section className="runtime-custom-section">
+      <div className="runtime-custom-header">
+        <div>
+          <strong>Piano Stem Cleanup / 钢琴分轨预清理</strong>
+          <div className="muted runtime-custom-help">
+            This lightweight pre-filter runs after source separation and before piano transcription. The filtered piano stem
+            is also the default piano preview.
+            <br />
+            这是一个轻量的钢琴分轨预过滤步骤，位于源分离之后、钢琴转谱之前；过滤后的钢琴分轨也会成为默认试听版本。
+          </div>
+        </div>
+      </div>
+      <div className="runtime-custom-form ornate-card">
+        <label className="runtime-option-card">
+          <input
+            checked={value.enabled}
+            disabled={disabled}
+            type="checkbox"
+            onChange={(event) => onToggleEnabled(event.target.checked)}
+          />
+          <span className="runtime-option-label">Use filtered piano stem by default / 默认使用过滤后的钢琴分轨</span>
+          <span className="muted">Keeps the raw separated stem available, but makes preview and transcription favor the cleaned stem. / 保留原始分轨，同时让试听和转谱优先使用清理后的版本。</span>
+        </label>
+
+        <div className="field">
+          <label htmlFor="piano-filter-low-cut">Low cleanup / 低频清理: {Math.round(value.lowCutHz)} Hz</label>
+          <input
+            id="piano-filter-low-cut"
+            type="range"
+            min="20"
+            max="180"
+            step="5"
+            disabled={disabled || !value.enabled}
+            value={value.lowCutHz}
+            onChange={(event) => onChangeNumber("lowCutHz", Number(event.target.value))}
+          />
+          <div className="muted">Reduces low bass-like residue in the piano stem. / 减少钢琴分轨里偏低频、像贝斯一样的残留。</div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="piano-filter-high-cut">High cleanup / 高频清理: {Math.round(value.highCutHz)} Hz</label>
+          <input
+            id="piano-filter-high-cut"
+            type="range"
+            min="3000"
+            max="12000"
+            step="250"
+            disabled={disabled || !value.enabled}
+            value={value.highCutHz}
+            onChange={(event) => onChangeNumber("highCutHz", Number(event.target.value))}
+          />
+          <div className="muted">Softens sharp high-frequency bleed that may confuse transcription. / 柔化可能干扰转谱的尖锐高频串音。</div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="piano-filter-strength">Cleanup strength / 清理强度: {value.cleanupStrength.toFixed(2)}</label>
+          <input
+            id="piano-filter-strength"
+            type="range"
+            min="0"
+            max="0.9"
+            step="0.05"
+            disabled={disabled || !value.enabled}
+            value={value.cleanupStrength}
+            onChange={(event) => onChangeNumber("cleanupStrength", Number(event.target.value))}
+          />
+          <div className="muted">Controls how strongly the piano stem is cleaned before transcription. / 控制钢琴分轨在转谱前被清理得多强。</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRecord | null {
   if (!projectDetail) {
     return null;
@@ -468,6 +561,7 @@ function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRec
           : "Project metadata loaded from the local project library.")
     },
     providerPreferences: projectDetail.providerPreferences ?? undefined,
+    processingPreferences: projectDetail.processingPreferences ?? undefined,
     result: projectDetail.originalResult ?? undefined,
     error: projectDetail.error ?? undefined
   };
@@ -481,6 +575,32 @@ function toEditableProviderPreferences(
     pianoTranscription: providerPreferences?.pianoTranscription ?? "auto",
     drumTranscription: providerPreferences?.drumTranscription ?? "auto"
   };
+}
+
+function toEditableProcessingPreferences(
+  processingPreferences?: ProcessingPreferences | null
+): ProcessingPreferences {
+  return {
+    pianoFilter: {
+      enabled: processingPreferences?.pianoFilter?.enabled ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.enabled,
+      lowCutHz: processingPreferences?.pianoFilter?.lowCutHz ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.lowCutHz,
+      highCutHz: processingPreferences?.pianoFilter?.highCutHz ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.highCutHz,
+      cleanupStrength:
+        processingPreferences?.pianoFilter?.cleanupStrength ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.cleanupStrength
+    }
+  };
+}
+
+function buildCreateJobPayload(
+  uploadId: string,
+  providerPreferences: ProviderPreferences,
+  processingPreferences: ProcessingPreferences
+) {
+  const hasExplicitPreference = Object.values(providerPreferences).some((value) => value && value !== "auto");
+
+  return hasExplicitPreference
+    ? { uploadId, providerPreferences, processingPreferences }
+    : { uploadId, processingPreferences };
 }
 
 function formatProjectAssetSummary(projectDetail: ProjectDetail): string {
@@ -581,10 +701,14 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [providerPreferences, setProviderPreferences] = useState<ProviderPreferences>(() =>
     toEditableProviderPreferences(initialProjectDetail?.providerPreferences ?? null)
   );
+  const [processingPreferences, setProcessingPreferences] = useState<ProcessingPreferences>(() =>
+    toEditableProcessingPreferences(initialProjectDetail?.processingPreferences ?? null)
+  );
   const [providerInstallStates, setProviderInstallStates] = useState<Record<string, RuntimeProviderInstallUiState>>({});
   const [isCustomProviderFormOpen, setIsCustomProviderFormOpen] = useState(false);
   const [customProviderManifestUrl, setCustomProviderManifestUrl] = useState("");
   const [customProviderInstallState, setCustomProviderInstallState] = useState<RuntimeCustomProviderInstallUiState | null>(null);
+  const [isRerunningProject, setIsRerunningProject] = useState(false);
   const lastDraftJobIdRef = useRef<string | null>(null);
 
   const {
@@ -657,6 +781,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     setJob(buildJobFromProjectDetail(initialProjectDetail));
     setSavedDraft(initialProjectDetail?.savedDraft ?? null);
     setProviderPreferences(toEditableProviderPreferences(initialProjectDetail?.providerPreferences ?? null));
+    setProcessingPreferences(toEditableProcessingPreferences(initialProjectDetail?.processingPreferences ?? null));
     setSuggestions([]);
     setSuggestionsStale(false);
     setLastAnalyzedDraftSignature(null);
@@ -694,6 +819,25 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
 
     return () => window.clearInterval(intervalId);
   }, [job, mode]);
+
+  useEffect(() => {
+    if (mode !== "project" || !projectDetail || (projectDetail.status !== "queued" && projectDetail.status !== "processing")) {
+      return;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const response = await getProjectDetail(projectDetail.projectId);
+        setProjectDetail(response.project);
+        setJob(buildJobFromProjectDetail(response.project));
+        setSavedDraft(response.project.savedDraft ?? null);
+      } catch (pollError) {
+        setError(pollError instanceof Error ? pollError.message : "Failed to refresh project status.");
+      }
+    }, 1500);
+
+    return () => window.clearInterval(intervalId);
+  }, [mode, projectDetail]);
 
   useEffect(() => {
     if (!job?.result || job.status !== "completed") {
@@ -1122,7 +1266,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
 
     return [
-      { label: "Piano stem / 钢琴分轨", stem: activeResult.stems.find((stem) => stem.instrumentHint === "piano") },
+      { label: "Filtered piano stem / 过滤后钢琴分轨", stem: activeResult.stems.find((stem) => stem.stemName === "piano_stem") },
+      { label: "Raw piano stem / 原始钢琴分轨", stem: activeResult.stems.find((stem) => stem.stemName === "piano_stem_raw") },
       { label: "Drum stem / 鼓组分轨", stem: activeResult.stems.find((stem) => stem.instrumentHint === "drums") }
     ]
       .filter((item) => item.stem != null)
@@ -1295,7 +1440,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       setUpload(uploadResponse);
       setIsUploading(false);
       setIsCreatingJob(true);
-      const jobResponse = await createJob(buildCreateJobPayload(uploadResponse.upload.uploadId, providerPreferences));
+      const jobResponse = await createJob(
+        buildCreateJobPayload(uploadResponse.upload.uploadId, providerPreferences, processingPreferences)
+      );
       setJob(jobResponse.job);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Upload failed.");
@@ -1448,6 +1595,19 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     setProviderPreferences((currentPreferences) => ({
       ...currentPreferences,
       [key]: value
+    }));
+  }
+
+  function handlePianoFilterSettingChange(
+    key: keyof ProcessingPreferences["pianoFilter"],
+    value: boolean | number
+  ): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoFilter: {
+        ...currentPreferences.pianoFilter,
+        [key]: value
+      }
     }));
   }
 
@@ -1688,6 +1848,32 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       await navigator.clipboard.writeText(shareUrl);
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : "Failed to copy the project link.");
+    }
+  }
+
+  async function handleRerunProject(): Promise<void> {
+    if (!projectDetail) {
+      return;
+    }
+
+    setError(null);
+    setIsRerunningProject(true);
+
+    try {
+      const response = await rerunProject(projectDetail.projectId, {
+        providerPreferences,
+        processingPreferences
+      });
+      setProjectDetail(response.project);
+      setJob(buildJobFromProjectDetail(response.project));
+      setSavedDraft(response.project.savedDraft ?? null);
+      setExportWorkflowMessage(
+        "Rebuilding the filtered piano stem and rerunning transcription for this project. / 正在为当前项目重建过滤后的钢琴分轨并重新转谱。"
+      );
+    } catch (rerunError) {
+      setError(rerunError instanceof Error ? rerunError.message : "Failed to rerun the current project.");
+    } finally {
+      setIsRerunningProject(false);
     }
   }
 
@@ -1944,6 +2130,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                       titleZh="鼓轨转谱"
                     />
                   </div>
+                  <PianoFilterSettingsPanel
+                    value={processingPreferences.pianoFilter}
+                    onToggleEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
+                    onChangeNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                  />
                   <section className="runtime-custom-section">
                     <div className="runtime-custom-header">
                       <div>
@@ -2283,9 +2474,28 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               </div>
             </article>
             <article className="score-secondary-card ornate-card audition-card">
+              <h3>Piano Filter Controls / 钢琴过滤控制</h3>
+              <p className="muted">
+                Tune the filtered piano stem, then rerun this project to rebuild the preview and piano transcription from the saved settings.
+                <br />
+                调整过滤后的钢琴分轨参数后，重新运行当前项目，即可按已保存设置重建试听和钢琴转谱。
+              </p>
+              <PianoFilterSettingsPanel
+                value={processingPreferences.pianoFilter}
+                disabled={isRerunningProject}
+                onToggleEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
+                onChangeNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+              />
+              <div className="actions">
+                <button className="button" type="button" disabled={!projectDetail || isRerunningProject} onClick={() => void handleRerunProject()}>
+                  {isRerunningProject ? "Rebuilding Filtered Stem... / 正在重建过滤分轨..." : "Rerun with Current Filter / 按当前过滤设置重跑"}
+                </button>
+              </div>
+            </article>
+            <article className="score-secondary-card ornate-card audition-card">
               <h3>Quick Stem Check / 快速试听</h3>
               <p className="muted">
-                Use these local stem previews to confirm separation worked. Full files are exposed here; in practice, the first 15-20 seconds are usually enough for a quick check.
+                Use these local stem previews to confirm separation worked. The filtered piano stem is the default piano preview and transcription input, while the raw piano stem stays available for comparison.
                 <br />
                 使用这些本地分轨试听快速确认分离是否可用。这里直接播放完整分轨，实际通常试听前 15-20 秒就足够判断。
               </p>

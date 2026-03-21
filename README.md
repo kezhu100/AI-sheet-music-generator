@@ -84,6 +84,18 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
   Drum MusicXML now uses lightweight percussion semantics optimized for MuseScore drum-staff import.  
   鼓谱 MusicXML 现已使用针对 MuseScore 鼓谱导入优化的轻量 percussion 语义。  
 
+- **Conservative piano draft cleanup after transcription**  
+  **钢琴转谱后增加保守型草稿清理**
+
+  Piano post-processing now applies lightweight conservative filtering to reduce false positives caused by non-piano residuals left in the separated piano stem.  
+  钢琴后处理现在会做轻量保守过滤，用于减少分离后钢琴 stem 中残留的非钢琴成分带来的误检。  
+
+- **Configurable piano stem pre-filter before transcription**  
+  **钢琴转谱前增加可调的分轨预过滤**
+
+  The workspace now lets users tune a lightweight piano-stem pre-filter, hear the filtered stem directly, and rerun piano transcription from that saved filtered preview.  
+  现在工作区支持调节轻量钢琴分轨预过滤，直接试听过滤后的分轨，并基于该已保存的过滤结果重新运行钢琴转谱。  
+
 - **MuseScore handoff for final polishing**  
   **支持交接到 MuseScore 进行最终排版润色**
 
@@ -162,6 +174,7 @@ Not required for normal app usage
 audio
   -> local ffmpeg normalization / PCM WAV handoff
   -> source separation
+  -> optional configurable piano stem pre-filter
   -> piano / drum transcription
   -> post-processing
   -> lightweight preview + stem audition
@@ -175,6 +188,8 @@ audio
   **执行本地分离与转谱**
 - **Verify the draft with lightweight preview and stem listening**  
   **通过轻量预览与分轨试听确认草稿可用性**
+- **Tune the filtered piano stem when separation leaves residue**  
+  **当钢琴分轨仍有残留时，可先调节过滤后的钢琴试听**
 - **Refine obvious issues in-browser**  
   **在浏览器内修正明显问题**
 - **Export clean separated output and finish in MuseScore**  

@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Optional
 from uuid import uuid4
 
-from app.models.schemas import JobProgress, JobRecord, JobResult, ProviderPreferences, utc_now
+from app.models.schemas import JobProgress, JobRecord, JobResult, ProcessingPreferences, ProviderPreferences, utc_now
 
 
 class JobStore:
@@ -12,16 +12,24 @@ class JobStore:
         self._jobs: dict[str, JobRecord] = {}
         self._lock = Lock()
 
-    def create(self, upload_id: str, provider_preferences: ProviderPreferences | None = None) -> JobRecord:
+    def create(
+        self,
+        upload_id: str,
+        provider_preferences: ProviderPreferences | None = None,
+        processing_preferences: ProcessingPreferences | None = None,
+        *,
+        job_id: str | None = None,
+    ) -> JobRecord:
         now = utc_now()
         job = JobRecord(
-            id=uuid4().hex,
+            id=job_id or uuid4().hex,
             uploadId=upload_id,
             status="queued",
             createdAt=now,
             updatedAt=now,
             progress=JobProgress(stage="queued", percent=0, message="Job created and waiting for processing."),
             providerPreferences=provider_preferences,
+            processingPreferences=processing_preferences,
         )
         with self._lock:
             self._jobs[job.id] = job

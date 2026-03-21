@@ -4,6 +4,39 @@
 
 ### 2026-03-21
 Decision:
+- Add a lightweight, configurable piano stem pre-filter stage before piano transcription, and make the filtered stem the default piano preview in the workspace.
+
+Context:
+- Conservative post-processing cleanup already reduced some residual-driven piano false positives, but users still could not hear or tune cleanup earlier in the audio path.
+- Product direction remains local-first, export-first, and MuseScore-centered, so practical controllable cleanup matters more than adding a heavier model or redesigning the browser notation surface.
+
+Chosen option:
+- Keep the current provider/export architecture and add a deterministic DSP-style piano pre-filter between source separation and piano transcription.
+- Persist project-local piano filter settings, regenerate a filtered piano stem on rerun, and expose both filtered and raw piano stem audition in the existing compact workspace.
+- Keep controls small and plain-language: enable/disable, low cleanup, high cleanup, and cleanup strength.
+
+Tradeoffs:
+- This improves user control and lets people hear the cleanup effect directly, but it is still not a perfect piano-isolation system and may trade away some piano brightness or low-end body when pushed too far.
+
+### 2026-03-21
+Decision:
+- Add a conservative piano post-processing cleanup layer to suppress obvious false positives from non-piano residuals left in the separated piano stem.
+
+Context:
+- The export path is already the product center of gravity, so cleaner piano drafts matter more than preserving every weak detection.
+- The current piano pipeline already has lightweight provider-level thresholds and generic post-processing, but it lacked piano-specific residual filtering after source separation.
+
+Chosen option:
+- Keep the current provider architecture and `JobResult` contract unchanged.
+- Add a small piano-specific heuristic cleanup stage inside backend post-processing.
+- Prefer removing isolated weak/extreme/suspicious piano notes over keeping noisy drafts.
+- Avoid introducing a heavier transcription model in this step.
+
+Tradeoffs:
+- This should reduce obvious residual-driven noise, but some weak real piano notes may now be filtered more aggressively in exchange for cleaner draft/export output.
+
+### 2026-03-21
+Decision:
 - Keep export UX compact, but make file purpose explicit so users can immediately distinguish MuseScore handoff, MIDI/DAW export, and compatibility-oriented combined export.
 
 Context:

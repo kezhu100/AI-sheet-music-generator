@@ -86,6 +86,74 @@ class PostProcessingTests(unittest.TestCase):
             result.warnings,
         )
 
+    def test_filters_isolated_weak_extreme_register_piano_note_as_residual(self) -> None:
+        processor = LightweightPostProcessor()
+        track = TrackResult(
+            instrument="piano",
+            sourceStem="piano_stem",
+            provider="provider-a",
+            eventCount=4,
+            notes=[
+                self._piano_note("keep-left", 0.00, 0.42, 60, 0.86),
+                self._piano_note("keep-right", 0.50, 0.92, 64, 0.84),
+                self._piano_note("keep-third", 1.02, 1.38, 67, 0.82),
+                self._piano_note("isolated-high-noise", 2.20, 2.32, 106, 0.46),
+            ],
+        )
+
+        result = processor.process([track], warnings=[])
+        note_ids = [note.id for note in result.tracks[0].notes]
+
+        self.assertEqual(note_ids, ["keep-left", "keep-right", "keep-third"])
+        self.assertIn(
+            "Phase 11D post-processing removed 1 suspicious piano note events that looked more like source-separation residuals than stable piano notes.",
+            result.warnings,
+        )
+
+    def test_filters_suspicious_long_weak_piano_note(self) -> None:
+        processor = LightweightPostProcessor()
+        track = TrackResult(
+            instrument="piano",
+            sourceStem="piano_stem",
+            provider="provider-a",
+            eventCount=4,
+            notes=[
+                self._piano_note("keep-a", 0.00, 0.40, 60, 0.88),
+                self._piano_note("keep-b", 0.52, 0.94, 64, 0.87),
+                self._piano_note("keep-c", 1.04, 1.42, 67, 0.85),
+                self._piano_note("long-pad-like", 1.60, 7.80, 58, 0.61),
+            ],
+        )
+
+        result = processor.process([track], warnings=[])
+        note_ids = [note.id for note in result.tracks[0].notes]
+
+        self.assertEqual(note_ids, ["keep-a", "keep-b", "keep-c"])
+        self.assertIn(
+            "Phase 11D post-processing removed 1 suspicious piano note events that looked more like source-separation residuals than stable piano notes.",
+            result.warnings,
+        )
+
+    def test_keeps_sparse_but_confident_supported_piano_notes(self) -> None:
+        processor = LightweightPostProcessor()
+        track = TrackResult(
+            instrument="piano",
+            sourceStem="piano_stem",
+            provider="provider-a",
+            eventCount=3,
+            notes=[
+                self._piano_note("left", 0.00, 0.52, 55, 0.83),
+                self._piano_note("middle", 0.38, 0.90, 60, 0.86),
+                self._piano_note("right", 0.82, 1.30, 64, 0.84),
+            ],
+        )
+
+        result = processor.process([track], warnings=[])
+        note_ids = [note.id for note in result.tracks[0].notes]
+
+        self.assertEqual(note_ids, ["left", "middle", "right"])
+        self.assertFalse(any("suspicious piano note events" in warning for warning in result.warnings))
+
     def test_merges_same_instrument_and_source_stem_tracks_with_stable_provider_name(self) -> None:
         processor = LightweightPostProcessor()
         merged = processor.process(

@@ -58,9 +58,52 @@ class ProviderPreferences(BaseModel):
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
 
+class PianoFilterSettings(BaseModel):
+    enabled: bool = True
+    low_cut_hz: float = Field(default=45.0, alias="lowCutHz")
+    high_cut_hz: float = Field(default=7200.0, alias="highCutHz")
+    cleanup_strength: float = Field(default=0.42, alias="cleanupStrength")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("low_cut_hz")
+    @classmethod
+    def validate_low_cut_hz(cls, value: float) -> float:
+        if value < 20 or value > 220:
+            raise ValueError("lowCutHz must stay between 20 and 220 Hz.")
+        return value
+
+    @field_validator("high_cut_hz")
+    @classmethod
+    def validate_high_cut_hz(cls, value: float) -> float:
+        if value < 1500 or value > 12000:
+            raise ValueError("highCutHz must stay between 1500 and 12000 Hz.")
+        return value
+
+    @field_validator("cleanup_strength")
+    @classmethod
+    def validate_cleanup_strength(cls, value: float) -> float:
+        if value < 0 or value > 1:
+            raise ValueError("cleanupStrength must stay between 0 and 1.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_cutoff_order(self) -> "PianoFilterSettings":
+        if self.high_cut_hz <= self.low_cut_hz:
+            raise ValueError("highCutHz must be greater than lowCutHz.")
+        return self
+
+
+class ProcessingPreferences(BaseModel):
+    piano_filter: PianoFilterSettings = Field(default_factory=PianoFilterSettings, alias="pianoFilter")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
 class CreateJobRequest(BaseModel):
     upload_id: str = Field(alias="uploadId")
     provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
+    processing_preferences: Optional[ProcessingPreferences] = Field(default=None, alias="processingPreferences")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -363,6 +406,7 @@ class JobRecord(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
     progress: JobProgress
     provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
+    processing_preferences: Optional[ProcessingPreferences] = Field(default=None, alias="processingPreferences")
     result: Optional[JobResult] = None
     error: Optional[str] = None
 
@@ -399,6 +443,7 @@ class ProjectSummary(BaseModel):
     draft_version: Optional[int] = Field(default=None, alias="draftVersion")
     draft_saved_at: Optional[datetime] = Field(default=None, alias="draftSavedAt")
     provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
+    processing_preferences: Optional[ProcessingPreferences] = Field(default=None, alias="processingPreferences")
     assets: ProjectAssetAvailability
     share_path: str = Field(alias="sharePath")
     current_stage: Optional[str] = Field(default=None, alias="currentStage")
@@ -520,6 +565,13 @@ class ProjectDuplicateRequest(BaseModel):
 
 class ProjectDeleteResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+
+class ProjectRerunRequest(BaseModel):
+    provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
+    processing_preferences: Optional[ProcessingPreferences] = Field(default=None, alias="processingPreferences")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

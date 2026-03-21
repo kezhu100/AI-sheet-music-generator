@@ -27,8 +27,9 @@ Phase 11A source separation update:
 - `development-copy` remains available for local development and deterministic fallback
 - `demucs` can be enabled as a stronger backend when Demucs is installed in the configured Python environment
 - fallback can automatically return to `development-copy` when the stronger provider is unavailable
-- persisted stems remain normalized as `piano_stem` and `drum_stem` so downstream transcription and frontend result handling stay unchanged
+- persisted stems now keep `piano_stem` as the filtered piano transcription/preview target, retain `piano_stem_raw` for comparison, and keep `drum_stem` unchanged
 - the current Demucs path maps `drum_stem` from `drums.wav` and maps `piano_stem` from a configurable non-drum output, defaulting to `other.wav`
+- the workspace can save project-local piano filter settings, regenerate the filtered piano stem, and rerun transcription on the same local project route
 
 Phase 11B piano transcription update:
 - the transcription stage now selects the piano backend explicitly through configuration instead of always using the heuristic WAV provider
@@ -37,6 +38,7 @@ Phase 11B piano transcription update:
 - the legacy piano alias `ml` is still accepted as a backward-compatibility config value and resolves to `basic-pitch`
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized piano note events still flow into the same post-processing stage and the same `JobResult` structure
+- a lightweight deterministic piano stem pre-filter can now run between source separation and piano transcription, with user-tunable low cut, high cut, and cleanup strength settings
 
 Phase 11C drum transcription update:
 - the transcription stage now selects the drum backend explicitly through configuration instead of always using the heuristic WAV provider
@@ -49,7 +51,8 @@ Phase 11C drum transcription update:
 
 Phase 11D post-processing update:
 - the post-processing stage remains backend-owned and still returns the same normalized `JobResult` shape
-- post-processing now performs richer cleanup before final delivery: confidence-aware filtering, short weak-note removal, near-duplicate cleanup, and overlapping same-pitch piano-note trimming where quantization would otherwise leave stacked durations
+- post-processing now performs richer cleanup before final delivery: confidence-aware filtering, short weak-note removal, conservative piano residual cleanup, near-duplicate cleanup, and overlapping same-pitch piano-note trimming where quantization would otherwise leave stacked durations
+- frontend stem audition now defaults to the filtered piano stem when available so users can hear the cleanup effect before export or rerun decisions
 - tempo estimation now uses weighted onset evidence from cleaned note events instead of only a minimal adjacent-interval heuristic
 - quantization still assumes a simple single-tempo 4/4 result, but it now adaptively chooses between eighth-note and sixteenth-note grids for more predictable normalization
 - warnings now surface fallback or cleanup behavior more explicitly when timing evidence is sparse/noisy or when events are removed during normalization

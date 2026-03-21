@@ -10,6 +10,8 @@ The current product includes:
 - audio upload
 - local audio normalization to a stable PCM WAV intermediate for common music formats
 - provider-based source separation and transcription
+- configurable piano stem pre-filtering before piano transcription
+- conservative piano post-processing cleanup to reduce residual-driven false positives
 - lightweight result review in the browser
 - draft editing and saved-draft persistence for cleanup before export
 - region re-transcription and draft analysis
@@ -85,6 +87,7 @@ Backend provider scope is now intentionally split:
 - common compressed inputs now rely on a local `ffmpeg` install for preprocessing; compatible PCM WAV inputs still work without it
 - generated notation remains a draft, not final engraving
 - browser preview remains simplified and verification-oriented rather than publication-grade notation
+- the piano stem preview may now favor a saved filtered stem over the raw separated stem
 - project workflows remain local-only
 - background job recovery is still deferred
 - MuseScore is the intended final notation polishing environment after separate piano/drum export
@@ -101,6 +104,7 @@ Backend provider scope is now intentionally split:
 This roadmap direction clarifies the product center of gravity:
 - the browser UI is a verification surface, not a final notation editor
 - draft editing remains for quick fixes before export, not deep engraving work
+- piano stem cleanup can now be tuned in the workspace and heard before rerunning transcription
 - separate piano/drum MusicXML handoff to MuseScore is the intended final notation-editing path
 - export quality and usability now matter more than richer in-browser notation rendering
 

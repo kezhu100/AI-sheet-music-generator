@@ -52,6 +52,8 @@
 - [ ] keep quick stem audition compact and easy to compare across piano/drum stems
 - [x] make separate piano/drum MusicXML handoff obvious in the export flow
 - [x] clarify export guidance so MuseScore, MIDI/DAW, and compatibility-oriented paths are easy to distinguish
+- [x] add conservative piano post-processing cleanup to reduce residual-driven false positives
+- [x] add configurable piano stem pre-filtering with filtered preview + same-project rerun flow
 
 ## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)

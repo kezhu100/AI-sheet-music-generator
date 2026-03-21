@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Protocol
 
-from app.models.schemas import JobResult, NoteEvent, StemAsset
+from app.models.schemas import JobResult, NoteEvent, ProcessingPreferences, StemAsset
 
 
 @dataclass(frozen=True)
@@ -53,5 +53,11 @@ class DrumTranscriptionProvider(Protocol):
 
 
 class ProcessingPipeline(Protocol):
-    def run(self, audio_path: Path, original_file_name: str, job_id: str) -> JobResult:
+    def run(
+        self,
+        audio_path: Path,
+        original_file_name: str,
+        job_id: str,
+        processing_preferences: ProcessingPreferences | None = None,
+    ) -> JobResult:
         ...

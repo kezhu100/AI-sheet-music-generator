@@ -42,9 +42,9 @@ async def create_job(payload: CreateJobRequest) -> JobResponse:
     if upload is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found.")
 
-    job = job_store.create(payload.upload_id, payload.provider_preferences)
-    project_store.create_project(job, upload, payload.provider_preferences)
-    start_job(job.id, upload, payload.provider_preferences)
+    job = job_store.create(payload.upload_id, payload.provider_preferences, payload.processing_preferences)
+    project_store.create_project(job, upload, payload.provider_preferences, payload.processing_preferences)
+    start_job(job.id, upload, payload.provider_preferences, payload.processing_preferences)
     return JobResponse(job=job)
 
 

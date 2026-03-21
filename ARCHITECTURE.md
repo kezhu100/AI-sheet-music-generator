@@ -95,14 +95,15 @@ The processing pipeline remains:
 2. create processing job
 3. backend-local audio normalization / ffmpeg transcoding into a job-scoped PCM WAV intermediate when needed
 4. source separation via the configured provider
-5. persist stems
-6. piano transcription via the configured provider
-7. drum transcription via the configured provider
-8. backend-owned post-processing and normalization
-9. deliver normalized `JobResult`
-10. clone to frontend draft for editing
-11. save/load latest draft separately when requested
-12. export piano-only or drums-only MIDI/MusicXML from original or draft result
+5. persist separated stems, including raw piano stem retention for comparison when filtering is enabled
+6. optional backend-owned piano stem pre-filtering before piano transcription
+7. piano transcription via the configured provider
+8. drum transcription via the configured provider
+9. backend-owned post-processing and normalization, including conservative piano cleanup for residual-heavy stems
+10. deliver normalized `JobResult`
+11. clone to frontend draft for editing
+12. save/load latest draft separately when requested
+13. export piano-only or drums-only MIDI/MusicXML from original or draft result
 
 Notes:
 - compatible PCM WAV uploads still pass through this stage without requiring ffmpeg transcoding
@@ -119,7 +120,7 @@ Phase 14.5 preserves the current boundary:
 
 The verification/handoff refinement keeps the same boundary:
 - the backend may expose persisted local stems for read-only browser audition without changing `JobResult`
-- the frontend may use those persisted assets for compact verification playback only
+- the frontend may use those persisted assets for compact verification playback only, including a filtered piano default plus optional raw comparison
 - export stays backend-owned, and MuseScore handoff remains download-based rather than OS-launch-based, with separate piano/drum MusicXML as the recommended path
 
 Provider install behavior follows the same boundary:

@@ -38,6 +38,14 @@ class JobsApiTests(unittest.TestCase):
                         "pianoTranscription": "basic-pitch",
                         "drumTranscription": "demucs-drums",
                     },
+                    "processingPreferences": {
+                        "pianoFilter": {
+                            "enabled": True,
+                            "lowCutHz": 60,
+                            "highCutHz": 6800,
+                            "cleanupStrength": 0.5,
+                        }
+                    },
                 },
             )
 
@@ -46,11 +54,14 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
         self.assertEqual(payload["providerPreferences"]["pianoTranscription"], "basic-pitch")
         self.assertEqual(payload["providerPreferences"]["drumTranscription"], "demucs-drums")
+        self.assertEqual(payload["processingPreferences"]["pianoFilter"]["lowCutHz"], 60)
         start_job_mock.assert_called_once()
-        _, _, provider_preferences = start_job_mock.call_args.args
+        _, _, provider_preferences, processing_preferences = start_job_mock.call_args.args
         self.assertEqual(provider_preferences.source_separation, "demucs")
         self.assertEqual(provider_preferences.piano_transcription, "basic-pitch")
         self.assertEqual(provider_preferences.drum_transcription, "demucs-drums")
+        self.assertEqual(processing_preferences.piano_filter.low_cut_hz, 60)
+        self.assertEqual(processing_preferences.piano_filter.high_cut_hz, 6800)
 
     def test_get_job_stem_asset_streams_local_stem_file(self) -> None:
         settings = get_settings()

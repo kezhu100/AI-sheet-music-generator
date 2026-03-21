@@ -3,7 +3,7 @@ from __future__ import annotations
 from threading import Thread
 from time import sleep
 
-from app.models.schemas import ProviderPreferences, UploadedFileDescriptor
+from app.models.schemas import ProcessingPreferences, ProviderPreferences, UploadedFileDescriptor
 from app.pipeline.development_pipeline import build_processing_pipeline
 from app.services.job_store import job_store
 from app.services.provider_preferences import resolve_settings_with_provider_preferences
@@ -11,12 +11,29 @@ from app.services.project_store import project_store
 from app.services.storage import resolve_upload_path
 
 
-def start_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: ProviderPreferences | None = None) -> None:
-    thread = Thread(target=_run_job, args=(job_id, upload, provider_preferences), daemon=True)
+def start_job(
+    job_id: str,
+    upload: UploadedFileDescriptor,
+    provider_preferences: ProviderPreferences | None = None,
+    processing_preferences: ProcessingPreferences | None = None,
+    *,
+    replace_existing_result: bool = False,
+) -> None:
+    thread = Thread(
+        target=_run_job,
+        args=(job_id, upload, provider_preferences, processing_preferences, replace_existing_result),
+        daemon=True,
+    )
     thread.start()
 
 
-def _run_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: ProviderPreferences | None = None) -> None:
+def _run_job(
+    job_id: str,
+    upload: UploadedFileDescriptor,
+    provider_preferences: ProviderPreferences | None = None,
+    processing_preferences: ProcessingPreferences | None = None,
+    replace_existing_result: bool = False,
+) -> None:
     try:
         settings = resolve_settings_with_provider_preferences(provider_preferences)
         job_store.update_progress(
@@ -71,9 +88,19 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: 
         sleep(0.4)
 
         pipeline = build_processing_pipeline(settings)
-        result = pipeline.run(resolve_upload_path(upload.stored_path), upload.file_name, job_id)
+        result = pipeline.run(
+            resolve_upload_path(upload.stored_path),
+            upload.file_name,
+            job_id,
+            processing_preferences,
+        )
         completed_job = job_store.complete(job_id, result)
-        project_store.mark_completed(completed_job, result)
+        project_store.mark_completed(
+            completed_job,
+            result,
+            replace_existing_result=replace_existing_result,
+            clear_saved_draft=replace_existing_result,
+        )
     except Exception as exc:
         failed_job = job_store.fail(job_id, str(exc))
         project_store.mark_failed(failed_job)

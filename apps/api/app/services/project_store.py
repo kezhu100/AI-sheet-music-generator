@@ -16,6 +16,7 @@ from app.models.schemas import (
     JobProgress,
     JobRecord,
     JobResult,
+    ProcessingPreferences,
     ProjectAssetAvailability,
     ProjectDetail,
     ProjectManifestRecord,
@@ -39,6 +40,7 @@ class ProjectStore:
         job: JobRecord,
         upload: UploadedFileDescriptor,
         provider_preferences: ProviderPreferences | None = None,
+        processing_preferences: ProcessingPreferences | None = None,
     ) -> ProjectManifestRecord:
         manifest = ProjectManifestRecord(
             summary=ProjectSummary(
@@ -52,6 +54,7 @@ class ProjectStore:
                 draftVersion=None,
                 draftSavedAt=None,
                 providerPreferences=provider_preferences if provider_preferences is not None else job.provider_preferences,
+                processingPreferences=processing_preferences if processing_preferences is not None else job.processing_preferences,
                 assets=ProjectAssetAvailability(
                     hasSourceUpload=True,
                     hasStems=False,
@@ -91,7 +94,14 @@ class ProjectStore:
         self._write_manifest(manifest)
         return manifest
 
-    def mark_completed(self, job: JobRecord, result: JobResult) -> Optional[ProjectManifestRecord]:
+    def mark_completed(
+        self,
+        job: JobRecord,
+        result: JobResult,
+        *,
+        replace_existing_result: bool = False,
+        clear_saved_draft: bool = False,
+    ) -> Optional[ProjectManifestRecord]:
         manifest = self._read_manifest(job.id)
         if manifest is None:
             return None
@@ -103,7 +113,14 @@ class ProjectStore:
         manifest.status_message = job.progress.message
         manifest.error = job.error
 
-        self._write_original_result_if_missing(job.id, result)
+        if replace_existing_result:
+            self.replace_original_result(job.id, result, clear_saved_draft=clear_saved_draft)
+            manifest.summary.has_saved_draft = False
+            manifest.summary.draft_version = None
+            manifest.summary.draft_saved_at = None
+            manifest.draft_saved_at = None
+        else:
+            self._write_original_result_if_missing(job.id, result)
         self._write_manifest(manifest)
         return manifest
 
@@ -198,6 +215,7 @@ class ProjectStore:
                 draftVersion=1 if saved_draft is not None else None,
                 draftSavedAt=now if saved_draft is not None else None,
                 providerPreferences=source_manifest.summary.provider_preferences,
+                processingPreferences=source_manifest.summary.processing_preferences,
                 assets=source_manifest.summary.assets.model_copy(deep=True),
                 sharePath=f"/projects/{duplicate_project_id}",
                 currentStage="completed" if original_result is not None else source_manifest.summary.current_stage,
@@ -266,6 +284,7 @@ class ProjectStore:
             draftVersion=summary.draft_version,
             assets=summary.assets,
             providerPreferences=summary.provider_preferences,
+            processingPreferences=summary.processing_preferences,
             sharePath=summary.share_path,
             upload=manifest.upload,
             originalResult=original_result,
@@ -299,9 +318,36 @@ class ProjectStore:
                 message=manifest.status_message or "Completed project loaded from persisted storage.",
             ),
             providerPreferences=manifest.summary.provider_preferences,
+            processingPreferences=manifest.summary.processing_preferences,
             result=original_result,
             error=manifest.error,
         )
+
+    def begin_reprocessing(
+        self,
+        project_id: str,
+        *,
+        provider_preferences: ProviderPreferences | None,
+        processing_preferences: ProcessingPreferences | None,
+        progress: JobProgress,
+    ) -> Optional[ProjectDetail]:
+        manifest = self._read_manifest(project_id)
+        if manifest is None or manifest.deleted_at is not None:
+            return None
+
+        now = utc_now()
+        manifest.summary.status = "queued"
+        manifest.summary.updated_at = now
+        manifest.summary.provider_preferences = provider_preferences
+        manifest.summary.processing_preferences = processing_preferences
+        manifest.summary.current_stage = progress.stage
+        manifest.summary.status_message = progress.message
+        manifest.summary.error = None
+        manifest.current_stage = progress.stage
+        manifest.status_message = progress.message
+        manifest.error = None
+        self._write_manifest(manifest)
+        return self.get_project_detail(project_id)
 
     def get_project_dir(self, project_id: str) -> Path:
         return self._project_dir(project_id)
@@ -376,6 +422,11 @@ class ProjectStore:
         manifest.summary.error = None
         manifest.summary.current_stage = manifest.current_stage
         manifest.summary.status_message = manifest.status_message
+
+    def replace_original_result(self, project_id: str, result: JobResult, *, clear_saved_draft: bool = False) -> None:
+        self._write_original_result(project_id, result)
+        if clear_saved_draft:
+            draft_store.delete(project_id)
 
     def _write_original_result_if_missing(self, project_id: str, result: JobResult) -> None:
         if self._read_original_result(project_id) is None:

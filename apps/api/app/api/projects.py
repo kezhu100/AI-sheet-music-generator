@@ -13,9 +13,12 @@ from app.models.schemas import (
     ProjectListResponse,
     ProjectPackagingResponse,
     ProjectRenameRequest,
+    ProjectRerunRequest,
 )
 from app.services.project_packaging import ProjectPackagingError, project_packaging_service
 from app.services.project_store import project_store
+from app.services.job_runner import start_job
+from app.services.job_store import job_store
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -65,6 +68,51 @@ async def duplicate_project(project_id: str, payload: Optional[ProjectDuplicateR
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
     return ProjectDetailResponse(project=project)
+
+
+@router.post("/{project_id}/rerun", response_model=ProjectDetailResponse)
+async def rerun_project(project_id: str, payload: Optional[ProjectRerunRequest] = None) -> ProjectDetailResponse:
+    project = project_store.get_project_detail(project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+    if project.upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Project reprocessing requires the original uploaded audio to still be available.",
+        )
+
+    provider_preferences = (
+        payload.provider_preferences
+        if payload is not None and payload.provider_preferences is not None
+        else project.provider_preferences
+    )
+    processing_preferences = (
+        payload.processing_preferences
+        if payload is not None and payload.processing_preferences is not None
+        else project.processing_preferences
+    )
+    queued_job = job_store.create(
+        project.upload.upload_id,
+        provider_preferences,
+        processing_preferences,
+        job_id=project_id,
+    )
+    refreshed_project = project_store.begin_reprocessing(
+        project_id,
+        provider_preferences=provider_preferences,
+        processing_preferences=processing_preferences,
+        progress=queued_job.progress,
+    )
+    if refreshed_project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+    start_job(
+        project_id,
+        project.upload,
+        provider_preferences,
+        processing_preferences,
+        replace_existing_result=True,
+    )
+    return ProjectDetailResponse(project=refreshed_project)
 
 
 @router.post("/{project_id}/export", response_model=ProjectPackagingResponse)

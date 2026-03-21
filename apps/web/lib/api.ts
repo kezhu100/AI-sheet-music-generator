@@ -11,6 +11,7 @@ import type {
   ProjectDeleteResponse,
   ProjectListResponse,
   ProjectPackagingResponse,
+  ProjectRerunRequest,
   ProviderInstallActionResponse,
   ProviderInstallRequest,
   ProviderInstallStatusResponse,
@@ -207,6 +208,18 @@ export async function duplicateProject(projectId: string, projectName?: string):
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ projectName } satisfies DuplicateProjectRequest)
+  });
+
+  return parseJson<ProjectDetailResponse>(response);
+}
+
+export async function rerunProject(projectId: string, payload: ProjectRerunRequest): Promise<ProjectDetailResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/rerun`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
   });
 
   return parseJson<ProjectDetailResponse>(response);

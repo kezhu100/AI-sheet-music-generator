@@ -202,6 +202,45 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(payload["providerPreferences"]["pianoTranscription"], "basic-pitch")
         self.assertEqual(payload["providerPreferences"]["drumTranscription"], "demucs-drums")
 
+    def test_rerun_project_persists_processing_preferences_and_requeues_same_project(self) -> None:
+        project_id = "phase12-project-rerun"
+        upload = build_upload(project_id, "phase12-rerun.wav")
+        job = build_job(project_id, upload.upload_id, status="completed")
+        result = build_result("phase12-rerun")
+        self.created_project_ids.append(project_id)
+        project_store.create_project(job, upload)
+        project_store.mark_completed(job, result)
+
+        with patch("app.api.projects.start_job") as start_job_mock:
+            response = TestClient(app).post(
+                f"/api/v1/projects/{project_id}/rerun",
+                json={
+                    "providerPreferences": {
+                        "sourceSeparation": "demucs",
+                        "pianoTranscription": "basic-pitch",
+                        "drumTranscription": "auto",
+                    },
+                    "processingPreferences": {
+                        "pianoFilter": {
+                            "enabled": True,
+                            "lowCutHz": 65,
+                            "highCutHz": 6400,
+                            "cleanupStrength": 0.55,
+                        }
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["project"]
+        self.assertEqual(payload["status"], "queued")
+        self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
+        self.assertEqual(payload["processingPreferences"]["pianoFilter"]["lowCutHz"], 65)
+        self.assertEqual(payload["processingPreferences"]["pianoFilter"]["cleanupStrength"], 0.55)
+        start_job_mock.assert_called_once()
+        self.assertEqual(start_job_mock.call_args.args[0], project_id)
+        self.assertEqual(start_job_mock.call_args.args[1].upload_id, upload.upload_id)
+
     def test_mark_completed_writes_original_result_from_completed_backend_result(self) -> None:
         project_id = "phase12-project-original-write"
         upload = build_upload(project_id, "phase12-original-write.wav")

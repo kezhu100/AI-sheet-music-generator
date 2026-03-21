@@ -24,6 +24,19 @@ DRUM_CONFIDENCE_THRESHOLD = 0.45
 VERY_LOW_CONFIDENCE_THRESHOLD = 0.2
 SHORT_PIANO_DURATION_SEC = 0.1
 SHORT_PIANO_CONFIDENCE_THRESHOLD = 0.5
+PIANO_CONSERVATIVE_MIN_PITCH = 24
+PIANO_CONSERVATIVE_MAX_PITCH = 103
+PIANO_STRICT_REGISTER_LOW_PITCH = 32
+PIANO_STRICT_REGISTER_HIGH_PITCH = 96
+PIANO_REGISTER_CONFIDENCE_THRESHOLD = 0.55
+PIANO_ISOLATION_WINDOW_SEC = 0.45
+PIANO_ISOLATION_MAX_PITCH_DISTANCE = 12
+PIANO_ISOLATED_CONFIDENCE_THRESHOLD = 0.58
+PIANO_ISOLATED_SHORT_DURATION_SEC = 0.14
+PIANO_ISOLATED_LONG_DURATION_SEC = 3.8
+PIANO_SUSPICIOUS_LONG_DURATION_SEC = 5.5
+PIANO_MAX_DURATION_SEC = 8.0
+PIANO_LONG_NOTE_CONFIDENCE_THRESHOLD = 0.78
 PIANO_DUPLICATE_WINDOW_SEC = 0.08
 DRUM_DUPLICATE_WINDOW_SEC = 0.05
 
@@ -31,6 +44,7 @@ DRUM_DUPLICATE_WINDOW_SEC = 0.05
 @dataclass(frozen=True)
 class CleanupStats:
     low_confidence_filtered: int = 0
+    piano_residual_filtered: int = 0
     invalid_timing_fixed: int = 0
     duplicates_removed: int = 0
     overlaps_trimmed: int = 0
@@ -76,6 +90,9 @@ def merge_tracks(tracks: list[TrackResult]) -> list[TrackResult]:
 
 
 def clean_track_notes(track: TrackResult) -> tuple[list[NoteEvent], CleanupStats]:
+    if track.instrument == "piano":
+        return _clean_piano_track_notes(track)
+
     cleaned: list[NoteEvent] = []
     low_confidence_filtered = 0
     invalid_timing_fixed = 0
@@ -188,6 +205,10 @@ def summarize_cleanup_warnings(stats: CleanupStats) -> list[str]:
         warnings.append(
             f"Phase 11D post-processing filtered {stats.low_confidence_filtered} low-confidence note events before returning the normalized result."
         )
+    if stats.piano_residual_filtered > 0:
+        warnings.append(
+            f"Phase 11D post-processing removed {stats.piano_residual_filtered} suspicious piano note events that looked more like source-separation residuals than stable piano notes."
+        )
     if stats.invalid_timing_fixed > 0:
         warnings.append(
             f"Phase 11D post-processing repaired {stats.invalid_timing_fixed} note events with non-positive durations before final normalization."
@@ -206,6 +227,7 @@ def summarize_cleanup_warnings(stats: CleanupStats) -> list[str]:
 def combine_cleanup_stats(*stats_items: CleanupStats) -> CleanupStats:
     return CleanupStats(
         low_confidence_filtered=sum(item.low_confidence_filtered for item in stats_items),
+        piano_residual_filtered=sum(item.piano_residual_filtered for item in stats_items),
         invalid_timing_fixed=sum(item.invalid_timing_fixed for item in stats_items),
         duplicates_removed=sum(item.duplicates_removed for item in stats_items),
         overlaps_trimmed=sum(item.overlaps_trimmed for item in stats_items),
@@ -241,6 +263,87 @@ def _should_filter_note(note: NoteEvent) -> bool:
     if note.instrument == "piano" and note.offset_sec is not None:
         duration = note.offset_sec - note.onset_sec
         if duration < SHORT_PIANO_DURATION_SEC and confidence < SHORT_PIANO_CONFIDENCE_THRESHOLD:
+            return True
+
+    return False
+
+
+def _clean_piano_track_notes(track: TrackResult) -> tuple[list[NoteEvent], CleanupStats]:
+    sorted_notes = sort_notes(track.notes)
+    cleaned: list[NoteEvent] = []
+    low_confidence_filtered = 0
+    piano_residual_filtered = 0
+    invalid_timing_fixed = 0
+
+    for index, note in enumerate(sorted_notes):
+        if _should_filter_note(note):
+            low_confidence_filtered += 1
+            continue
+
+        if _should_filter_piano_residual(note, sorted_notes, index):
+            piano_residual_filtered += 1
+            continue
+
+        normalized_note = note
+        if note.offset_sec is not None and note.offset_sec <= note.onset_sec:
+            normalized_note = note.model_copy(
+                update={"offset_sec": round(note.onset_sec + MIN_NOTE_DURATION_SEC, 3)}
+            )
+            invalid_timing_fixed += 1
+
+        cleaned.append(normalized_note)
+
+    deduped_notes, duplicates_removed = _dedupe_notes(track.instrument, cleaned)
+    return deduped_notes, CleanupStats(
+        low_confidence_filtered=low_confidence_filtered,
+        piano_residual_filtered=piano_residual_filtered,
+        invalid_timing_fixed=invalid_timing_fixed,
+        duplicates_removed=duplicates_removed,
+    )
+
+
+def _should_filter_piano_residual(note: NoteEvent, notes: list[NoteEvent], index: int) -> bool:
+    pitch = note.pitch
+    if pitch is None:
+        return False
+
+    confidence = 1.0 if note.confidence is None else max(0.0, min(1.0, note.confidence))
+    duration = _note_duration(note)
+    has_local_support = _has_piano_local_support(notes, index)
+    is_extreme_register = pitch < PIANO_STRICT_REGISTER_LOW_PITCH or pitch > PIANO_STRICT_REGISTER_HIGH_PITCH
+
+    if (pitch < PIANO_CONSERVATIVE_MIN_PITCH or pitch > PIANO_CONSERVATIVE_MAX_PITCH) and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD:
+        return True
+
+    if duration >= PIANO_MAX_DURATION_SEC:
+        return True
+
+    if duration >= PIANO_SUSPICIOUS_LONG_DURATION_SEC and confidence < PIANO_LONG_NOTE_CONFIDENCE_THRESHOLD:
+        return True
+
+    if not has_local_support:
+        if confidence < PIANO_ISOLATED_CONFIDENCE_THRESHOLD and (
+            duration <= PIANO_ISOLATED_SHORT_DURATION_SEC or duration >= PIANO_ISOLATED_LONG_DURATION_SEC
+        ):
+            return True
+        if is_extreme_register and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD:
+            return True
+
+    return False
+
+
+def _has_piano_local_support(notes: list[NoteEvent], index: int) -> bool:
+    current = notes[index]
+    current_pitch = current.pitch
+    if current_pitch is None:
+        return False
+
+    for neighbor_index, neighbor in enumerate(notes):
+        if neighbor_index == index or neighbor.pitch is None:
+            continue
+        if abs(neighbor.onset_sec - current.onset_sec) > PIANO_ISOLATION_WINDOW_SEC:
+            continue
+        if abs(neighbor.pitch - current_pitch) <= PIANO_ISOLATION_MAX_PITCH_DISTANCE:
             return True
 
     return False

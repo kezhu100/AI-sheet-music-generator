@@ -34,15 +34,17 @@ class DevelopmentPipelineTests(unittest.TestCase):
         self.assertEqual(result.project_name, "demo")
         self.assertGreaterEqual(result.bpm, 100)
         self.assertLessEqual(result.bpm, 140)
-        self.assertEqual(len(result.stems), 2)
+        self.assertEqual(len(result.stems), 3)
         self.assertEqual(len(result.tracks), 2)
         self.assertEqual({stem.instrument_hint for stem in result.stems}, {"piano", "drums"})
+        self.assertEqual({stem.stem_name for stem in result.stems}, {"piano_stem", "piano_stem_raw", "drum_stem"})
         self.assertEqual({track.instrument for track in result.tracks}, {"piano", "drums"})
         self.assertTrue(all(stem.stored_path.startswith("data/stems/job-test/") for stem in result.stems))
         self.assertIn(
             "Source separation ran with the development copy provider, so the uploaded file was duplicated into placeholder stems instead of being truly separated.",
             result.warnings,
         )
+        self.assertTrue(any("filtered piano stem" in warning for warning in result.warnings))
         self.assertIn(
             "Drum transcription is now a real heuristic MVP provider that consumes the persisted drum stem and currently supports only uncompressed PCM .wav stems.",
             result.warnings,
@@ -50,6 +52,7 @@ class DevelopmentPipelineTests(unittest.TestCase):
 
         piano_track = next(track for track in result.tracks if track.instrument == "piano")
         self.assertEqual(piano_track.provider, "heuristic-wav-piano-provider")
+        self.assertEqual(piano_track.source_stem, "piano_stem")
         self.assertGreaterEqual(len(piano_track.notes), 3)
         self.assertTrue(all(note.bar is not None for note in piano_track.notes))
         self.assertTrue(all(note.beat is not None for note in piano_track.notes))
