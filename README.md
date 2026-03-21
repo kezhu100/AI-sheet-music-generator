@@ -81,6 +81,9 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 - **Separate piano/drum MIDI + MusicXML export**  
   **支持分别导出钢琴/鼓的 MIDI 与 MusicXML**
 
+  Drum MusicXML now uses lightweight percussion semantics optimized for MuseScore drum-staff import.  
+  鼓谱 MusicXML 现已使用针对 MuseScore 鼓谱导入优化的轻量 percussion 语义。  
+
 - **MuseScore handoff for final polishing**  
   **支持交接到 MuseScore 进行最终排版润色**
 

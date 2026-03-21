@@ -115,6 +115,7 @@ Phase 14.5 preserves the current boundary:
 - the frontend still owns preview rendering, draft editing interactions, and workspace composition
 - the web app consumes normalized backend results rather than backend storage details
 - exporter-side grouping now derives separate piano-only or drums-only files from the normalized `JobResult` without changing the shared result contract
+- drums-only MusicXML keeps exporter-owned lightweight percussion semantics for MuseScore import quality, without introducing a larger engraving subsystem
 
 The verification/handoff refinement keeps the same boundary:
 - the backend may expose persisted local stems for read-only browser audition without changing `JobResult`

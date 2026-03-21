@@ -13,6 +13,7 @@ DIVISIONS_PER_QUARTER = 4
 BEATS_PER_BAR = 4
 MEASURE_DURATION_DIVISIONS = DIVISIONS_PER_QUARTER * BEATS_PER_BAR
 DEFAULT_DRUM_DURATION_DIVISIONS = 1
+DRUMSET_PART_NAME = "Drumset"
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,13 @@ class NoteSegment:
     note: NoteEvent
     tie_start: bool
     tie_stop: bool
+
+
+@dataclass(frozen=True)
+class DrumDisplaySpec:
+    display_step: str
+    display_octave: int
+    notehead: str | None = None
 
 
 class MusicXmlExportError(Exception):
@@ -77,7 +85,7 @@ def _build_part_descriptor(index: int, track: TrackResult) -> MusicXmlPart:
     if track.instrument == "piano":
         name = "Piano"
     elif track.instrument == "drums":
-        name = "Drums"
+        name = DRUMSET_PART_NAME
     else:
         name = track.instrument.title()
 
@@ -87,8 +95,12 @@ def _build_part_descriptor(index: int, track: TrackResult) -> MusicXmlPart:
 def _append_score_part(part_list: ET.Element, part: MusicXmlPart) -> None:
     score_part = ET.SubElement(part_list, "score-part", id=part.id)
     ET.SubElement(score_part, "part-name").text = part.name
+    if part.track.instrument == "drums":
+        ET.SubElement(score_part, "part-abbreviation").text = "Drs."
     score_instrument = ET.SubElement(score_part, "score-instrument", id=f"{part.id}-I1")
     ET.SubElement(score_instrument, "instrument-name").text = part.name
+    if part.track.instrument == "drums":
+        ET.SubElement(score_instrument, "instrument-sound").text = "drum set"
     midi_instrument = ET.SubElement(score_part, "midi-instrument", id=f"{part.id}-I1")
     ET.SubElement(midi_instrument, "midi-channel").text = "10" if part.track.instrument == "drums" else "1"
     ET.SubElement(midi_instrument, "midi-program").text = "1" if part.track.instrument != "drums" else "1"
@@ -126,6 +138,8 @@ def _append_measure_attributes(measure: ET.Element, instrument: str) -> None:
 
     clef = ET.SubElement(attributes, "clef")
     if instrument == "drums":
+        staff_details = ET.SubElement(attributes, "staff-details")
+        ET.SubElement(staff_details, "staff-lines").text = "5"
         ET.SubElement(clef, "sign").text = "percussion"
         ET.SubElement(clef, "line").text = "2"
     else:
@@ -191,10 +205,10 @@ def _append_note(measure: ET.Element, segment: NoteSegment, part: MusicXmlPart, 
         ET.SubElement(note_element, "chord")
 
     if part.track.instrument == "drums":
-        _append_unpitched(note_element, segment.note)
+        drum_spec = _append_unpitched(note_element, segment.note)
         ET.SubElement(note_element, "instrument", id=f"{part.id}-I1")
-        if (segment.note.drum_label or "").lower() in {"hi-hat", "hihat"}:
-            ET.SubElement(note_element, "notehead").text = "x"
+        if drum_spec.notehead is not None:
+            ET.SubElement(note_element, "notehead").text = drum_spec.notehead
     else:
         _append_pitch(note_element, segment.note)
 
@@ -234,11 +248,12 @@ def _append_pitch(note_element: ET.Element, note: NoteEvent) -> None:
     ET.SubElement(pitch, "octave").text = str(octave)
 
 
-def _append_unpitched(note_element: ET.Element, note: NoteEvent) -> None:
-    display_step, display_octave = _drum_display_pitch(note)
+def _append_unpitched(note_element: ET.Element, note: NoteEvent) -> DrumDisplaySpec:
+    drum_spec = _drum_display_pitch(note)
     unpitched = ET.SubElement(note_element, "unpitched")
-    ET.SubElement(unpitched, "display-step").text = display_step
-    ET.SubElement(unpitched, "display-octave").text = str(display_octave)
+    ET.SubElement(unpitched, "display-step").text = drum_spec.display_step
+    ET.SubElement(unpitched, "display-octave").text = str(drum_spec.display_octave)
+    return drum_spec
 
 
 def _split_track_into_segments(track: TrackResult, bpm: int) -> list[NoteSegment]:
@@ -336,12 +351,18 @@ def _midi_to_pitch_components(midi_note: int) -> tuple[str, int, int]:
     return step, alter, octave
 
 
-def _drum_display_pitch(note: NoteEvent) -> tuple[str, int]:
-    label = (note.drum_label or "").lower()
+def _drum_display_pitch(note: NoteEvent) -> DrumDisplaySpec:
+    label = _normalize_drum_label(note.drum_label)
     mapping = {
-        "kick": ("F", 4),
-        "snare": ("C", 5),
-        "hi-hat": ("G", 5),
-        "hihat": ("G", 5),
+        "kick": DrumDisplaySpec(display_step="F", display_octave=4),
+        "snare": DrumDisplaySpec(display_step="C", display_octave=5),
+        "hi-hat": DrumDisplaySpec(display_step="G", display_octave=5, notehead="x"),
     }
-    return mapping.get(label, ("C", 5))
+    return mapping.get(label, DrumDisplaySpec(display_step="D", display_octave=5))
+
+
+def _normalize_drum_label(label: str | None) -> str:
+    normalized = (label or "").strip().lower().replace("_", "-").replace(" ", "-")
+    if normalized == "hihat":
+        return "hi-hat"
+    return normalized

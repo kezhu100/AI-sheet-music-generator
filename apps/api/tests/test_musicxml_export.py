@@ -49,6 +49,31 @@ class MusicXmlExportTests(unittest.TestCase):
         self.assertGreaterEqual(len(xml_root.findall(".//unpitched")), 1)
         self.assertEqual(len(xml_root.findall(".//pitch")), 0)
 
+    def test_drums_only_musicxml_export_uses_percussion_clef_and_drumset_metadata(self) -> None:
+        result = self._build_manual_result()
+
+        xml_root = ET.fromstring(build_musicxml_file(build_export_result(result, "drums")))
+
+        self.assertEqual(xml_root.findtext(".//part-list/score-part/part-name"), "Drumset")
+        self.assertEqual(xml_root.findtext(".//part-list/score-part/part-abbreviation"), "Drs.")
+        self.assertEqual(xml_root.findtext(".//score-instrument/instrument-sound"), "drum set")
+        self.assertEqual(xml_root.findtext(".//measure/attributes/clef/sign"), "percussion")
+        self.assertEqual(xml_root.findtext(".//measure/attributes/staff-details/staff-lines"), "5")
+
+    def test_different_drum_types_map_to_different_display_positions(self) -> None:
+        result = self._build_manual_result()
+
+        xml_root = ET.fromstring(build_musicxml_file(build_export_result(result, "drums")))
+        positions = [
+            (node.findtext("display-step"), node.findtext("display-octave"))
+            for node in xml_root.findall(".//unpitched")
+        ]
+
+        self.assertIn(("F", "4"), positions)
+        self.assertIn(("C", "5"), positions)
+        self.assertIn(("G", "5"), positions)
+        self.assertEqual(len(set(positions)), 3)
+
     def test_export_endpoint_returns_musicxml_download(self) -> None:
         result = self._build_result()
         job = job_store.create("upload-musicxml-test")
@@ -139,7 +164,7 @@ class MusicXmlExportTests(unittest.TestCase):
                         "instrument": "drums",
                         "sourceStem": "drum_stem",
                         "provider": "heuristic",
-                        "eventCount": 1,
+                        "eventCount": 3,
                         "notes": [
                             {
                                 "id": "drum-note-1",
@@ -149,6 +174,26 @@ class MusicXmlExportTests(unittest.TestCase):
                                 "onsetSec": 0.25,
                                 "offsetSec": 0.35,
                                 "velocity": 100,
+                                "sourceStem": "drum_stem",
+                            },
+                            {
+                                "id": "drum-note-2",
+                                "instrument": "drums",
+                                "drumLabel": "snare",
+                                "midiNote": 38,
+                                "onsetSec": 0.5,
+                                "offsetSec": 0.6,
+                                "velocity": 96,
+                                "sourceStem": "drum_stem",
+                            },
+                            {
+                                "id": "drum-note-3",
+                                "instrument": "drums",
+                                "drumLabel": "hi hat",
+                                "midiNote": 42,
+                                "onsetSec": 0.75,
+                                "offsetSec": 0.85,
+                                "velocity": 88,
                                 "sourceStem": "drum_stem",
                             }
                         ],
