@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import ValidationError
 
 from app.models.schemas import (
@@ -28,8 +29,10 @@ from app.services.job_runner import start_job
 from app.services.job_store import job_store
 from app.services.project_store import project_store
 from app.services.upload_registry import upload_registry
+from app.core.config import get_settings
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+settings = get_settings()
 
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
@@ -111,6 +114,24 @@ async def retranscribe_job_region(job_id: str, payload: RegionRetranscriptionReq
         providerUsed=retranscription_result.provider_used,
         notes=retranscription_result.notes,
     )
+
+
+@router.get("/{job_id}/stems/{stem_name}")
+async def get_job_stem_asset(job_id: str, stem_name: str) -> FileResponse:
+    job = _get_completed_job(job_id, allow_processing_result=True)
+    if job.result is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available yet.")
+
+    stem_asset = next((stem for stem in job.result.stems if stem.stem_name == stem_name), None)
+    if stem_asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stem asset not found.")
+
+    stem_path = _resolve_project_file_path(stem_asset.stored_path)
+    if not stem_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stem file is not available on disk.")
+
+    media_type, _ = mimetypes.guess_type(stem_asset.file_name)
+    return FileResponse(path=stem_path, media_type=media_type or "application/octet-stream", filename=stem_asset.file_name)
 
 
 @router.get("/{job_id}/exports/midi")
@@ -202,6 +223,18 @@ def _get_completed_job(job_id: str, *, allow_processing_result: bool = False):
     if not allow_processing_result and (job.status != "completed" or job.result is None):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job result is not available yet.")
     return job
+
+
+def _resolve_project_file_path(stored_path: str) -> Path:
+    candidate = (settings.project_root / stored_path).resolve()
+    project_root = settings.project_root.resolve()
+
+    try:
+        candidate.relative_to(project_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stored asset path is outside the project root.") from exc
+
+    return candidate
 
 
 def _build_content_disposition(filename: str) -> str:

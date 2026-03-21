@@ -20,7 +20,7 @@
 
 ## Phase 14.5 - Workspace Product Polish
 - [x] unify home and project workspace around one shared layout shell
-- [x] make the score preview the primary result surface
+- [x] make the browser preview the primary verification surface
 - [x] reduce piano-roll dominance with a compact scrollable viewport
 - [x] separate editing and export into clearer product sections
 - [x] move runtime/provider/stem/warning/raw-note details into a collapsed advanced area
@@ -34,6 +34,23 @@
 - [x] stabilize long score-preview browsing with fixed-height internal-scroll preview readers
 - [x] expose Advanced Runtime Options near upload/start with Auto defaults, provider availability, and per-job provider preferences
 - [x] align homepage, library, and workspace visuals around an artwork-inspired fantasy music hero language without sacrificing readability
+
+## Phase 14.6 - Verification + Handoff Refinement
+- [x] reposition in-browser preview as lightweight verification rather than final notation
+- [x] keep piano/drum preview surfaces lightweight and reuse existing renderers
+- [x] add compact local stem audition for quick separation checks
+- [x] narrow editing copy toward review / refine before export
+- [x] add a clear MuseScore handoff action in the export area without faking OS integration
+- [x] update core docs to reflect export-first workflow and MuseScore handoff
+- [ ] optional future trim/snippet audition if a cheap backend-local implementation becomes worthwhile
+
+## Roadmap Theme - Lightweight Verification + MuseScore Handoff Direction
+- [ ] improve drum transcription robustness and reduce `demucs-drums` fallback frequency
+- [ ] add clearer beat/grid overlay in the piano roll for timing verification
+- [ ] add playback playhead synced with audio for quick review
+- [ ] limit the default verification window to a readable first 10-20 seconds
+- [ ] keep quick stem audition compact and easy to compare across piano/drum stems
+- [ ] keep the MusicXML-centered "Open in MuseScore" handoff obvious in the export flow
 
 ## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)
@@ -74,6 +91,4 @@
 - [ ] cloud storage and multi-device sync
 - [ ] public sharing and permission systems
 - [ ] background job recovery after restart
-- [ ] richer engraving fidelity and advanced notation semantics
-
-
+- [ ] richer in-browser engraving fidelity and advanced notation semantics

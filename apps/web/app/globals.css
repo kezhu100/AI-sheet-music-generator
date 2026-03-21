@@ -780,6 +780,29 @@ textarea {
   padding: 16px;
 }
 
+.audition-card {
+  margin-bottom: 18px;
+}
+
+.audition-stem-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.audition-stem-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(108, 97, 67, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 252, 246, 0.78);
+}
+
+.audition-stem-card audio {
+  width: 100%;
+}
+
 .score-primary-card h3,
 .score-secondary-card h3 {
   margin: 0;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import unittest
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+from app.core.config import get_settings
 from app.models.schemas import UploadedFileDescriptor, utc_now
 from app.services.upload_registry import upload_registry
 
@@ -49,6 +51,33 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(provider_preferences.source_separation, "demucs")
         self.assertEqual(provider_preferences.piano_transcription, "basic-pitch")
         self.assertEqual(provider_preferences.drum_transcription, "demucs-drums")
+
+    def test_get_job_stem_asset_streams_local_stem_file(self) -> None:
+        settings = get_settings()
+        stem_dir = settings.stems_dir / "job-stem-preview"
+        stem_dir.mkdir(parents=True, exist_ok=True)
+        stem_path = stem_dir / "piano_preview.wav"
+        stem_bytes = b"RIFFdemoWAVEfmt "
+        stem_path.write_bytes(stem_bytes)
+
+        job = SimpleNamespace(
+            result=SimpleNamespace(
+                stems=[
+                    SimpleNamespace(
+                        stem_name="piano_stem",
+                        stored_path=str(stem_path.relative_to(settings.project_root)).replace("\\", "/"),
+                        file_name="piano_preview.wav",
+                    )
+                ]
+            )
+        )
+
+        with patch("app.api.jobs._get_completed_job", return_value=job):
+            response = TestClient(app).get("/api/v1/jobs/job-stem-preview/stems/piano_stem")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, stem_bytes)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
 
 
 if __name__ == "__main__":

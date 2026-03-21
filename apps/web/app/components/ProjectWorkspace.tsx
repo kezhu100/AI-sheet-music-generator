@@ -36,6 +36,7 @@ import {
   downloadMusicXmlExport,
   duplicateProject,
   exportProjectToPath,
+  getJobStemAssetUrl,
   getJob,
   getJobDraft,
   getProviderInstallStatus,
@@ -116,6 +117,17 @@ function buildCreateJobPayload(uploadId: string, providerPreferences: ProviderPr
 
 function buildRuntimeOptionInstallKey(option: RuntimeProviderOption): string {
   return `${option.category}:${option.id}`;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 interface RuntimeProviderInstallUiState {
@@ -534,6 +546,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [isExportingProjectPackage, setIsExportingProjectPackage] = useState(false);
   const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
+  const [museScoreHandoffMessage, setMuseScoreHandoffMessage] = useState<string | null>(null);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
   const [isRefreshingRuntimeDiagnostics, setIsRefreshingRuntimeDiagnostics] = useState(false);
@@ -1054,6 +1067,22 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   }, [activeResult, job?.result]);
   const downloadBaseName =
     projectDetail?.projectName ?? activeResult?.projectName ?? job?.result?.projectName ?? "ai-sheet-music-generator";
+  const auditionStemCards = useMemo(() => {
+    if (!job?.id || !activeResult) {
+      return [];
+    }
+
+    return [
+      { label: "Piano stem / 钢琴分轨", stem: activeResult.stems.find((stem) => stem.instrumentHint === "piano") },
+      { label: "Drum stem / 鼓组分轨", stem: activeResult.stems.find((stem) => stem.instrumentHint === "drums") }
+    ]
+      .filter((item) => item.stem != null)
+      .map((item) => ({
+        label: item.label,
+        stem: item.stem!,
+        url: getJobStemAssetUrl(job.id, item.stem!.stemName)
+      }));
+  }, [activeResult, job?.id]);
 
   useEffect(() => {
     if (!activeResult) {
@@ -1207,6 +1236,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     setSavedDraft(null);
     setSuggestions([]);
     setSuggestionsStale(false);
+    setMuseScoreHandoffMessage(null);
     setLastAnalyzedDraftSignature(null);
     lastDraftJobIdRef.current = null;
     clearEditableState();
@@ -1246,14 +1276,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
 
     try {
       const midiBlob = await downloadMidiExport(job.id, modeName === "draft" ? getCurrentDraftResult() : undefined);
-      const url = window.URL.createObjectURL(midiBlob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${downloadBaseName}-${modeName}.mid`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
+      triggerBlobDownload(midiBlob, `${downloadBaseName}-${modeName}.mid`);
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MIDI.");
     } finally {
@@ -1265,15 +1288,15 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
   }
 
-  async function handleMusicXmlExport(modeName: "original" | "draft"): Promise<void> {
+  async function handleMusicXmlExport(modeName: "original" | "draft"): Promise<boolean> {
     if (!job?.result) {
       setError("Complete a job before exporting MusicXML.");
-      return;
+      return false;
     }
 
     if (modeName === "draft" && !activeResult) {
       setError("Draft result is not available yet.");
-      return;
+      return false;
     }
 
     setError(null);
@@ -1285,16 +1308,15 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
 
     try {
       const musicXmlBlob = await downloadMusicXmlExport(job.id, modeName === "draft" ? getCurrentDraftResult() : undefined);
-      const url = window.URL.createObjectURL(musicXmlBlob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${downloadBaseName}-${modeName}.musicxml`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
+      const fileName = `${downloadBaseName}-${modeName}.musicxml`;
+      triggerBlobDownload(musicXmlBlob, fileName);
+      setMuseScoreHandoffMessage(
+        `Downloaded ${fileName}. Open it in MuseScore for final notation polishing. / 已下载 ${fileName}，请在 MuseScore 中打开并完成最终排版润色。`
+      );
+      return true;
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MusicXML.");
+      return false;
     } finally {
       if (modeName === "original") {
         setIsExportingOriginalMusicXml(false);
@@ -1757,7 +1779,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           <div>
             <h1>{mode === "home" ? "AI Sheet Music Generator" : projectDetail?.projectName ?? "Project Workspace / 项目工作区"}</h1>
             <p>
-              A local-first creative workspace for turning audio into editable draft notation.
+              A local-first AI transcription workspace for review, cleanup, and export.
               <br />
               一个本地优先的创作工作区，把音频整理成可编辑的草稿乐谱。
             </p>
@@ -2041,8 +2063,8 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             </h2>
             <div className="note-list compact-list">
               <article className="note-card ornate-card">
-                <strong>Score First / 乐谱优先</strong>
-                <div className="muted">The score preview is the main result. Piano roll and technical details stay secondary. / 乐谱预览是主结果，钢琴卷帘和技术信息保持次要。</div>
+                <strong>Export First / 导出优先</strong>
+                <div className="muted">Preview and editing stay lightweight here so you can validate the draft before exporting to professional notation tools. / 这里的预览与编辑保持轻量，重点是先验证草稿，再导出到专业记谱工具。</div>
               </article>
               <article className="note-card ornate-card">
                 <strong>Draft-First Editing / 草稿式编辑</strong>
@@ -2116,6 +2138,16 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           <p style={{ whiteSpace: "pre-wrap" }}>{exportSuccessMessage}</p>
         </section>
       ) : null}
+      {museScoreHandoffMessage ? (
+        <section className="panel panel-full">
+          <h2>
+            MuseScore Handoff
+            <br />
+            MuseScore 交接
+          </h2>
+          <p style={{ whiteSpace: "pre-wrap" }}>{museScoreHandoffMessage}</p>
+        </section>
+      ) : null}
       {activeResult ? (
         <>
           <section className="panel workspace-banner ornate-banner">
@@ -2139,7 +2171,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 disabled={!activeResult || isExportingDraftMusicXml}
                 onClick={() => void handleMusicXmlExport("draft")}
               >
-                {isExportingDraftMusicXml ? "Exporting... / 导出中..." : "Export Draft Score / 导出当前草稿"}
+                {isExportingDraftMusicXml ? "Exporting... / 导出中..." : "Export Draft MusicXML / 导出草稿 MusicXML"}
               </button>
             </div>
           </section>
@@ -2165,16 +2197,16 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           <section className="panel result-hero-panel">
             <div className="section-heading-row">
               <div>
-                <div className="eyebrow">Main Result / 主结果</div>
+                <div className="eyebrow">Verification Preview / 导出前校验</div>
                 <h2>
-                  Score Preview
+                  Lightweight Preview
                   <br />
-                  乐谱预览
+                  轻量预览
                 </h2>
                 <p className="muted section-help">
-                  Read the piano score first, then compare the drum companion below before refining the draft.
+                  Use the browser preview to quickly verify transcription quality before export, not for final engraving.
                   <br />
-                  先查看生成后的乐谱，再参考下方的鼓谱辅助预览，然后继续调整草稿。
+                  浏览器内预览只用于导出前快速确认转谱质量，并不承担最终排版工作。
                 </p>
               </div>
               <div className="result-meta-chip">{activeResult.bpm} BPM</div>
@@ -2211,13 +2243,36 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   : "No fallback warning was detected in this result. / 本次结果未检测到回退警告。"}
               </div>
             </article>
+            <article className="score-secondary-card ornate-card audition-card">
+              <h3>Quick Stem Check / 快速试听</h3>
+              <p className="muted">
+                Use these local stem previews to confirm separation worked. Full files are exposed here; in practice, the first 15-20 seconds are usually enough for a quick check.
+                <br />
+                使用这些本地分轨试听快速确认分离是否可用。这里直接播放完整分轨，实际通常试听前 15-20 秒就足够判断。
+              </p>
+              {auditionStemCards.length > 0 ? (
+                <div className="audition-stem-list">
+                  {auditionStemCards.map(({ label, stem, url }) => (
+                    <div className="audition-stem-card" key={stem.stemName}>
+                      <strong>{label}</strong>
+                      <div className="muted">{stem.fileName}</div>
+                      <audio controls preload="metadata" src={url}>
+                        Your browser does not support audio preview.
+                      </audio>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">Stem audio preview becomes available after local stems are persisted. / 本地分轨持久化后即可试听。</p>
+              )}
+            </article>
             <div className="score-stack">
               <div className="score-primary-card ornate-card">
-                <h3>Piano Score / 钢琴乐谱</h3>
+                <h3>Piano Verification / 钢琴校验预览</h3>
                 <PianoScorePreview bpm={activeResult.bpm} track={pianoTrack} />
               </div>
               <div className="score-secondary-card ornate-card">
-                <h3>Drum Companion / 鼓谱辅助预览</h3>
+                <h3>Drum Verification / 鼓组校验预览</h3>
                 <DrumNotationPreview bpm={activeResult.bpm} track={drumTrack} />
               </div>
             </div>
@@ -2289,18 +2344,19 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <div>
                   <div className="eyebrow">Editing Area / 编辑区</div>
                   <h2>
-                    Refine the Draft
+                    Review and Refine
                     <br />
-                    调整草稿
+                    复核并微调
                   </h2>
                 </div>
               </div>
               <p className="muted section-help">
-                Use one wide combined track editor for piano and drums, then apply precise edits and draft tools below. /
-                使用一个统一的宽轨道编辑区同时处理钢琴和鼓组，再在下方进行精细编辑与草稿操作。
+                Keep edits lightweight here: fix obvious note issues, verify timing, and reduce cleanup work before export.
+                <br />
+                这里只做轻量修整：修正明显错音、确认时值节奏，并减少导出后的返工。
               </p>
               <div className="ornate-card preview-panel editor-workspace-panel">
-                <h3>Track Editor / 轨道编辑器</h3>
+                <h3>Lightweight Editor / 轻量编辑器</h3>
                 <PianoRollPreview
                   bpm={activeResult.bpm}
                   onBoxSelect={handleBoxSelect}
@@ -2377,14 +2433,14 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <div>
                   <div className="eyebrow">Export / 导出</div>
                   <h2>
-                    Export the Draft
+                    Export and Handoff
                     <br />
-                    导出当前草稿
+                    导出与交接
                   </h2>
                   <p className="muted section-help">
-                    Draft export uses the current editable score. Original export keeps the untouched generated result.
+                    MIDI and MusicXML are the core output. Use MuseScore for final notation polishing after this lightweight review step.
                     <br />
-                    草稿导出使用当前可编辑乐谱，原始导出保留未修改的生成结果。
+                    MIDI 与 MusicXML 是核心产出；完成这里的轻量复核后，建议转交 MuseScore 做最终排版润色。
                   </p>
                 </div>
               </div>
@@ -2409,6 +2465,25 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     <button className="button secondary" type="button" disabled={!job?.result || isExportingOriginalMusicXml} onClick={() => void handleMusicXmlExport("original")}>
                       {isExportingOriginalMusicXml ? "Exporting MusicXML... / 导出中..." : "Original MusicXML / 原始 MusicXML"}
                     </button>
+                  </div>
+                </article>
+                <article className="note-card ornate-card">
+                  <strong>MuseScore Handoff / 交接 MuseScore</strong>
+                  <div className="muted">
+                    Download the draft MusicXML, then open it in MuseScore for final notation editing and engraving. / 下载草稿 MusicXML，然后在 MuseScore 中完成最终记谱编辑与排版。
+                  </div>
+                  <div className="actions">
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!activeResult || isExportingDraftMusicXml}
+                      onClick={() => void handleMusicXmlExport("draft")}
+                    >
+                      {isExportingDraftMusicXml ? "Preparing MuseScore handoff... / 准备交接中..." : "Open in MuseScore / 在 MuseScore 中打开"}
+                    </button>
+                  </div>
+                  <div className="muted">
+                    This downloads MusicXML only. No OS-level app launch is attempted. / 此操作仅下载 MusicXML，不会尝试系统级启动应用。
                   </div>
                 </article>
                 <article className="note-card ornate-card">

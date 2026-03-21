@@ -42,6 +42,10 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export function getJobStemAssetUrl(jobId: string, stemName: string): string {
+  return `${API_BASE_URL}/api/v1/jobs/${encodeURIComponent(jobId)}/stems/${encodeURIComponent(stemName)}`;
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;

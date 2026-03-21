@@ -1,10 +1,10 @@
 ﻿# AI Sheet Music Generator
 
-Turn audio into structured sheet music — locally, privately, and in a score-first workspace.  
-将音频转换为结构化乐谱 —— 本地运行、隐私优先，并以乐谱为核心工作流。
+Turn audio into structured draft notation and export-ready music data — locally, privately, and with a lightweight review workflow.  
+将音频转换为结构化草稿记谱与可导出音乐数据 —— 本地运行、隐私优先，并采用轻量复核工作流。
 
-Local-first AI sheet music generation with a browser UI, local backend, editable draft workflow, and export-ready results.  
-这是一个本地优先的 AI 乐谱生成工具，采用浏览器界面 + 本地后端，支持可编辑草稿与导出工作流。
+Local-first AI transcription and draft-cleanup with a browser UI, local backend, lightweight editing, and strong export-ready results.  
+这是一个本地优先的 AI 转谱与草稿清理工具，采用浏览器界面 + 本地后端，支持轻量编辑与强导出工作流。
 
 ![GitHub stars](https://img.shields.io/github/stars/your-name/ai-sheet-music-generator?style=for-the-badge)
 ![Next.js](https://img.shields.io/badge/Next.js-Web_UI-black?style=for-the-badge)
@@ -20,10 +20,10 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
   **本地优先设计**
 - **No cloud upload, no accounts, privacy by default**  
   **无需上传到云端，无需账号，默认保护隐私**
-- **Creative workflow: audio -> score -> edit -> export**  
-  **创作工作流：音频 -> 乐谱 -> 编辑 -> 导出**
-- **Score-first product, not a settings-heavy dashboard**  
-  **以乐谱为核心，而不是参数面板优先**
+- **Creative workflow: audio -> transcribe -> verify -> export**  
+  **创作工作流：音频 -> 转谱 -> 校验 -> 导出**
+- **Lightweight browser review, then handoff to MuseScore**  
+  **浏览器内轻量复核，然后交接到 MuseScore**
 
 ---
 
@@ -42,10 +42,10 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 *Reopen local projects, import packages, and manage your saved work.*  
 *重新打开本地项目、导入项目包，并管理已保存的工作内容。*
 
-### Score Preview Workspace / 乐谱预览工作区
+### Verification Workspace / 轻量校验工作区
 ![Score Preview](docs/score-preview.png)
-*Read the generated piano score first, compare the drum companion, then refine the draft.*  
-*先阅读生成的钢琴乐谱，再对照鼓谱辅助视图，随后继续精修草稿。*
+*Use lightweight preview, stem audition, and compact editing to verify transcription quality before export.*  
+*通过轻量预览、分轨试听与紧凑编辑，在导出前确认转谱质量。*
 
 ---
 
@@ -57,14 +57,17 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 - **Audio to piano + drum transcription**  
   **将音频转换为钢琴与鼓的转谱结果**
 
-- **Score-first preview workflow**  
-  **以乐谱预览为主的结果浏览流程**
+- **Lightweight preview workflow**  
+  **以轻量预览为主的结果校验流程**
 
 - **Scrollable score readers for long results**  
   **长结果使用可滚动读谱视窗，浏览更稳定**
 
 - **Editable draft system**  
   **支持草稿编辑，且不会覆盖原始结果**
+
+- **Quick local stem audition for verification**  
+  **支持本地分轨快速试听，用于校验分离效果**
 
 - **Saved draft and original result stay separate**  
   **已保存草稿与原始结果保持分离**
@@ -77,6 +80,9 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 
 - **MIDI + MusicXML export**  
   **支持导出 MIDI 与 MusicXML**
+
+- **MuseScore handoff for final polishing**  
+  **支持交接到 MuseScore 进行最终排版润色**
 
 - **Provider-based quality control**  
   **支持基于 provider 的质量调节**
@@ -122,10 +128,10 @@ Then:
 
 1. **Upload audio**  
    **上传音频**
-2. **Generate a score draft**  
-   **生成乐谱草稿**
-3. **Edit and export**  
-   **编辑并导出**
+2. **Generate a transcription draft**  
+   **生成转谱草稿**
+3. **Review, clean up, and export**  
+   **复核、清理并导出**
 
 Open the local URL printed in the terminal.  
 打开终端中输出的本地地址即可开始使用。
@@ -152,8 +158,8 @@ audio
   -> source separation
   -> piano / drum transcription
   -> post-processing
-  -> score preview
-  -> editable draft
+  -> lightweight preview + stem audition
+  -> editable draft cleanup
   -> MIDI / MusicXML export
 ```
 
@@ -161,12 +167,12 @@ audio
   **上传完整音频或单独 stem**
 - **Run local separation + transcription**  
   **执行本地分离与转谱**
-- **Review the generated score first**  
-  **优先查看生成的乐谱**
-- **Refine the draft in-browser**  
-  **在浏览器内继续修订草稿**
-- **Export clean structured output**  
-  **导出结构化结果**
+- **Verify the draft with lightweight preview and stem listening**  
+  **通过轻量预览与分轨试听确认草稿可用性**
+- **Refine obvious issues in-browser**  
+  **在浏览器内修正明显问题**
+- **Export clean structured output and finish in MuseScore**  
+  **导出结构化结果，并在 MuseScore 中完成最终整理**
 
 ---
 
@@ -181,8 +187,8 @@ packages/
   music-engine/  music logic
 ```
 
-apps/web: score-first UI, project library, editing workflow
-前端界面、项目库与编辑流程
+apps/web: lightweight review UI, project library, editing workflow
+前端界面、项目库与轻量复核/编辑流程
 
 apps/api: upload, jobs, runtime, export
 上传、任务处理、运行时与导出
@@ -204,9 +210,9 @@ packages/music-engine: music-domain utilities
 - The generated result is editable without overwriting the original completed output.  
   生成结果可继续编辑，同时不会覆盖原始完成结果。
 
-### Score-first / 乐谱优先
-- The product is built around readable score preview first, then editing and export.  
-  产品围绕“先看乐谱，再编辑与导出”的流程设计。
+### Export-first review / 导出前复核
+- The product is built around local transcription, lightweight browser verification, and handoff to MuseScore for final notation polishing.  
+  产品围绕“本地转谱、浏览器内轻量校验、再交给 MuseScore 做最终排版”的流程设计。
 
 This combination is what makes the project different: it is not just an AI demo, and not just an export tool. It is a local creative workspace.  
 这正是本项目的独特之处：它不只是 AI 演示，也不只是导出工具，而是一个本地创作工作区。
@@ -239,11 +245,16 @@ This combination is what makes the project different: it is not just an AI demo,
 - **No cloud sync, accounts, or sharing system**  
   暂不提供云同步、账号系统或分享功能  
 
-- **Score rendering is readable, not publication-grade engraving**  
-  乐谱渲染以可读性为主，并非出版级排版  
+- **Browser preview is for verification, not final engraving**  
+  浏览器预览用于校验，并非最终出版级排版  
 ---
 
 ## 🛣 Roadmap / 路线图
+
+- **Lightweight Verification + MuseScore Handoff Direction**  
+  **轻量校验 + MuseScore 交接方向**  
+  The browser UI is now a verification surface for review-and-fix-before-export, not a final notation editor. MusicXML handoff to MuseScore is the intended final editing path.  
+  浏览器界面现在用于导出前校验与快速修正，而不是最终记谱编辑器；MusicXML 交接到 MuseScore 是预期的最终编辑路径。  
 
 - **Better transcription models**  
   **更好的转谱模型**
@@ -251,11 +262,14 @@ This combination is what makes the project different: it is not just an AI demo,
 - **Desktop packaging**  
   **桌面应用封装**
 
-- **Improved editing workflow**  
-  **更完善的编辑体验**
+- **Better verification and cleanup workflow**  
+  **更完善的校验与清理体验**
 
 - **Stronger project management and quality controls**  
   **更强的项目管理与质量控制**
+
+- **Smoother MuseScore handoff and export ergonomics**  
+  **更顺畅的 MuseScore 交接与导出体验**
 
 ---
 

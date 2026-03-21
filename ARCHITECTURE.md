@@ -31,7 +31,7 @@ Phase 14.5 is a frontend product-presentation refinement layer on top of Phase 1
 
 It adds:
 - a single shared workspace shell for home and project routes
-- a score-first information hierarchy
+- a verification-first information hierarchy
 - export and editing separation in the UI
 - advanced technical detail moved behind a collapsed disclosure
 - stronger bilingual user-facing copy in the main workflow
@@ -80,12 +80,14 @@ This layer preserves:
 The main workspace now follows this structure:
 1. Hero and primary action area
 2. Upload or project entry
-3. Main result preview with score first
+3. Main verification preview
 4. Editing area
 5. Export area
 6. Advanced Details (collapsed by default)
 
 Advanced Details contains runtime/provider summaries, stems, warnings, and note-detail views that are still available for inspection.
+The primary preview surfaces remain lightweight and verification-oriented, while final notation polishing is expected to happen after MusicXML export in MuseScore.
+Draft editing remains in place for quick fixes before export rather than as a full in-browser notation-editing system.
 
 ## Processing Pipeline
 The processing pipeline remains:
@@ -113,6 +115,11 @@ Phase 14.5 preserves the current boundary:
 - the frontend still owns preview rendering, draft editing interactions, and workspace composition
 - the web app consumes normalized backend results rather than backend storage details
 
+The verification/handoff refinement keeps the same boundary:
+- the backend may expose persisted local stems for read-only browser audition without changing `JobResult`
+- the frontend may use those persisted assets for compact verification playback only
+- export stays backend-owned, and MuseScore handoff remains download-based rather than OS-launch-based
+
 Provider install behavior follows the same boundary:
 - install logic is backend-owned and explicit
 - frontend should only trigger install actions and render structured backend status
@@ -124,4 +131,4 @@ Provider install behavior follows the same boundary:
 - preserve the current local-first browser architecture
 - keep desktop packaging optional in Phase 15L
 - continue refining usability without destabilizing core contracts
-
+- avoid spending roadmap effort on richer in-browser engraving when export + MuseScore handoff covers the final-notation path

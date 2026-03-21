@@ -4,6 +4,39 @@
 
 ### 2026-03-21
 Decision:
+- Clarify the roadmap around lightweight verification before export and MuseScore as the final notation-editing environment.
+
+Context:
+- Real usage feedback showed that the preview UI was not the primary place users validated transcription quality.
+- Full notation editing in the browser is out of scope, while professional notation tools already handle final editing better.
+
+Chosen option:
+- Keep the existing preview and draft surfaces, but describe them as verification and quick-fix tools before export.
+- Focus roadmap value on transcription reliability, preview clarity, export usability, and MusicXML handoff.
+
+Tradeoffs:
+- The browser remains useful for checking and quick fixes, but intentionally stops short of becoming a full notation editor.
+
+### 2026-03-21
+Decision:
+- Reposition the product around local-first transcription, lightweight verification/cleanup, and export handoff to MuseScore instead of making in-browser score rendering the centerpiece.
+
+Context:
+- The existing architecture, draft model, export boundary, and normalized `JobResult` contract already support a strong local transcription workflow.
+- Product direction changed away from investing in richer browser engraving, but users still need enough preview/editing to verify results before export.
+
+Chosen option:
+- Keep the existing lightweight score, drum, and piano-roll surfaces, but reframe them as verification and cleanup tools.
+- Add compact stem audition using existing persisted local stems and a minimal backend read endpoint rather than changing the result contract.
+- Add a clear `Open in MuseScore` handoff action that downloads MusicXML and explicitly tells users to finish notation polishing in MuseScore.
+- Do not add OS-level launching behavior or expand `JobResult` for this step.
+
+Tradeoffs:
+- The browser keeps useful preview/editing coverage without pretending to be a full notation editor.
+- Stem audition currently exposes the persisted full stem rather than a trimmed 15-20 second snippet, which keeps the patch small and honest.
+
+### 2026-03-21
+Decision:
 - Replace `madmom` as the practical official enhanced drum path with `demucs-drums`, which reuses Demucs stem isolation plus deterministic rule-based onset detection.
 
 Context:
@@ -240,5 +273,3 @@ Chosen option:
 
 Tradeoffs:
 - The result is more distinctive and better aligned across pages, but it intentionally abstracts the artwork into CSS layers and decorative overlays instead of showing a literal full-screen fantasy scene.
-
-
