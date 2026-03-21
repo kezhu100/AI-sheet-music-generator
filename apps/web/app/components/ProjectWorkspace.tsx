@@ -142,6 +142,21 @@ function buildInstrumentExportFileName(
   return `${baseName}_${scope}.${extension}`;
 }
 
+function getInstrumentScopeLabel(scope: InstrumentExportScope): string {
+  return scope === "piano" ? "piano" : "drums";
+}
+
+function buildExportWorkflowMessage(format: ExportFormatName, scope: InstrumentExportScope, fileName: string): string {
+  const instrumentLabel = scope === "piano" ? "piano" : "drums";
+  const chineseInstrumentLabel = scope === "piano" ? "钢琴" : "鼓";
+
+  if (format === "musicxml") {
+    return `Downloaded ${fileName}. This is the recommended MuseScore handoff for ${instrumentLabel} editing. / 已下载 ${fileName}。这是推荐用于 MuseScore ${chineseInstrumentLabel}编辑的交接文件。`;
+  }
+
+  return `Downloaded ${fileName}. This is the recommended MIDI/DAW export for ${instrumentLabel} workflows. / 已下载 ${fileName}。这是推荐用于${chineseInstrumentLabel} MIDI/DAW 工作流的导出文件。`;
+}
+
 function buildExportStateKey(modeName: ExportModeName, format: ExportFormatName, scope: InstrumentExportScope): string {
   return `${modeName}:${format}:${scope}`;
 }
@@ -559,7 +574,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [isExportingProjectPackage, setIsExportingProjectPackage] = useState(false);
   const [exportSuccessMessage, setExportSuccessMessage] = useState<string | null>(null);
-  const [museScoreHandoffMessage, setMuseScoreHandoffMessage] = useState<string | null>(null);
+  const [exportWorkflowMessage, setExportWorkflowMessage] = useState<string | null>(null);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
   const [isRefreshingRuntimeDiagnostics, setIsRefreshingRuntimeDiagnostics] = useState(false);
@@ -1270,7 +1285,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     setSavedDraft(null);
     setSuggestions([]);
     setSuggestionsStale(false);
-    setMuseScoreHandoffMessage(null);
+    setExportWorkflowMessage(null);
     setLastAnalyzedDraftSignature(null);
     lastDraftJobIdRef.current = null;
     clearEditableState();
@@ -1306,7 +1321,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
 
     try {
       const midiBlob = await downloadMidiExport(job.id, scope, modeName === "draft" ? getCurrentDraftResult() : undefined);
-      triggerBlobDownload(midiBlob, buildInstrumentExportFileName(downloadBaseName, scope, "midi"));
+      const fileName = buildInstrumentExportFileName(downloadBaseName, scope, "midi");
+      triggerBlobDownload(midiBlob, fileName);
+      setExportWorkflowMessage(buildExportWorkflowMessage("midi", scope, fileName));
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MIDI.");
     } finally {
@@ -1336,9 +1353,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       );
       const fileName = buildInstrumentExportFileName(downloadBaseName, scope, "musicxml");
       triggerBlobDownload(musicXmlBlob, fileName);
-      setMuseScoreHandoffMessage(
-        `Downloaded ${fileName}. Open it in MuseScore as a separate ${scope} handoff for cleaner notation cleanup. / 已下载 ${fileName}，请将它作为独立的${scope === "piano" ? "钢琴" : "鼓"}文件导入 MuseScore，以减少混排问题并完成最终整理。`
-      );
+      setExportWorkflowMessage(buildExportWorkflowMessage("musicxml", scope, fileName));
       return true;
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Failed to export MusicXML.");
@@ -2160,14 +2175,14 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           <p style={{ whiteSpace: "pre-wrap" }}>{exportSuccessMessage}</p>
         </section>
       ) : null}
-      {museScoreHandoffMessage ? (
+      {exportWorkflowMessage ? (
         <section className="panel panel-full">
           <h2>
-            MuseScore Handoff
+            Export Guidance
             <br />
-            MuseScore 交接
+            导出指引
           </h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{museScoreHandoffMessage}</p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{exportWorkflowMessage}</p>
         </section>
       ) : null}
       {activeResult ? (
@@ -2462,9 +2477,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     导出与交接
                   </h2>
                   <p className="muted section-help">
-                    MIDI and MusicXML are the core output. Export piano and drums separately for the cleanest MuseScore handoff after this lightweight review step.
+                    Export piano and drums separately by default. Use MusicXML for MuseScore editing, use MIDI for DAW and MIDI-production workflows, and treat combined export as a compatibility path rather than the main handoff.
                     <br />
-                    MIDI 与 MusicXML 是核心产出；完成这里的轻量复核后，建议将钢琴与鼓分开导出，再交给 MuseScore 做最终排版润色。
+                    默认建议分开导出钢琴与鼓：MusicXML 更适合交给 MuseScore 编辑，MIDI 更适合 DAW 与 MIDI 制作流程；混合导出仅作为兼容路径，不是主推荐方案。
                   </p>
                 </div>
               </div>
@@ -2473,6 +2488,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   <strong>Current Draft / 当前草稿</strong>
                   <div className="muted">
                     Separate-by-instrument export is the recommended path for review-ready handoff. / 推荐按乐器分别导出，作为更稳妥的交接路径。
+                  </div>
+                  <div className="muted">
+                    Recommended for MIDI / DAW: use the separate MIDI files below. / 推荐用于 MIDI / DAW：请使用下面分开的 MIDI 文件。
                   </div>
                   <div className="actions">
                     <button
@@ -2491,6 +2509,11 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     >
                       {isExporting("draft", "midi", "drums") ? "Exporting MIDI... / 导出中..." : "Drums MIDI / 鼓 MIDI"}
                     </button>
+                  </div>
+                  <div className="muted">
+                    Recommended for MuseScore: use the separate MusicXML files below. / 推荐用于 MuseScore：请使用下面分开的 MusicXML 文件。
+                  </div>
+                  <div className="actions">
                     <button
                       className="button"
                       type="button"
@@ -2512,9 +2535,18 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                         : "Drums MusicXML / 鼓 MusicXML"}
                     </button>
                   </div>
+                  <div className="muted">
+                    Combined export remains compatibility-oriented and is intentionally not the primary draft workflow here. / 混合导出仍保留为兼容路径，但这里不会把它作为主要草稿工作流推荐。
+                  </div>
                 </article>
                 <article className="note-card ornate-card">
                   <strong>Original Result / 原始结果</strong>
+                  <div className="muted">
+                    Use these when you want the untouched completed result instead of your current draft edits. / 如果你想导出未编辑的完成结果，而不是当前草稿修改，请使用这里的文件。
+                  </div>
+                  <div className="muted">
+                    MIDI is best for DAW workflows; MusicXML is best for MuseScore handoff. / MIDI 更适合 DAW 流程；MusicXML 更适合交给 MuseScore。
+                  </div>
                   <div className="actions">
                     <button
                       className="button secondary"
@@ -2561,7 +2593,10 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <article className="note-card ornate-card">
                   <strong>MuseScore Handoff / 交接 MuseScore</strong>
                   <div className="muted">
-                    Download separate draft MusicXML files for piano and drums, then import them into MuseScore for cleaner final notation editing. / 分别下载钢琴与鼓的草稿 MusicXML，再导入 MuseScore，可更干净地完成最终记谱编辑。
+                    Recommended path: export separate draft MusicXML files for piano and drums, then import each file into MuseScore for the matching notation cleanup task. / 推荐路径：分别导出钢琴与鼓的草稿 MusicXML，再按对应任务分别导入 MuseScore 做记谱整理。
+                  </div>
+                  <div className="muted">
+                    Piano MusicXML is best for piano score editing. Drums MusicXML is best for drum-staff editing. / Piano MusicXML 最适合钢琴谱编辑；Drums MusicXML 最适合鼓谱编辑。
                   </div>
                   <div className="actions">
                     <button
@@ -2586,7 +2621,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                     </button>
                   </div>
                   <div className="muted">
-                    This downloads separate MusicXML files only. No OS-level app launch is attempted. / 此操作只下载分开的 MusicXML 文件，不会尝试系统级启动应用。
+                    This downloads separate MusicXML files only. Combined export is intentionally de-emphasized here because separate handoff is usually cleaner in MuseScore. / 此操作只下载分开的 MusicXML 文件；这里刻意弱化混合导出，因为分开交接通常更适合 MuseScore。
                   </div>
                 </article>
                 <article className="note-card ornate-card">

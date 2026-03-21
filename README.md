@@ -87,6 +87,9 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 - **MuseScore handoff for final polishing**  
   **支持交接到 MuseScore 进行最终排版润色**
 
+  Separate MusicXML export is the recommended default handoff, while combined export stays compatibility-oriented.  
+  默认推荐分开的 MusicXML 交接路径，而混合导出仅保留为兼容用途。  
+
 - **Provider-based quality control**  
   **支持基于 provider 的质量调节**
 

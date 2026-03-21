@@ -52,6 +52,7 @@ Presentation priorities:
 - custom-provider registration copy should clearly distinguish built-in, official enhanced, and custom registered states
 - generated results should expose a lightweight provider-used/fallback summary so Auto behavior stays understandable without opening developer-style diagnostics
 - export and handoff should clearly recommend separate piano/drum files for MuseScore as the final notation polishing environment
+- export guidance should clearly distinguish MuseScore-oriented MusicXML handoff, DAW-oriented MIDI export, and combined export as an optional compatibility path
 - drum MusicXML should use lightweight percussion semantics so MuseScore imports it as a readable drum staff without pretending to be a full notation engine
 - the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
 - the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums

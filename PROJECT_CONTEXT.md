@@ -15,6 +15,7 @@ The current product includes:
 - region re-transcription and draft analysis
 - separate piano/drum MIDI and MusicXML export
 - MuseScore handoff through separate MusicXML export
+- combined export remains compatibility-oriented rather than the primary product path
 - local project reopen, import, and export workflows
 
 ## Current Milestone

@@ -4,6 +4,22 @@
 
 ### 2026-03-21
 Decision:
+- Keep export UX compact, but make file purpose explicit so users can immediately distinguish MuseScore handoff, MIDI/DAW export, and compatibility-oriented combined export.
+
+Context:
+- Separate piano/drum exports already existed, but the export area still made users infer which file fit which next step.
+- Product direction is export-first and MuseScore-centered, so file-purpose guidance matters more than adding more controls.
+
+Chosen option:
+- Keep the current export layout and backend contract.
+- Add concise export helper copy and success messaging in the existing export area.
+- Recommend separate MusicXML for MuseScore, separate MIDI for DAW workflows, and describe combined export as optional compatibility behavior.
+
+Tradeoffs:
+- This keeps the patch small and product-aligned, but combined export remains de-emphasized rather than promoted through new top-level UI.
+
+### 2026-03-21
+Decision:
 - Keep the normalized `JobResult` contract unchanged and add exporter-side grouping so piano and drums are exported as separate MIDI and MusicXML files for MuseScore handoff.
 
 Context:
