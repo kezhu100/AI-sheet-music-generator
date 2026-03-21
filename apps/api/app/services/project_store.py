@@ -219,8 +219,7 @@ class ProjectStore:
         )
 
         if original_result is not None:
-            namespaced_original = self._namespace_draft_note_ids(original_result, duplicate_project_id)
-            self._write_original_result(duplicate_project_id, namespaced_original)
+            self._write_original_result(duplicate_project_id, original_result)
         if saved_draft is not None:
             namespaced_saved_draft = JobDraftRecord(
                 jobId=duplicate_project_id,

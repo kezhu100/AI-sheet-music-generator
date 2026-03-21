@@ -246,7 +246,7 @@ class ProjectPackagingService:
             )
 
         imported_original = self._build_imported_result(
-            result=project_store.namespace_draft_note_ids(original_result, new_project_id),
+            result=original_result,
             restored_stems=restored_stems,
             warning_messages=import_warnings,
         )

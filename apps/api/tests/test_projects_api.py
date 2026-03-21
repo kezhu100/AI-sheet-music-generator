@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -87,6 +88,27 @@ def build_result(project_name: str = "project-demo", first_pitch: int = 60) -> J
                 }
             ],
         }
+    )
+
+
+def build_clean_original_result(project_name: str = "project-demo", first_pitch: int = 60) -> JobResult:
+    result = build_result(project_name, first_pitch=first_pitch)
+    return result.model_copy(
+        update={
+            "tracks": [
+                track.model_copy(
+                    update={
+                        "notes": [
+                            note.model_copy(update={"draft_note_id": None})
+                            for note in track.notes
+                        ]
+                    },
+                    deep=True,
+                )
+                for track in result.tracks
+            ]
+        },
+        deep=True,
     )
 
 
@@ -299,10 +321,10 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertNotIn(project_id, listed_ids)
 
     def test_duplicate_project_creates_isolated_saved_draft_and_persisted_fallback_job(self) -> None:
-        project_id = "phase125-project-duplicate"
+        project_id = f"phase125-project-duplicate-{uuid4().hex}"
         upload = build_upload(project_id, "phase125-duplicate.wav")
         job = build_job(project_id, upload.upload_id, status="completed")
-        original_result = build_result("phase125-source", first_pitch=60)
+        original_result = build_clean_original_result("phase125-source", first_pitch=60)
         edited_result = build_result("phase125-source", first_pitch=72)
         self.created_project_ids.append(project_id)
         project_store.create_project(job, upload)
@@ -325,6 +347,9 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertNotEqual(duplicate_project_id, project_id)
         self.assertEqual(duplicate_project["projectName"], "phase125-duplicate-copy")
         self.assertTrue(duplicate_project["hasSavedDraft"])
+        self.assertIsNone(duplicate_project["originalResult"]["tracks"][0]["notes"][0]["draftNoteId"])
+        duplicated_original = self._read_original_result_payload(duplicate_project_id)
+        self.assertIsNone(duplicated_original.tracks[0].notes[0].draft_note_id)
 
         source_draft = client.get(f"/api/v1/jobs/{project_id}/draft").json()["draft"]
         duplicate_draft = client.get(f"/api/v1/jobs/{duplicate_project_id}/draft").json()["draft"]
@@ -396,10 +421,10 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertIn("already exists", response.json()["detail"])
 
     def test_import_project_package_creates_new_local_project_identity_and_restores_assets(self) -> None:
-        source_project_id = "phase13l-import-source"
+        source_project_id = f"phase13l-import-source-{uuid4().hex}"
         upload = build_upload(source_project_id, "phase13l-import.wav")
         job = build_job(source_project_id, upload.upload_id, status="completed")
-        result = build_result("phase13l-import-source")
+        result = build_clean_original_result("phase13l-import-source")
         self.created_project_ids.append(source_project_id)
         self._write_upload_asset(upload)
         self._write_stem_assets(result)
@@ -430,6 +455,9 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(imported_project["jobId"], imported_project_id)
         self.assertEqual(imported_project["savedDraft"]["jobId"], imported_project_id)
         self.assertTrue(imported_project["savedDraft"]["result"]["tracks"][0]["notes"][0]["draftNoteId"].startswith(f"draft:{imported_project_id}:"))
+        self.assertIsNone(imported_project["originalResult"]["tracks"][0]["notes"][0]["draftNoteId"])
+        imported_original = self._read_original_result_payload(imported_project_id)
+        self.assertIsNone(imported_original.tracks[0].notes[0].draft_note_id)
         self.assertEqual(imported_project["originalResult"]["stems"][0]["storedPath"], f"data/stems/{imported_project_id}/piano_stem.wav")
         self.assertEqual(imported_project["upload"]["storedPath"], f"data/uploads/{imported_project_id}_{upload.file_name}")
 
