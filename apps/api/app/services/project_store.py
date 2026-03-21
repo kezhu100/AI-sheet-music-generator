@@ -29,6 +29,7 @@ from app.services.draft_store import draft_store
 
 class ProjectStore:
     def __init__(self, projects_dir: Path) -> None:
+        self._settings = get_settings()
         self._projects_dir = projects_dir
         self._lock = Lock()
         self._projects_dir.mkdir(parents=True, exist_ok=True)
@@ -146,10 +147,12 @@ class ProjectStore:
         manifest = self._read_manifest(project_id)
         if manifest is None or manifest.deleted_at is not None:
             return False
+        original_result = self._read_original_result(project_id)
 
         manifest.deleted_at = utc_now()
         self._write_manifest(manifest)
         with self._lock:
+            self._delete_owned_assets(manifest, original_result)
             project_dir = self._project_dir(project_id)
             for attempt in range(3):
                 for child_path in project_dir.glob("*"):
@@ -443,6 +446,75 @@ class ProjectStore:
 
     def _project_dir(self, project_id: str) -> Path:
         return self._projects_dir / project_id
+
+    def _delete_owned_assets(
+        self,
+        manifest: ProjectManifestRecord,
+        original_result: Optional[JobResult],
+    ) -> None:
+        if manifest.upload is not None:
+            self._delete_owned_file(Path(manifest.upload.stored_path), self._settings.uploads_dir)
+        if original_result is not None:
+            for stem in original_result.stems:
+                self._delete_owned_file(Path(stem.stored_path), self._settings.stems_dir, prune_empty_parents=True)
+
+    def _delete_owned_file(self, stored_path: Path, root_dir: Path, *, prune_empty_parents: bool = False) -> None:
+        try:
+            file_path = (self._settings.project_root / stored_path).resolve()
+            root_path = root_dir.resolve()
+            file_path.relative_to(root_path)
+        except (OSError, RuntimeError, ValueError):
+            return
+
+        try:
+            if file_path.exists() and file_path.is_file():
+                if not self._unlink_with_retries(file_path):
+                    return
+        except OSError:
+            return
+
+        if prune_empty_parents:
+            self._prune_empty_parent_dirs(file_path.parent, root_path)
+
+    def _prune_empty_parent_dirs(self, directory: Path, root_dir: Path) -> None:
+        current_dir = directory
+        while current_dir != root_dir:
+            try:
+                current_dir.relative_to(root_dir)
+                if not self._rmdir_with_retries(current_dir):
+                    break
+            except OSError:
+                break
+            current_dir = current_dir.parent
+
+    def _unlink_with_retries(self, path: Path) -> bool:
+        for attempt in range(3):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                path.unlink()
+                return True
+            except FileNotFoundError:
+                return True
+            except PermissionError:
+                gc.collect()
+                time.sleep(0.02 * (attempt + 1))
+            except OSError:
+                return False
+        return False
+
+    def _rmdir_with_retries(self, path: Path) -> bool:
+        for attempt in range(3):
+            try:
+                path.rmdir()
+                return True
+            except FileNotFoundError:
+                return True
+            except PermissionError:
+                gc.collect()
+                time.sleep(0.02 * (attempt + 1))
+            except OSError:
+                return False
+        return False
 
     def _manifest_path(self, project_id: str) -> Path:
         return self._project_dir(project_id) / "manifest.json"

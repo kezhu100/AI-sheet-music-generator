@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -300,11 +301,29 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(persisted_result.project_name, "phase125-original-name")
 
     def test_delete_project_hides_project_from_library_and_detail_routes(self) -> None:
-        project_id = "phase125-project-delete"
+        project_id = f"phase125-project-delete-{uuid4().hex}"
         upload = build_upload(project_id, "phase125-delete.wav")
         job = build_job(project_id, upload.upload_id, status="completed")
-        result = build_result("phase125-delete")
+        base_result = build_result("phase125-delete")
+        result = base_result.model_copy(
+            update={
+                "stems": [
+                    stem.model_copy(
+                        update={
+                            "stored_path": f"data/stems/{project_id}/piano_stem.wav",
+                        }
+                    )
+                    for stem in base_result.stems
+                ]
+            },
+            deep=True,
+        )
         self.created_project_ids.append(project_id)
+        self._write_upload_asset(upload)
+        self._write_stem_assets(result)
+        upload_path = self.settings.project_root / upload.stored_path
+        stem_path = self.settings.project_root / result.stems[0].stored_path
+        stem_dir = stem_path.parent
         project_store.create_project(job, upload)
         project_store.mark_completed(job, result)
         client = TestClient(app)
@@ -313,12 +332,20 @@ class ProjectsApiTests(unittest.TestCase):
             json={"draftResult": build_result("phase125-delete", first_pitch=72).model_dump(mode="json", by_alias=True)},
         )
 
-        response = client.delete(f"/api/v1/projects/{project_id}")
+        with patch.object(project_store, "_unlink_with_retries", return_value=True) as unlink_mock, patch.object(
+            project_store,
+            "_rmdir_with_retries",
+            return_value=True,
+        ) as rmdir_mock:
+            response = client.delete(f"/api/v1/projects/{project_id}")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(client.get(f"/api/v1/projects/{project_id}").status_code, 404)
         listed_ids = [project["projectId"] for project in client.get("/api/v1/projects").json()["projects"]]
         self.assertNotIn(project_id, listed_ids)
+        self.assertIn(upload_path, [call.args[0] for call in unlink_mock.call_args_list])
+        self.assertIn(stem_path, [call.args[0] for call in unlink_mock.call_args_list])
+        self.assertIn(stem_dir, [call.args[0] for call in rmdir_mock.call_args_list])
 
     def test_duplicate_project_creates_isolated_saved_draft_and_persisted_fallback_job(self) -> None:
         project_id = f"phase125-project-duplicate-{uuid4().hex}"
