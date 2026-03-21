@@ -32,7 +32,8 @@ Phase 11A source separation update:
 Phase 11B piano transcription update:
 - the transcription stage now selects the piano backend explicitly through configuration instead of always using the heuristic WAV provider
 - `heuristic` remains available for local development and deterministic fallback
-- `ml` and `basic-pitch` can be enabled as stronger piano backends when Basic Pitch is installed in the configured Python environment
+- `basic-pitch` is the canonical stronger piano backend when Basic Pitch is installed in the configured Python environment
+- the legacy piano alias `ml` is still accepted as a backward-compatibility config value and resolves to `basic-pitch`
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized piano note events still flow into the same post-processing stage and the same `JobResult` structure
 
@@ -40,6 +41,7 @@ Phase 11C drum transcription update:
 - the transcription stage now selects the drum backend explicitly through configuration instead of always using the heuristic WAV provider
 - `heuristic` remains available for local development and deterministic fallback
 - `demucs-drums` is the practical enhanced drum backend, reusing Demucs drum-stem isolation plus deterministic onset rules when Demucs is installed in the configured Python environment
+- the legacy drum aliases `ml` and `madmom` are still accepted as backward-compatibility config values and resolve to `demucs-drums`
 - fallback can automatically return to `heuristic` when the stronger provider is unavailable
 - normalized drum note events still flow into the same post-processing stage and the same `JobResult` structure
 - the stronger drum path keeps output mapped to the stable `kick`, `snare`, and `hi-hat` lanes expected by the current editor workflow
@@ -95,6 +97,7 @@ Phase 12.5 project-management update:
 - duplicate now creates a new local project/job identity, copies the persisted original result plus latest saved draft when present, and namespaces duplicated draft note ids
 - delete now removes projects from the library/detail routes immediately while local file cleanup remains best-effort in the same filesystem
 - persisted completed projects can now fall back to filesystem-backed project data for draft save/load, export, analysis, and region re-transcription flows when the in-memory job record is gone
+- persisted per-project provider preferences are reused on reopen and region re-transcription when recorded; older projects without that history fall back conservatively
 
 Phase 13L local project system update:
 - the live local project stays manifest-backed and lightweight under `apps/api/data/projects/<project-id>/`
@@ -102,6 +105,7 @@ Phase 13L local project system update:
 - export aggregates `manifest.json`, immutable `original-result.json`, separate `saved-draft.json` when present, and available local upload/stem assets into a zip package written to a caller-supplied local path
 - import restores that package into the managed local library as a new independent local project instance with a fresh local `projectId`
 - imported original-result and saved-draft artifacts remain separate, and imported draft note ids are re-namespaced to the new local project id
+- imported and duplicated original completed results remain semantically clean; draft-only note ids stay on the draft side
 - missing optional packaged assets are surfaced honestly; Phase 13L still does not recover in-progress background job execution
 
 Provider foundation update:
@@ -111,5 +115,3 @@ Provider foundation update:
 - official enhanced providers still use the existing explicit backend install flow
 - custom providers now have a separate backend registration path based on a validated local `file://` manifest URL plus app-managed local asset storage
 - in this step, custom providers are surfaced in runtime diagnostics only; they are not yet wired into the main provider-selection execution path or `Auto` pipeline behavior
-
-

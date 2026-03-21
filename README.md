@@ -69,6 +69,9 @@ Local-first AI sheet music generation with a browser UI, local backend, editable
 - **Saved draft and original result stay separate**  
   **已保存草稿与原始结果保持分离**
 
+- **Reopened projects keep their recorded provider choices when available**  
+  **重新打开项目时，如有记录，会保留当时的 provider 选择**
+
 - **Project Library with local persistence**  
   **提供本地持久化的项目库**
 

@@ -502,8 +502,8 @@ class FallbackDrumTranscriptionProvider(DrumTranscriptionProvider):
 
 
 def build_drum_transcription_provider(settings: Settings) -> DrumTranscriptionProvider:
-    provider_id = settings.drum_transcription_provider
-    fallback_id = settings.drum_transcription_fallback_provider
+    provider_id = _normalize_drum_provider_id(settings.drum_transcription_provider)
+    fallback_id = _normalize_drum_provider_id(settings.drum_transcription_fallback_provider)
 
     primary = _create_provider(provider_id, settings)
     if fallback_id and fallback_id != provider_id:
@@ -514,9 +514,10 @@ def build_drum_transcription_provider(settings: Settings) -> DrumTranscriptionPr
 
 
 def _create_provider(provider_id: str, settings: Settings) -> DrumTranscriptionProvider:
+    provider_id = _normalize_drum_provider_id(provider_id)
     if provider_id == DRUM_TRANSCRIPTION_PROVIDER_HEURISTIC:
         return HeuristicWavDrumTranscriptionProvider()
-    if provider_id == DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET or provider_id in LEGACY_ENHANCED_DRUM_PROVIDER_IDS:
+    if provider_id == DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET:
         return DemucsOnsetDrumTranscriptionProvider(
             python_executable=settings.drum_transcription_ml_python or settings.source_separation_demucs_python,
             model_name=settings.source_separation_demucs_model,
@@ -526,6 +527,12 @@ def _create_provider(provider_id: str, settings: Settings) -> DrumTranscriptionP
         )
 
     raise ValueError(f"Unsupported drum transcription provider '{provider_id}'.")
+
+
+def _normalize_drum_provider_id(provider_id: Optional[str]) -> Optional[str]:
+    if provider_id in LEGACY_ENHANCED_DRUM_PROVIDER_IDS:
+        return DRUM_TRANSCRIPTION_PROVIDER_DEMUCS_ONSET
+    return provider_id
 
 
 def _dedupe_warnings(warnings: List[str]) -> List[str]:

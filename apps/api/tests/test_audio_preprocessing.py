@@ -118,7 +118,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             separation_provider = RecordingSourceSeparationProvider(normalized_path)
             pipeline = self._build_pipeline(settings, separation_provider)
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 output_path = Path(command[-1])
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_test_wav(output_path)
@@ -185,7 +185,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             preprocessor = LocalAudioPreprocessor(settings)
             captured_command: list[str] = []
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 nonlocal captured_command
                 captured_command = list(command)
                 output_path = Path(command[-1])
@@ -210,7 +210,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             separation_provider = RecordingSourceSeparationProvider(normalized_path)
             pipeline = self._build_pipeline(settings, separation_provider)
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 output_path = Path(command[-1])
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path.write_bytes(b"partial")
@@ -235,7 +235,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             separation_provider = RecordingSourceSeparationProvider(normalized_path)
             pipeline = self._build_pipeline(settings, separation_provider)
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 output_path = Path(command[-1])
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path.write_bytes(b"partial")
@@ -262,7 +262,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             preprocessor = LocalAudioPreprocessor(settings)
             normalized_path = settings.stems_dir / "job-invalid-success" / "normalized_input.wav"
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 output_path = Path(command[-1])
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path.write_bytes(b"not-a-real-wav")
@@ -284,7 +284,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             preprocessor = LocalAudioPreprocessor(settings)
             captured_command: list[str] = []
 
-            def fake_run(command, check, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+            def fake_run(command, check, capture_output, text, timeout, encoding=None, errors=None):  # type: ignore[no-untyped-def]
                 nonlocal captured_command
                 captured_command = list(command)
                 output_path = Path(command[-1])

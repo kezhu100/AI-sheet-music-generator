@@ -18,6 +18,7 @@ from app.pipeline.interfaces import PianoTranscriptionProvider, SourceStem, Tran
 PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC = "heuristic"
 PIANO_TRANSCRIPTION_PROVIDER_ML = "ml"
 PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH = "basic-pitch"
+LEGACY_BASIC_PITCH_PROVIDER_IDS = {PIANO_TRANSCRIPTION_PROVIDER_ML}
 
 
 class UnsupportedPianoStemError(Exception):
@@ -442,8 +443,8 @@ class FallbackPianoTranscriptionProvider(PianoTranscriptionProvider):
 
 
 def build_piano_transcription_provider(settings: Settings) -> PianoTranscriptionProvider:
-    provider_id = settings.piano_transcription_provider
-    fallback_id = settings.piano_transcription_fallback_provider
+    provider_id = _normalize_piano_provider_id(settings.piano_transcription_provider)
+    fallback_id = _normalize_piano_provider_id(settings.piano_transcription_fallback_provider)
 
     primary = _create_provider(provider_id, settings)
     if fallback_id and fallback_id != provider_id:
@@ -454,15 +455,22 @@ def build_piano_transcription_provider(settings: Settings) -> PianoTranscription
 
 
 def _create_provider(provider_id: str, settings: Settings) -> PianoTranscriptionProvider:
+    provider_id = _normalize_piano_provider_id(provider_id)
     if provider_id == PIANO_TRANSCRIPTION_PROVIDER_HEURISTIC:
         return HeuristicWavPianoTranscriptionProvider()
-    if provider_id in {PIANO_TRANSCRIPTION_PROVIDER_ML, PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH}:
+    if provider_id == PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH:
         return BasicPitchPianoTranscriptionProvider(
             python_executable=settings.piano_transcription_ml_python,
             minimum_confidence=settings.piano_transcription_ml_min_confidence,
         )
 
     raise ValueError(f"Unsupported piano transcription provider '{provider_id}'.")
+
+
+def _normalize_piano_provider_id(provider_id: Optional[str]) -> Optional[str]:
+    if provider_id in LEGACY_BASIC_PITCH_PROVIDER_IDS:
+        return PIANO_TRANSCRIPTION_PROVIDER_BASIC_PITCH
+    return provider_id
 
 
 def _coerce_float(value: Any) -> Optional[float]:

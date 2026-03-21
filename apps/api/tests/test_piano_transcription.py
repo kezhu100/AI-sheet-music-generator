@@ -41,6 +41,15 @@ class PianoTranscriptionProviderSelectionTests(unittest.TestCase):
 
         self.assertIsInstance(provider, FallbackPianoTranscriptionProvider)
 
+    def test_legacy_ml_alias_resolves_to_basic_pitch_provider(self) -> None:
+        provider = build_piano_transcription_provider(
+            Settings(
+                piano_transcription_provider=PIANO_TRANSCRIPTION_PROVIDER_ML,
+            )
+        )
+
+        self.assertIsInstance(provider, BasicPitchPianoTranscriptionProvider)
+
     def test_ml_provider_normalizes_note_events_into_noteevent_shape(self) -> None:
         provider = StubBasicPitchProvider(
             note_events=[
