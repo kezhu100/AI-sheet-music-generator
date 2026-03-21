@@ -362,6 +362,7 @@ class JobRecord(BaseModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     progress: JobProgress
+    provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
     result: Optional[JobResult] = None
     error: Optional[str] = None
 
@@ -397,6 +398,7 @@ class ProjectSummary(BaseModel):
     has_saved_draft: bool = Field(alias="hasSavedDraft")
     draft_version: Optional[int] = Field(default=None, alias="draftVersion")
     draft_saved_at: Optional[datetime] = Field(default=None, alias="draftSavedAt")
+    provider_preferences: Optional[ProviderPreferences] = Field(default=None, alias="providerPreferences")
     assets: ProjectAssetAvailability
     share_path: str = Field(alias="sharePath")
     current_stage: Optional[str] = Field(default=None, alias="currentStage")

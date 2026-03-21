@@ -3,10 +3,10 @@ from __future__ import annotations
 from threading import Thread
 from time import sleep
 
-from app.core.config import get_settings
 from app.models.schemas import ProviderPreferences, UploadedFileDescriptor
 from app.pipeline.development_pipeline import build_processing_pipeline
 from app.services.job_store import job_store
+from app.services.provider_preferences import resolve_settings_with_provider_preferences
 from app.services.project_store import project_store
 from app.services.storage import resolve_upload_path
 
@@ -18,7 +18,7 @@ def start_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences:
 
 def _run_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: ProviderPreferences | None = None) -> None:
     try:
-        settings = _resolve_job_settings(provider_preferences)
+        settings = resolve_settings_with_provider_preferences(provider_preferences)
         job_store.update_progress(
             job_id,
             status="processing",
@@ -77,19 +77,3 @@ def _run_job(job_id: str, upload: UploadedFileDescriptor, provider_preferences: 
     except Exception as exc:
         failed_job = job_store.fail(job_id, str(exc))
         project_store.mark_failed(failed_job)
-
-
-def _resolve_job_settings(provider_preferences: ProviderPreferences | None):
-    settings = get_settings()
-    if provider_preferences is None:
-        return settings
-
-    updates = {}
-    if provider_preferences.source_separation and provider_preferences.source_separation != "auto":
-        updates["source_separation_provider"] = provider_preferences.source_separation
-    if provider_preferences.piano_transcription and provider_preferences.piano_transcription != "auto":
-        updates["piano_transcription_provider"] = provider_preferences.piano_transcription
-    if provider_preferences.drum_transcription and provider_preferences.drum_transcription != "auto":
-        updates["drum_transcription_provider"] = provider_preferences.drum_transcription
-
-    return settings.model_copy(update=updates) if updates else settings

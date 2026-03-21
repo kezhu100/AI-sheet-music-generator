@@ -20,6 +20,7 @@ from app.models.schemas import (
     ProjectDetail,
     ProjectManifestRecord,
     ProjectSummary,
+    ProviderPreferences,
     UploadedFileDescriptor,
     utc_now,
 )
@@ -32,7 +33,12 @@ class ProjectStore:
         self._lock = Lock()
         self._projects_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_project(self, job: JobRecord, upload: UploadedFileDescriptor) -> ProjectManifestRecord:
+    def create_project(
+        self,
+        job: JobRecord,
+        upload: UploadedFileDescriptor,
+        provider_preferences: ProviderPreferences | None = None,
+    ) -> ProjectManifestRecord:
         manifest = ProjectManifestRecord(
             summary=ProjectSummary(
                 projectId=job.id,
@@ -44,6 +50,7 @@ class ProjectStore:
                 hasSavedDraft=False,
                 draftVersion=None,
                 draftSavedAt=None,
+                providerPreferences=provider_preferences if provider_preferences is not None else job.provider_preferences,
                 assets=ProjectAssetAvailability(
                     hasSourceUpload=True,
                     hasStems=False,
@@ -187,6 +194,7 @@ class ProjectStore:
                 hasSavedDraft=saved_draft is not None,
                 draftVersion=1 if saved_draft is not None else None,
                 draftSavedAt=now if saved_draft is not None else None,
+                providerPreferences=source_manifest.summary.provider_preferences,
                 assets=source_manifest.summary.assets.model_copy(deep=True),
                 sharePath=f"/projects/{duplicate_project_id}",
                 currentStage="completed" if original_result is not None else source_manifest.summary.current_stage,
@@ -255,6 +263,7 @@ class ProjectStore:
             hasSavedDraft=summary.has_saved_draft,
             draftVersion=summary.draft_version,
             assets=summary.assets,
+            providerPreferences=summary.provider_preferences,
             sharePath=summary.share_path,
             upload=manifest.upload,
             originalResult=original_result,
@@ -287,6 +296,7 @@ class ProjectStore:
                 percent=100,
                 message=manifest.status_message or "Completed project loaded from persisted storage.",
             ),
+            providerPreferences=manifest.summary.provider_preferences,
             result=original_result,
             error=manifest.error,
         )

@@ -38,8 +38,8 @@ async def create_job(payload: CreateJobRequest) -> JobResponse:
     if upload is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload not found.")
 
-    job = job_store.create(payload.upload_id)
-    project_store.create_project(job, upload)
+    job = job_store.create(payload.upload_id, payload.provider_preferences)
+    project_store.create_project(job, upload, payload.provider_preferences)
     start_job(job.id, upload, payload.provider_preferences)
     return JobResponse(job=job)
 
@@ -102,6 +102,7 @@ async def retranscribe_job_region(job_id: str, payload: RegionRetranscriptionReq
         job_id=job_id,
         result_stems=job.result.stems,
         request=payload,
+        provider_preferences=job.provider_preferences,
     )
     return RegionRetranscriptionResponse(
         instrument=payload.instrument,

@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import get_settings
 from app.main import app
-from app.models.schemas import JobProgress, JobRecord, JobResult, UploadedFileDescriptor, utc_now
+from app.models.schemas import JobProgress, JobRecord, JobResult, ProviderPreferences, UploadedFileDescriptor, utc_now
 from app.services.project_store import project_store
 from app.services.job_store import job_store
 from app.services import project_packaging
@@ -32,7 +32,12 @@ def build_upload(upload_id: str, file_name: str) -> UploadedFileDescriptor:
     )
 
 
-def build_job(job_id: str, upload_id: str, status: str = "queued") -> JobRecord:
+def build_job(
+    job_id: str,
+    upload_id: str,
+    status: str = "queued",
+    provider_preferences: ProviderPreferences | None = None,
+) -> JobRecord:
     now = utc_now()
     return JobRecord(
         id=job_id,
@@ -41,6 +46,7 @@ def build_job(job_id: str, upload_id: str, status: str = "queued") -> JobRecord:
         createdAt=now,
         updatedAt=now,
         progress=JobProgress(stage=status, percent=0 if status == "queued" else 100, message=f"Job is {status}."),
+        providerPreferences=provider_preferences,
     )
 
 
@@ -146,7 +152,16 @@ class ProjectsApiTests(unittest.TestCase):
     def test_project_detail_returns_original_result_for_completed_project(self) -> None:
         project_id = "phase12-project-detail"
         upload = build_upload(project_id, "phase12-detail.wav")
-        job = build_job(project_id, upload.upload_id, status="completed")
+        job = build_job(
+            project_id,
+            upload.upload_id,
+            status="completed",
+            provider_preferences=ProviderPreferences(
+                sourceSeparation="demucs",
+                pianoTranscription="basic-pitch",
+                drumTranscription="demucs-drums",
+            ),
+        )
         result = build_result("phase12-detail")
         self.created_project_ids.append(project_id)
         project_store.create_project(job, upload)
@@ -160,6 +175,9 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(payload["originalResult"]["projectName"], "phase12-detail")
         self.assertEqual(payload["assets"]["availableExports"], ["midi", "musicxml"])
         self.assertTrue(payload["assets"]["hasOriginalResult"])
+        self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
+        self.assertEqual(payload["providerPreferences"]["pianoTranscription"], "basic-pitch")
+        self.assertEqual(payload["providerPreferences"]["drumTranscription"], "demucs-drums")
 
     def test_mark_completed_writes_original_result_from_completed_backend_result(self) -> None:
         project_id = "phase12-project-original-write"

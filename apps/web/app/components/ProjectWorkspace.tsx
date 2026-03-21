@@ -132,8 +132,9 @@ interface RuntimeProviderInstallUiState {
 interface RuntimeUsedProviderSummaryItem {
   key: keyof ProviderPreferences;
   label: string;
-  requestedProvider: string;
+  requestedProvider: string | null;
   requestedLabel: string;
+  requestRecorded: boolean;
   usedProvider: string | null;
   usedLabel: string;
   fallback: boolean;
@@ -423,8 +424,19 @@ function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRec
           ? "Completed project loaded from the local project library."
           : "Project metadata loaded from the local project library.")
     },
+    providerPreferences: projectDetail.providerPreferences ?? undefined,
     result: projectDetail.originalResult ?? undefined,
     error: projectDetail.error ?? undefined
+  };
+}
+
+function toEditableProviderPreferences(
+  providerPreferences?: ProviderPreferences | null
+): ProviderPreferences {
+  return {
+    sourceSeparation: providerPreferences?.sourceSeparation ?? "auto",
+    pianoTranscription: providerPreferences?.pianoTranscription ?? "auto",
+    drumTranscription: providerPreferences?.drumTranscription ?? "auto"
   };
 }
 
@@ -525,7 +537,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnosticsResponse | null>(null);
   const [runtimeDiagnosticsError, setRuntimeDiagnosticsError] = useState<string | null>(null);
   const [isRefreshingRuntimeDiagnostics, setIsRefreshingRuntimeDiagnostics] = useState(false);
-  const [providerPreferences, setProviderPreferences] = useState<ProviderPreferences>(DEFAULT_PROVIDER_PREFERENCES);
+  const [providerPreferences, setProviderPreferences] = useState<ProviderPreferences>(() =>
+    toEditableProviderPreferences(initialProjectDetail?.providerPreferences ?? null)
+  );
   const [providerInstallStates, setProviderInstallStates] = useState<Record<string, RuntimeProviderInstallUiState>>({});
   const [isCustomProviderFormOpen, setIsCustomProviderFormOpen] = useState(false);
   const [customProviderManifestUrl, setCustomProviderManifestUrl] = useState("");
@@ -601,6 +615,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     setProjectDetail(initialProjectDetail);
     setJob(buildJobFromProjectDetail(initialProjectDetail));
     setSavedDraft(initialProjectDetail?.savedDraft ?? null);
+    setProviderPreferences(toEditableProviderPreferences(initialProjectDetail?.providerPreferences ?? null));
     setSuggestions([]);
     setSuggestionsStale(false);
     setLastAnalyzedDraftSignature(null);
@@ -744,6 +759,10 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       drum: new Map((drumRuntimeProvider?.options ?? []).map((option) => [option.provider, option]))
     };
   }, [sourceRuntimeProvider?.options, pianoRuntimeProvider?.options, drumRuntimeProvider?.options]);
+  const persistedProviderPreferences = useMemo(
+    () => job?.providerPreferences ?? projectDetail?.providerPreferences ?? null,
+    [job?.providerPreferences, projectDetail?.providerPreferences]
+  );
   const runtimeUsedProviderSummary = useMemo<RuntimeUsedProviderSummaryItem[]>(() => {
     if (!activeResult) {
       return [];
@@ -763,17 +782,22 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       usedProvider: string | null,
       optionMap: Map<string, RuntimeProviderOption>
     ): RuntimeUsedProviderSummaryItem {
-      const requestedProvider = providerPreferences[key] ?? "auto";
-      const requestedOption = requestedProvider === "auto" ? undefined : optionMap.get(requestedProvider);
+      const requestedProvider = persistedProviderPreferences?.[key] ?? null;
+      const requestedOption =
+        requestedProvider && requestedProvider !== "auto" ? optionMap.get(requestedProvider) : undefined;
       const usedOption = usedProvider ? optionMap.get(usedProvider) : undefined;
-      const fallback = requestedProvider !== "auto" && usedProvider != null && usedProvider !== requestedProvider;
+      const requestRecorded = requestedProvider != null;
+      const fallback = requestRecorded && requestedProvider !== "auto" && usedProvider != null && usedProvider !== requestedProvider;
       const autoPickedEnhanced = requestedProvider === "auto" && Boolean(usedOption?.optionalEnhanced);
 
       return {
         key,
         label,
         requestedProvider,
-        requestedLabel: requestedOption?.label ?? (requestedProvider === "auto" ? "Auto" : requestedProvider),
+        requestedLabel: requestRecorded
+          ? requestedOption?.label ?? (requestedProvider === "auto" ? "Auto" : requestedProvider)
+          : "Not recorded",
+        requestRecorded,
         usedProvider,
         usedLabel: usedOption?.label ?? usedProvider ?? "unknown",
         fallback,
@@ -786,7 +810,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       buildSummaryItem("pianoTranscription", "Piano", pianoUsedProvider, providerOptionLookup.piano),
       buildSummaryItem("drumTranscription", "Drums", drumUsedProvider, providerOptionLookup.drum)
     ];
-  }, [activeResult, providerPreferences, providerOptionLookup]);
+  }, [activeResult, persistedProviderPreferences, providerOptionLookup]);
   const runtimeUsedFallbackDetected = useMemo(() => {
     if (!activeResult) {
       return false;
@@ -2159,14 +2183,20 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <strong>Provider Use Summary / Provider 使用摘要</strong>
               <div className="runtime-provider-summary-lines">
                 {runtimeUsedProviderSummary.map((item) => {
-                  const modeLabel = item.requestedProvider === "auto" ? "Auto" : item.requestedLabel;
-                  const behaviorText = item.fallback
-                    ? "fallback to built-in"
-                    : item.autoPickedEnhanced
-                      ? "Auto picked optional enhanced"
-                      : item.requestedProvider === "auto"
-                        ? "Auto path"
-                        : "requested provider";
+                  const modeLabel = item.requestRecorded
+                    ? item.requestedProvider === "auto"
+                      ? "Auto"
+                      : item.requestedLabel
+                    : "Not recorded";
+                  const behaviorText = !item.requestRecorded
+                    ? "historical request not recorded"
+                    : item.fallback
+                      ? "fallback from requested provider"
+                      : item.autoPickedEnhanced
+                        ? "Auto picked optional enhanced"
+                        : item.requestedProvider === "auto"
+                          ? "Auto path"
+                          : "requested provider";
 
                   return (
                     <div key={item.key}>

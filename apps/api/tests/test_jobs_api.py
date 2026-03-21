@@ -40,6 +40,10 @@ class JobsApiTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 201)
+        payload = response.json()["job"]
+        self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
+        self.assertEqual(payload["providerPreferences"]["pianoTranscription"], "basic-pitch")
+        self.assertEqual(payload["providerPreferences"]["drumTranscription"], "demucs-drums")
         start_job_mock.assert_called_once()
         _, _, provider_preferences = start_job_mock.call_args.args
         self.assertEqual(provider_preferences.source_separation, "demucs")

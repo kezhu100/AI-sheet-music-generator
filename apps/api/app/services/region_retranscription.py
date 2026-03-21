@@ -10,11 +10,12 @@ from tempfile import TemporaryDirectory
 from fastapi import HTTPException, status
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import NoteEvent, RegionRetranscriptionRequest, StemAsset, TrackResult
+from app.models.schemas import NoteEvent, ProviderPreferences, RegionRetranscriptionRequest, StemAsset, TrackResult
 from app.pipeline.drum_transcription import build_drum_transcription_provider
 from app.pipeline.interfaces import SourceStem, TranscriptionResult
 from app.pipeline.piano_transcription import build_piano_transcription_provider
 from app.pipeline.post_processing import LightweightPostProcessor
+from app.services.provider_preferences import resolve_settings_with_provider_preferences
 from app.services.storage import resolve_project_path
 
 
@@ -35,6 +36,7 @@ class RegionRetranscriptionService:
         job_id: str,
         result_stems: list[StemAsset],
         request: RegionRetranscriptionRequest,
+        provider_preferences: ProviderPreferences | None = None,
     ) -> RegionRetranscriptionRunResult:
         stem_asset = self._resolve_stem_asset(result_stems, request.instrument)
         stem_path = resolve_project_path(stem_asset.stored_path)
@@ -60,7 +62,7 @@ class RegionRetranscriptionService:
                 file_path=segment_path,
                 stem_asset=stem_asset,
             )
-            transcription_result = self._transcribe_region(source_stem, request.instrument)
+            transcription_result = self._transcribe_region(source_stem, request.instrument, provider_preferences)
 
         processed = self._post_processor.process(
             [
@@ -100,13 +102,19 @@ class RegionRetranscriptionService:
             detail=f"No persisted {instrument} stem is available for region re-transcription.",
         )
 
-    def _transcribe_region(self, stem: SourceStem, instrument: str) -> TranscriptionResult:
+    def _transcribe_region(
+        self,
+        stem: SourceStem,
+        instrument: str,
+        provider_preferences: ProviderPreferences | None,
+    ) -> TranscriptionResult:
         try:
+            settings = resolve_settings_with_provider_preferences(provider_preferences, self._settings)
             if instrument == "piano":
-                provider = build_piano_transcription_provider(self._settings)
+                provider = build_piano_transcription_provider(settings)
                 return provider.transcribe(stem)
 
-            provider = build_drum_transcription_provider(self._settings)
+            provider = build_drum_transcription_provider(settings)
             return provider.transcribe(stem)
         except (RuntimeError, ValueError) as exc:
             raise HTTPException(

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import get_settings
 from app.main import app
-from app.models.schemas import JobResult
+from app.models.schemas import JobResult, ProviderPreferences
 from app.services.job_store import job_store
 from app.services.storage import persist_stem_copy
 
@@ -126,7 +126,48 @@ class RegionRetranscriptionApiTests(unittest.TestCase):
         self.assertGreaterEqual(len(response.json()["notes"]), 1)
         self.assertIn("providerUsed", response.json())
 
-    def _build_completed_job(self, temp_dir: Path, job_id: str):
+    def test_region_retranscription_uses_persisted_provider_preferences_instead_of_current_defaults(self) -> None:
+        previous_env = {
+            "PIANO_TRANSCRIPTION_PROVIDER": os.getenv("PIANO_TRANSCRIPTION_PROVIDER"),
+            "PIANO_TRANSCRIPTION_FALLBACK_PROVIDER": os.getenv("PIANO_TRANSCRIPTION_FALLBACK_PROVIDER"),
+            "PIANO_TRANSCRIPTION_ML_PYTHON": os.getenv("PIANO_TRANSCRIPTION_ML_PYTHON"),
+        }
+
+        os.environ["PIANO_TRANSCRIPTION_PROVIDER"] = "heuristic"
+        os.environ.pop("PIANO_TRANSCRIPTION_FALLBACK_PROVIDER", None)
+        os.environ["PIANO_TRANSCRIPTION_ML_PYTHON"] = str(Path("Z:/missing-basic-pitch-python.exe"))
+        get_settings.cache_clear()
+
+        try:
+            with TemporaryDirectory() as temp_dir:
+                job = self._build_completed_job(
+                    Path(temp_dir),
+                    "region-persisted-provider-job",
+                    provider_preferences=ProviderPreferences(
+                        pianoTranscription="basic-pitch",
+                    ),
+                )
+                response = TestClient(app).post(
+                    f"/api/v1/jobs/{job.id}/retranscribe-region",
+                    json={"instrument": "piano", "startSec": 0.0, "endSec": 1.35},
+                )
+        finally:
+            for key, value in previous_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+            get_settings.cache_clear()
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("configured piano provider", response.json()["detail"])
+
+    def _build_completed_job(
+        self,
+        temp_dir: Path,
+        job_id: str,
+        provider_preferences: ProviderPreferences | None = None,
+    ):
         source_wav = temp_dir / f"{job_id}.wav"
         self._write_test_clip(source_wav)
 
@@ -175,7 +216,7 @@ class RegionRetranscriptionApiTests(unittest.TestCase):
             }
         )
 
-        job = job_store.create(f"upload-{job_id}")
+        job = job_store.create(f"upload-{job_id}", provider_preferences)
         job_store.complete(job.id, result)
         return job
 

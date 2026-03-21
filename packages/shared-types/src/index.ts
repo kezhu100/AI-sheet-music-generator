@@ -156,6 +156,7 @@ export interface ProjectSummary {
   hasSavedDraft: boolean;
   draftVersion?: number | null;
   draftSavedAt?: string | null;
+  providerPreferences?: ProviderPreferences | null;
   assets: ProjectAssetAvailability;
   sharePath: string;
   currentStage?: string | null;
@@ -361,6 +362,7 @@ export interface JobRecord {
   createdAt: string;
   updatedAt: string;
   progress: JobProgress;
+  providerPreferences?: ProviderPreferences | null;
   result?: JobResult;
   error?: string;
 }
