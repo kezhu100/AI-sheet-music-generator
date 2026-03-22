@@ -2391,67 +2391,6 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               </div>
             </div>
           </section>
-
-          {false ? (
-          <section className="content-grid result-support-grid">
-            <div className="panel panel-support">
-              <h2>Piano Roll Editor / 钢琴卷帘编辑器</h2>
-              <p className="muted section-help">
-                Split previews keep piano and drums readable while preserving the same draft editing flow. /
-                分离预览让钢琴和鼓组更易阅读，同时保持同一套草稿编辑流程。
-              </p>
-              <div className="preview-dual-grid">
-                <div className="ornate-card preview-panel">
-                  <h3>Piano Preview / 钢琴预览</h3>
-                  <PianoRollPreview
-                    bpm={activeResult!.bpm}
-                    instrumentFilter="piano"
-                    onBoxSelect={handleBoxSelect}
-                    onClearSelection={clearSelection}
-                    onMoveNote={handleMoveNote}
-                    onSelectRegion={setRetranscriptionRegion}
-                    onSelectNote={handleSelectNote}
-                    selectedRegion={retranscriptionRegion}
-                    selectedNoteId={selectedDraftNoteId}
-                    selectedNoteIds={selectedDraftNoteIds}
-                    suggestedNoteIds={suggestions.map((suggestion) => suggestion.noteId)}
-                    selectedTrackKey={selectedTrackKey}
-                    tracks={visibleTracks}
-                  />
-                </div>
-                <div className="ornate-card preview-panel">
-                  <h3>Drum Preview / 鼓组预览</h3>
-                  <PianoRollPreview
-                    bpm={activeResult!.bpm}
-                    instrumentFilter="drums"
-                    onBoxSelect={handleBoxSelect}
-                    onClearSelection={clearSelection}
-                    onMoveNote={handleMoveNote}
-                    onSelectRegion={setRetranscriptionRegion}
-                    onSelectNote={handleSelectNote}
-                    selectedRegion={retranscriptionRegion}
-                    selectedNoteId={selectedDraftNoteId}
-                    selectedNoteIds={selectedDraftNoteIds}
-                    suggestedNoteIds={suggestions.map((suggestion) => suggestion.noteId)}
-                    selectedTrackKey={selectedTrackKey}
-                    tracks={visibleTracks}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="panel panel-support">
-              <h2>Visible Layers / 可见层</h2>
-              <TrackVisibilityControls
-                onHideAllTracks={() => setVisibleTrackKeys([])}
-                onShowAllTracks={() => setVisibleTrackKeys(previewTracks.map((track) => track.key))}
-                onToggleTrack={toggleTrackVisibility}
-                tracks={previewTracks}
-                visibleTrackKeys={visibleTrackKeys}
-              />
-            </div>
-          </section>
-          ) : null}
-
           <section className="content-grid editing-section-grid">
             <div className="panel panel-full">
               <div className="section-heading-row">
