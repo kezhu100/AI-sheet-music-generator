@@ -20,6 +20,7 @@ from app.services.audio_preprocessing import (
     LocalAudioPreprocessor,
     MissingFFmpegError,
 )
+from app.services.piano_stem_filtering import PianoStemFilterResult
 
 
 class RecordingSourceSeparationProvider:
@@ -104,6 +105,21 @@ class FakeDrumProvider:
                     sourceStem=stem.stem_name,
                 )
             ],
+            warnings=[],
+        )
+
+
+class PassthroughPianoStemFilterService:
+    def build_filtered_piano_stem(
+        self,
+        *,
+        stem: SourceStem,
+        job_id: str,
+        preferences=None,
+    ) -> PianoStemFilterResult:
+        return PianoStemFilterResult(
+            transcription_stem=stem,
+            exported_stems=[stem.stem_asset],
             warnings=[],
         )
 
@@ -314,6 +330,7 @@ class AudioPreprocessingTests(unittest.TestCase):
             drum_provider=FakeDrumProvider(),
             post_processor=LightweightPostProcessor(),
             audio_preprocessor=LocalAudioPreprocessor(settings),
+            piano_stem_filter_service=PassthroughPianoStemFilterService(),
         )
 
     def _build_settings(self, root: Path) -> Settings:
