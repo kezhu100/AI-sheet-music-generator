@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -56,6 +56,9 @@ import { DrumNotationPreview } from "./DrumNotationPreview";
 import { NoteEditorPanel } from "./NoteEditorPanel";
 import { PianoRollPreview } from "./PianoRollPreview";
 import { PianoScorePreview } from "./PianoScorePreview";
+import { ProjectWorkspaceAdvancedDetails } from "./ProjectWorkspaceAdvancedDetails";
+import { ProjectWorkspaceExportPanel } from "./ProjectWorkspaceExportPanel";
+import { ProjectWorkspaceRuntimeOptions } from "./ProjectWorkspaceRuntimeOptions";
 import { TrackVisibilityControls } from "./TrackVisibilityControls";
 
 type WorkspaceMode = "home" | "project";
@@ -154,13 +157,11 @@ function getInstrumentScopeLabel(scope: InstrumentExportScope): string {
 
 function buildExportWorkflowMessage(format: ExportFormatName, scope: InstrumentExportScope, fileName: string): string {
   const instrumentLabel = scope === "piano" ? "piano" : "drums";
-  const chineseInstrumentLabel = scope === "piano" ? "钢琴" : "鼓";
-
+  const chineseInstrumentLabel = scope === "piano" ? "钢琴" : "鼓组";
   if (format === "musicxml") {
-    return `Downloaded ${fileName}. This is the recommended MuseScore handoff for ${instrumentLabel} editing. / 已下载 ${fileName}。这是推荐用于 MuseScore ${chineseInstrumentLabel}编辑的交接文件。`;
+    return `Downloaded ${fileName}. This is the recommended MuseScore handoff for ${instrumentLabel} editing. / 已下载 ${fileName}。这是用于${chineseInstrumentLabel}编辑的推荐 MuseScore 交接文件。`;
   }
-
-  return `Downloaded ${fileName}. This is the recommended MIDI/DAW export for ${instrumentLabel} workflows. / 已下载 ${fileName}。这是推荐用于${chineseInstrumentLabel} MIDI/DAW 工作流的导出文件。`;
+  return `Downloaded ${fileName}. This is the recommended MIDI/DAW export for ${instrumentLabel} workflows. / 已下载 ${fileName}。这是用于${chineseInstrumentLabel}流程的推荐 MIDI/DAW 导出文件。`;
 }
 
 function buildExportStateKey(modeName: ExportModeName, format: ExportFormatName, scope: InstrumentExportScope): string {
@@ -229,18 +230,15 @@ function normalizeUsedProviderId(providerName: string | null): string | null {
 function getCompactInstallMessage(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) {
-    return "Check the local manifest path and try again. / 检查本地 manifest 路径后重试。";
+    return "Check the local manifest path and try again. / 请检查本地 manifest 路径后重试。";
   }
-
   if (trimmed.length <= 140) {
     return trimmed;
   }
-
   const sentence = trimmed.split(/[.!?]\s/)[0]?.trim();
   if (sentence && sentence.length <= 140) {
     return `${sentence}.`;
   }
-
   return `${trimmed.slice(0, 137).trimEnd()}...`;
 }
 
@@ -253,7 +251,7 @@ function getProviderInstallFailureNote(option: RuntimeProviderOption, failed: bo
     return null;
   }
 
-  return "Demucs Drums needs the local Demucs runtime. Built-in drum transcription remains available. / Demucs Drums 需要本地 Demucs 运行时；内置鼓转谱仍可作为稳定回退。";
+  return "Demucs Drums needs the local Demucs runtime. Built-in drum transcription remains available. / Demucs Drums 需要本地 Demucs 运行时，内置鼓组转写仍可作为稳定回退。";
 }
 
 interface RuntimeCustomProviderSectionProps {
@@ -265,11 +263,11 @@ function RuntimeCustomProviderSection({ provider }: RuntimeCustomProviderSection
     return (
       <div className="runtime-custom-provider-list">
         <article className="runtime-custom-card">
-          <strong>Custom registered providers / 自定义已注册 providers</strong>
+          <strong>Custom Registered Providers / 已注册自定义提供方</strong>
           <div className="muted">
             No custom registrations yet. Not part of Auto or execution in this step.
             <br />
-            当前还没有已注册项目；本阶段仅提供注册与诊断展示。
+            目前还没有已注册项目；本阶段仅提供注册与诊断展示。
           </div>
         </article>
       </div>
@@ -281,7 +279,7 @@ function RuntimeCustomProviderSection({ provider }: RuntimeCustomProviderSection
       {provider.customProviders.map((customProvider) => (
         <article className="runtime-custom-card" key={`${provider.key}:${customProvider.providerId}`}>
           <strong>{customProvider.displayName}</strong>
-          <div className="runtime-provider-kind runtime-provider-kind-custom">Custom registered / 已注册自定义</div>
+          <div className="runtime-provider-kind runtime-provider-kind-custom">Custom Registered / 已注册自定义</div>
           <div className="muted">
             {customProvider.providerId} · v{customProvider.providerVersion}
           </div>
@@ -421,7 +419,7 @@ function RuntimeProviderPreferenceField({
               ) : null}
               {isInstalling ? (
                 <span className="muted runtime-install-status">
-                  Installing official provider... / 正在安装官方 provider：
+                  Installing official provider... / 正在安装官方提供方...
                   {installState?.message ?? "Preparing install."}
                 </span>
               ) : null}
@@ -470,12 +468,12 @@ function PianoFilterSettingsPanel({
     <section className="runtime-custom-section">
       <div className="runtime-custom-header">
         <div>
-          <strong>Piano Stem Cleanup / 钢琴分轨预清理</strong>
+          <strong>Piano Stem Cleanup / 钢琴 Stem 清理</strong>
           <div className="muted runtime-custom-help">
             This lightweight pre-filter runs after source separation and before piano transcription. The filtered piano stem
             is also the default piano preview.
             <br />
-            这是一个轻量的钢琴分轨预过滤步骤，位于源分离之后、钢琴转谱之前；过滤后的钢琴分轨也会成为默认试听版本。
+            这个轻量预过滤步骤位于源分离之后、钢琴转写之前。过滤后的钢琴 stem 也会作为默认钢琴预览。
           </div>
         </div>
       </div>
@@ -487,8 +485,8 @@ function PianoFilterSettingsPanel({
             type="checkbox"
             onChange={(event) => onToggleEnabled(event.target.checked)}
           />
-          <span className="runtime-option-label">Use filtered piano stem by default / 默认使用过滤后的钢琴分轨</span>
-          <span className="muted">Keeps the raw separated stem available, but makes preview and transcription favor the cleaned stem. / 保留原始分轨，同时让试听和转谱优先使用清理后的版本。</span>
+          <span className="runtime-option-label">Use filtered piano stem by default / 默认使用过滤后的钢琴 stem</span>
+          <span className="muted">Keeps the raw separated stem available, but makes preview and transcription favor the cleaned stem. / 保留原始分离 stem，同时让预览和转写优先使用清理后的版本。</span>
         </label>
 
         <div className="field">
@@ -503,7 +501,7 @@ function PianoFilterSettingsPanel({
             value={value.lowCutHz}
             onChange={(event) => onChangeNumber("lowCutHz", Number(event.target.value))}
           />
-          <div className="muted">Reduces low bass-like residue in the piano stem. / 减少钢琴分轨里偏低频、像贝斯一样的残留。</div>
+          <div className="muted">Reduces low bass-like residue in the piano stem. / 减少钢琴 stem 里偏低频、像贝斯一样的残留。</div>
         </div>
 
         <div className="field">
@@ -518,7 +516,7 @@ function PianoFilterSettingsPanel({
             value={value.highCutHz}
             onChange={(event) => onChangeNumber("highCutHz", Number(event.target.value))}
           />
-          <div className="muted">Softens sharp high-frequency bleed that may confuse transcription. / 柔化可能干扰转谱的尖锐高频串音。</div>
+          <div className="muted">Softens sharp high-frequency bleed that may confuse transcription. / 柔化可能干扰转写的尖锐高频串音。</div>
         </div>
 
         <div className="field">
@@ -533,13 +531,12 @@ function PianoFilterSettingsPanel({
             value={value.cleanupStrength}
             onChange={(event) => onChangeNumber("cleanupStrength", Number(event.target.value))}
           />
-          <div className="muted">Controls how strongly the piano stem is cleaned before transcription. / 控制钢琴分轨在转谱前被清理得多强。</div>
+          <div className="muted">Controls how strongly the piano stem is cleaned before transcription. / 控制钢琴 stem 在转写前被清理得多强。</div>
         </div>
       </div>
     </section>
   );
 }
-
 function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRecord | null {
   if (!projectDetail) {
     return null;
@@ -635,27 +632,25 @@ function formatProjectExportSuccess(savedPath: string): string {
 
 function translateWarningToChinese(warning: string): string {
   const normalizedWarning = warning.toLowerCase();
-
   if (normalizedWarning.includes("misaligned")) {
-    return "部分片段可能存在对齐误差。";
+    return "时间未对齐";
   }
   if (normalizedWarning.includes("fell back") || normalizedWarning.includes("fallback")) {
-    return "当前流程已切换到备用方案。";
+    return "发生回退";
   }
   if (normalizedWarning.includes("unavailable")) {
-    return "当前选择的处理能力不可用。";
+    return "当前不可用";
   }
   if (normalizedWarning.includes("sparse") || normalizedWarning.includes("noisy")) {
-    return "当前节奏证据较少或噪声较多，结果可能不够稳定。";
+    return "结果稀疏或噪声较多";
   }
   if (normalizedWarning.includes("removed")) {
-    return "部分事件在规范化清理阶段被移除。";
+    return "内容已移除";
   }
   if (normalizedWarning.includes("missing")) {
-    return "部分本地资源缺失。";
+    return "内容缺失";
   }
-
-  return "请参考前面的英文提示。";
+  return "请检查详情";
 }
 
 function formatWarningMessage(warning: string): string {
@@ -1266,7 +1261,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }
 
     return [
-      { label: "Filtered piano stem / 过滤后钢琴分轨", stem: activeResult.stems.find((stem) => stem.stemName === "piano_stem") },
+      { label: "Filtered piano stem / 过滤后的钢琴分轨", stem: activeResult.stems.find((stem) => stem.stemName === "piano_stem") },
       { label: "Raw piano stem / 原始钢琴分轨", stem: activeResult.stems.find((stem) => stem.stemName === "piano_stem_raw") },
       { label: "Drum stem / 鼓组分轨", stem: activeResult.stems.find((stem) => stem.instrumentHint === "drums") }
     ]
@@ -1868,7 +1863,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
       setJob(buildJobFromProjectDetail(response.project));
       setSavedDraft(response.project.savedDraft ?? null);
       setExportWorkflowMessage(
-        "Rebuilding the filtered piano stem and rerunning transcription for this project. / 正在为当前项目重建过滤后的钢琴分轨并重新转谱。"
+        "Rebuilding the filtered piano stem and rerunning transcription for this project. / 正在为当前项目重建过滤后的钢琴分轨并重新转写。"
       );
     } catch (rerunError) {
       setError(rerunError instanceof Error ? rerunError.message : "Failed to rerun the current project.");
@@ -2004,7 +1999,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <p>
               A local-first AI transcription workspace for review, cleanup, and export.
               <br />
-              一个本地优先的创作工作区，把音频整理成可编辑的草稿乐谱。
+              一个本地优先的 AI 转写工作区，用于复核、清理和导出。
             </p>
             <div className="pill-row">
               <span className="pill">Local-first / 本地优先</span>
@@ -2020,7 +2015,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <h3>Session Status / 当前状态</h3>
             <div className="note-list compact-list">
               <article className="note-card ornate-card">
-                <strong>{job ? `${job.status} · ${job.progress.percent}%` : mode === "project" ? "Project ready / 项目已载入" : "Ready / 已准备好"}</strong>
+                <strong>{job ? `${job.status} · ${job.progress.percent}%` : mode === "project" ? "Project ready / 项目已加载" : "Ready / 已准备好"}</strong>
                 <div className="muted">
                   {job ? `${job.progress.stage} / ${job.progress.message}` : "Local browser UI + local runtime / 浏览器界面 + 本地运行时"}
                 </div>
@@ -2068,160 +2063,32 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   可以上传完整混音，也可以上传单独音轨素材。
                 </p>
               </div>
-              <details className="runtime-options-panel ornate-card">
-                <summary>Advanced Runtime Options / 高级运行选项</summary>
-                <div className="runtime-options-body">
-                  <p className="muted">
-                    Built-in providers stay ready by default. Official enhanced providers are optional, and custom providers only register for diagnostics in this step.
-                    <br />
-                    内置 provider 默认即开即用；官方增强 provider 可按需安装；自定义 provider 在本阶段仅用于注册与诊断展示。
-                  </p>
-                  <div className="runtime-options-toolbar">
-                    <button
-                      className="button tertiary button-tiny"
-                      type="button"
-                      disabled={isRefreshingRuntimeDiagnostics}
-                      onClick={() => void refreshRuntimeDiagnostics()}
-                    >
-                      {isRefreshingRuntimeDiagnostics ? "Refreshing... / 刷新中..." : "Refresh Availability / 刷新可用性"}
-                    </button>
-                  </div>
-                  <div className="runtime-option-grid">
-                    <RuntimeProviderPreferenceField
-                      currentValue={providerPreferences.sourceSeparation}
-                      fieldName="source-separation-provider"
-                      preferenceKey="sourceSeparation"
-                      onChange={(value) => handleProviderPreferenceChange("sourceSeparation", value as "auto" | "development-copy" | "demucs")}
-                      onInstall={(preferenceKey, option, options) =>
-                        void handleInstallProviderOption(preferenceKey, option, options)
-                      }
-                      installStates={providerInstallStates}
-                      options={sourceRuntimeProvider?.options}
-                      selectedProviderLabel={sourceRuntimeProvider?.selectedProviderLabel}
-                      title="Source Separation"
-                      titleZh="源分离"
-                    />
-                    <RuntimeProviderPreferenceField
-                      currentValue={providerPreferences.pianoTranscription}
-                      fieldName="piano-transcription-provider"
-                      preferenceKey="pianoTranscription"
-                      onChange={(value) => handleProviderPreferenceChange("pianoTranscription", value as "auto" | "heuristic" | "basic-pitch")}
-                      onInstall={(preferenceKey, option, options) =>
-                        void handleInstallProviderOption(preferenceKey, option, options)
-                      }
-                      installStates={providerInstallStates}
-                      options={pianoRuntimeProvider?.options}
-                      selectedProviderLabel={pianoRuntimeProvider?.selectedProviderLabel}
-                      title="Piano Transcription"
-                      titleZh="钢琴转谱"
-                    />
-                    <RuntimeProviderPreferenceField
-                      currentValue={providerPreferences.drumTranscription}
-                      fieldName="drum-transcription-provider"
-                      preferenceKey="drumTranscription"
-                      onChange={(value) => handleProviderPreferenceChange("drumTranscription", value as "auto" | "heuristic" | "demucs-drums")}
-                      onInstall={(preferenceKey, option, options) =>
-                        void handleInstallProviderOption(preferenceKey, option, options)
-                      }
-                      installStates={providerInstallStates}
-                      options={drumRuntimeProvider?.options}
-                      selectedProviderLabel={drumRuntimeProvider?.selectedProviderLabel}
-                      title="Drum Transcription"
-                      titleZh="鼓轨转谱"
-                    />
-                  </div>
-                  <PianoFilterSettingsPanel
-                    value={processingPreferences.pianoFilter}
-                    onToggleEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
-                    onChangeNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
-                  />
-                  <section className="runtime-custom-section">
-                    <div className="runtime-custom-header">
-                      <div>
-                        <strong>Register custom provider / 注册自定义 provider</strong>
-                        <div className="muted runtime-custom-help">
-                          Local manifest URL only. Registers a diagnostic entry, not an execution-ready provider.
-                          <br />
-                          仅支持本地 manifest URL，且只接受本地 `file://...json` 路径。本阶段仅用于注册与诊断展示。
-                        </div>
-                      </div>
-                      <button
-                        className="button tertiary button-tiny"
-                        type="button"
-                        onClick={() => setIsCustomProviderFormOpen((currentOpen) => !currentOpen)}
-                      >
-                        {isCustomProviderFormOpen ? "Close / 收起" : "Register Custom Provider / 注册自定义 provider"}
-                      </button>
-                    </div>
-                    {isCustomProviderFormOpen ? (
-                      <div className="runtime-custom-form ornate-card">
-                        <div className="field">
-                          <label htmlFor="custom-provider-manifest-url">Local manifest URL only / 仅限本地 manifest URL</label>
-                          <input
-                            id="custom-provider-manifest-url"
-                            placeholder="file:///C:/path/to/provider-manifest.json"
-                            type="text"
-                            value={customProviderManifestUrl}
-                            onChange={(event) => setCustomProviderManifestUrl(event.target.value)}
-                          />
-                        </div>
-                        <div className="actions">
-                          <button className="button secondary button-tiny" type="button" onClick={() => void handleCustomProviderInstall()}>
-                            Confirm / 确认
-                          </button>
-                          <button className="button tertiary button-tiny" type="button" onClick={handleCancelCustomProviderForm}>
-                            Cancel / 取消
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                    {customProviderInstallState ? (
-                      <article
-                        className={`runtime-custom-status ${
-                          customProviderInstallState.state === "failed"
-                            ? "is-error"
-                            : customProviderInstallState.state === "completed"
-                              ? "is-success"
-                              : ""
-                        }`}
-                      >
-                        <strong>
-                          {customProviderInstallState.state === "completed"
-                            ? "Registered for diagnostics / 已注册用于诊断"
-                            : customProviderInstallState.state === "failed"
-                              ? "Registration failed / 注册失败"
-                              : "Registering... / 正在注册..."}
-                        </strong>
-                        <div className="muted">{customProviderInstallState.message}</div>
-                        <div className="muted">Not used by Auto or the main pipeline in this step. / 本阶段不会进入 Auto 或主流水线执行。</div>
-                        {customProviderInstallState.targetManifestUrl ? (
-                          <div className="muted">Manifest URL: {customProviderInstallState.targetManifestUrl}</div>
-                        ) : null}
-                        {getFirstActionableStep(customProviderInstallState.actionableSteps) ? (
-                          <div className="muted">
-                            Next step: {getFirstActionableStep(customProviderInstallState.actionableSteps)}
-                          </div>
-                        ) : null}
-                      </article>
-                    ) : null}
-                    <div className="runtime-custom-grid">
-                      <div className="runtime-custom-column">
-                        <h4>Custom Source Separation / 自定义源分离</h4>
-                        {sourceRuntimeProvider ? <RuntimeCustomProviderSection provider={sourceRuntimeProvider} /> : null}
-                      </div>
-                      <div className="runtime-custom-column">
-                        <h4>Custom Piano / 自定义钢琴转谱</h4>
-                        {pianoRuntimeProvider ? <RuntimeCustomProviderSection provider={pianoRuntimeProvider} /> : null}
-                      </div>
-                      <div className="runtime-custom-column">
-                        <h4>Custom Drums / 自定义鼓组转谱</h4>
-                        {drumRuntimeProvider ? <RuntimeCustomProviderSection provider={drumRuntimeProvider} /> : null}
-                      </div>
-                    </div>
-                  </section>
-                  {runtimeDiagnosticsError ? <p className="error">{runtimeDiagnosticsError}</p> : null}
-                </div>
-              </details>
+              <ProjectWorkspaceRuntimeOptions
+                isRefreshingRuntimeDiagnostics={isRefreshingRuntimeDiagnostics}
+                onRefreshRuntimeDiagnostics={() => void refreshRuntimeDiagnostics()}
+                providerPreferences={providerPreferences}
+                onSourcePreferenceChange={(value) => handleProviderPreferenceChange("sourceSeparation", value)}
+                onPianoPreferenceChange={(value) => handleProviderPreferenceChange("pianoTranscription", value)}
+                onDrumPreferenceChange={(value) => handleProviderPreferenceChange("drumTranscription", value)}
+                providerInstallStates={providerInstallStates}
+                onInstallProviderOption={(preferenceKey, option, options) =>
+                  void handleInstallProviderOption(preferenceKey, option, options)
+                }
+                sourceRuntimeProvider={sourceRuntimeProvider ?? undefined}
+                pianoRuntimeProvider={pianoRuntimeProvider ?? undefined}
+                drumRuntimeProvider={drumRuntimeProvider ?? undefined}
+                processingPreferences={processingPreferences}
+                onTogglePianoFilterEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
+                onChangePianoFilterNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                isCustomProviderFormOpen={isCustomProviderFormOpen}
+                onToggleCustomProviderForm={() => setIsCustomProviderFormOpen((currentOpen) => !currentOpen)}
+                customProviderManifestUrl={customProviderManifestUrl}
+                onChangeCustomProviderManifestUrl={setCustomProviderManifestUrl}
+                onConfirmCustomProviderInstall={() => void handleCustomProviderInstall()}
+                onCancelCustomProviderForm={handleCancelCustomProviderForm}
+                customProviderInstallState={customProviderInstallState}
+                runtimeDiagnosticsError={runtimeDiagnosticsError}
+              />
               <div className="actions action-bar-primary">
                 <button
                   className="button"
@@ -2229,7 +2096,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   disabled={isUploading || isCreatingJob || !selectedFile}
                   onClick={handleUploadAndCreateJob}
                 >
-                  {isUploading ? "Uploading... / 上传中..." : isCreatingJob ? "Creating Job... / 创建任务中..." : "Generate Score / 生成乐谱"}
+                  {isUploading ? "Uploading... / 上传中..." : isCreatingJob ? "Creating Job... / 正在创建任务..." : "Generate Score / 生成乐谱"}
                 </button>
                 <Link className="button secondary" href="/projects">
                   Browse Library / 浏览项目库
@@ -2257,9 +2124,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               {job?.result ? (
                 <p className="muted section-help">
                   {isLoadingDraft
-                    ? "Checking for a saved draft... / 正在检查是否有已保存草稿..."
+                    ? "Checking for a saved draft... / 正在检查是否已有保存草稿..."
                     : hasSavedDraft
-                      ? `Saved draft v${savedDraftVersion ?? 1} is loaded separately from the original result. / 已加载保存草稿 v${savedDraftVersion ?? 1}。`
+                      ? `Saved draft v${savedDraftVersion ?? 1} is loaded separately from the original result. / 已单独加载保存草稿 v${savedDraftVersion ?? 1}。`
                       : "No saved draft yet. Your current editor state can still be exported. / 还没有保存草稿，但当前编辑状态仍可导出。"}
                 </p>
               ) : null}
@@ -2327,7 +2194,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                       ? `v${projectDetail.draftVersion ?? 1}${projectDetail.draftSavedAt ? ` · ${new Date(projectDetail.draftSavedAt).toLocaleString()}` : ""}`
                       : "No saved draft yet / 暂无已保存草稿"}
                   </div>
-                  <div className="muted">Original result stays separate from the editable draft. / 原始结果与编辑草稿保持分离。</div>
+                  <div className="muted">Original result stays separate from the editable draft. / 原始结果与可编辑草稿保持分离。</div>
                 </article>
               </div>
             ) : (
@@ -2354,7 +2221,6 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           </div>
         </section>
       )}
-
       {error ? <p className="error">{error}</p> : null}
       {exportSuccessMessage ? (
         <section className="panel panel-full">
@@ -2400,8 +2266,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 onClick={() => void handleMusicXmlExport("draft", "piano")}
               >
                 {isExporting("draft", "musicxml", "piano")
-                  ? "Exporting... / 导出中..."
-                  : "Export Draft Piano MusicXML / 导出钢琴草稿 MusicXML"}
+                  ? "Exporting... / 导出中..." : "Export Draft Piano MusicXML / 导出钢琴草稿 MusicXML"}
               </button>
             </div>
           </section>
@@ -2436,13 +2301,13 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 <p className="muted section-help">
                   Use the browser preview to quickly verify transcription quality before export, not for final engraving.
                   <br />
-                  浏览器内预览只用于导出前快速确认转谱质量，并不承担最终排版工作。
+                  浏览器内预览只用于导出前快速确认转写质量，并不承担最终排版工作。
                 </p>
               </div>
               <div className="result-meta-chip">{activeResult.bpm} BPM</div>
             </div>
             <article className="note-card ornate-card runtime-provider-summary-card">
-              <strong>Provider Use Summary / Provider 使用摘要</strong>
+              <strong>Provider Use Summary / 提供方使用摘要</strong>
               <div className="runtime-provider-summary-lines">
                 {runtimeUsedProviderSummary.map((item) => {
                   const modeLabel = item.requestRecorded
@@ -2478,7 +2343,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <p className="muted">
                 Tune the filtered piano stem, then rerun this project to rebuild the preview and piano transcription from the saved settings.
                 <br />
-                调整过滤后的钢琴分轨参数后，重新运行当前项目，即可按已保存设置重建试听和钢琴转谱。
+                调整过滤后的钢琴 stem 参数后，重新运行当前项目，即可按已保存设置重建预览和钢琴转写。
               </p>
               <PianoFilterSettingsPanel
                 value={processingPreferences.pianoFilter}
@@ -2488,7 +2353,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               />
               <div className="actions">
                 <button className="button" type="button" disabled={!projectDetail || isRerunningProject} onClick={() => void handleRerunProject()}>
-                  {isRerunningProject ? "Rebuilding Filtered Stem... / 正在重建过滤分轨..." : "Rerun with Current Filter / 按当前过滤设置重跑"}
+                  {isRerunningProject ? "Rebuilding Filtered Stem... / 正在重建过滤后的 Stem..." : "Rerun with Current Filter / 按当前过滤设置重跑"}
                 </button>
               </div>
             </article>
@@ -2497,7 +2362,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <p className="muted">
                 Use these local stem previews to confirm separation worked. The filtered piano stem is the default piano preview and transcription input, while the raw piano stem stays available for comparison.
                 <br />
-                使用这些本地分轨试听快速确认分离是否可用。这里直接播放完整分轨，实际通常试听前 15-20 秒就足够判断。
+                使用这些本地 stem 预览快速确认分离是否可用。这里会直接播放完整分轨，但实际通常试听前 15-20 秒就足够判断。
               </p>
               {auditionStemCards.length > 0 ? (
                 <div className="audition-stem-list">
@@ -2512,7 +2377,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                   ))}
                 </div>
               ) : (
-                <p className="muted">Stem audio preview becomes available after local stems are persisted. / 本地分轨持久化后即可试听。</p>
+                <p className="muted">Stem audio preview becomes available after local stems are persisted. / 本地 stem 持久化后即可试听。</p>
               )}
             </article>
             <div className="score-stack">
@@ -2533,7 +2398,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               <h2>Piano Roll Editor / 钢琴卷帘编辑器</h2>
               <p className="muted section-help">
                 Split previews keep piano and drums readable while preserving the same draft editing flow. /
-                分离预览让钢琴和鼓组更易读，同时保持同一套草稿编辑流程。
+                分离预览让钢琴和鼓组更易阅读，同时保持同一套草稿编辑流程。
               </p>
               <div className="preview-dual-grid">
                 <div className="ornate-card preview-panel">
@@ -2575,7 +2440,7 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               </div>
             </div>
             <div className="panel panel-support">
-              <h2>Visible Layers / 可见轨道</h2>
+              <h2>Visible Layers / 可见层</h2>
               <TrackVisibilityControls
                 onHideAllTracks={() => setVisibleTrackKeys([])}
                 onShowAllTracks={() => setVisibleTrackKeys(previewTracks.map((track) => track.key))}
@@ -2591,18 +2456,18 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             <div className="panel panel-full">
               <div className="section-heading-row">
                 <div>
-                  <div className="eyebrow">Editing Area / 编辑区</div>
+                  <div className="eyebrow">Editing Area / 编辑区域</div>
                   <h2>
                     Review and Refine
                     <br />
-                    复核并微调
+                    复核与微调
                   </h2>
                 </div>
               </div>
               <p className="muted section-help">
                 Keep edits lightweight here: fix obvious note issues, verify timing, and reduce cleanup work before export.
                 <br />
-                这里只做轻量修整：修正明显错音、确认时值节奏，并减少导出后的返工。
+                这里仅做轻量调整：修正明显错音、确认时值节奏，并减少导出后的返工。
               </p>
               <div className="ornate-card preview-panel editor-workspace-panel">
                 <h3>Lightweight Editor / 轻量编辑器</h3>
@@ -2676,365 +2541,41 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
             </div>
           </section>
 
-          <section className="content-grid export-grid">
-            <div className="panel panel-full export-panel ornate-card">
-              <div className="section-heading-row">
-                <div>
-                  <div className="eyebrow">Export / 导出</div>
-                  <h2>
-                    Export and Handoff
-                    <br />
-                    导出与交接
-                  </h2>
-                  <p className="muted section-help">
-                    Export piano and drums separately by default. Use MusicXML for MuseScore editing, use MIDI for DAW and MIDI-production workflows, and treat combined export as a compatibility path rather than the main handoff.
-                    <br />
-                    默认建议分开导出钢琴与鼓：MusicXML 更适合交给 MuseScore 编辑，MIDI 更适合 DAW 与 MIDI 制作流程；混合导出仅作为兼容路径，不是主推荐方案。
-                  </p>
-                </div>
-              </div>
-              <div className="export-card-grid">
-                <article className="note-card ornate-card">
-                  <strong>Current Draft / 当前草稿</strong>
-                  <div className="muted">
-                    Separate-by-instrument export is the recommended path for review-ready handoff. / 推荐按乐器分别导出，作为更稳妥的交接路径。
-                  </div>
-                  <div className="muted">
-                    Recommended for MIDI / DAW: use the separate MIDI files below. / 推荐用于 MIDI / DAW：请使用下面分开的 MIDI 文件。
-                  </div>
-                  <div className="actions">
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "midi", "piano")}
-                      onClick={() => void handleMidiExport("draft", "piano")}
-                    >
-                      {isExporting("draft", "midi", "piano") ? "Exporting MIDI... / 导出中..." : "Piano MIDI / 钢琴 MIDI"}
-                    </button>
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "midi", "drums")}
-                      onClick={() => void handleMidiExport("draft", "drums")}
-                    >
-                      {isExporting("draft", "midi", "drums") ? "Exporting MIDI... / 导出中..." : "Drums MIDI / 鼓 MIDI"}
-                    </button>
-                  </div>
-                  <div className="muted">
-                    Recommended for MuseScore: use the separate MusicXML files below. / 推荐用于 MuseScore：请使用下面分开的 MusicXML 文件。
-                  </div>
-                  <div className="actions">
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "musicxml", "piano")}
-                      onClick={() => void handleMusicXmlExport("draft", "piano")}
-                    >
-                      {isExporting("draft", "musicxml", "piano")
-                        ? "Exporting MusicXML... / 导出中..."
-                        : "Piano MusicXML / 钢琴 MusicXML"}
-                    </button>
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "musicxml", "drums")}
-                      onClick={() => void handleMusicXmlExport("draft", "drums")}
-                    >
-                      {isExporting("draft", "musicxml", "drums")
-                        ? "Exporting MusicXML... / 导出中..."
-                        : "Drums MusicXML / 鼓 MusicXML"}
-                    </button>
-                  </div>
-                  <div className="muted">
-                    Combined export remains compatibility-oriented and is intentionally not the primary draft workflow here. / 混合导出仍保留为兼容路径，但这里不会把它作为主要草稿工作流推荐。
-                  </div>
-                </article>
-                <article className="note-card ornate-card">
-                  <strong>Original Result / 原始结果</strong>
-                  <div className="muted">
-                    Use these when you want the untouched completed result instead of your current draft edits. / 如果你想导出未编辑的完成结果，而不是当前草稿修改，请使用这里的文件。
-                  </div>
-                  <div className="muted">
-                    MIDI is best for DAW workflows; MusicXML is best for MuseScore handoff. / MIDI 更适合 DAW 流程；MusicXML 更适合交给 MuseScore。
-                  </div>
-                  <div className="actions">
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled={!job?.result || isExporting("original", "midi", "piano")}
-                      onClick={() => void handleMidiExport("original", "piano")}
-                    >
-                      {isExporting("original", "midi", "piano")
-                        ? "Exporting MIDI... / 导出中..."
-                        : "Piano MIDI / 钢琴 MIDI"}
-                    </button>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled={!job?.result || isExporting("original", "midi", "drums")}
-                      onClick={() => void handleMidiExport("original", "drums")}
-                    >
-                      {isExporting("original", "midi", "drums")
-                        ? "Exporting MIDI... / 导出中..."
-                        : "Drums MIDI / 鼓 MIDI"}
-                    </button>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled={!job?.result || isExporting("original", "musicxml", "piano")}
-                      onClick={() => void handleMusicXmlExport("original", "piano")}
-                    >
-                      {isExporting("original", "musicxml", "piano")
-                        ? "Exporting MusicXML... / 导出中..."
-                        : "Piano MusicXML / 钢琴 MusicXML"}
-                    </button>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled={!job?.result || isExporting("original", "musicxml", "drums")}
-                      onClick={() => void handleMusicXmlExport("original", "drums")}
-                    >
-                      {isExporting("original", "musicxml", "drums")
-                        ? "Exporting MusicXML... / 导出中..."
-                        : "Drums MusicXML / 鼓 MusicXML"}
-                    </button>
-                  </div>
-                </article>
-                <article className="note-card ornate-card">
-                  <strong>MuseScore Handoff / 交接 MuseScore</strong>
-                  <div className="muted">
-                    Recommended path: export separate draft MusicXML files for piano and drums, then import each file into MuseScore for the matching notation cleanup task. / 推荐路径：分别导出钢琴与鼓的草稿 MusicXML，再按对应任务分别导入 MuseScore 做记谱整理。
-                  </div>
-                  <div className="muted">
-                    Piano MusicXML is best for piano score editing. Drums MusicXML is best for drum-staff editing. / Piano MusicXML 最适合钢琴谱编辑；Drums MusicXML 最适合鼓谱编辑。
-                  </div>
-                  <div className="actions">
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "musicxml", "piano")}
-                      onClick={() => void handleMusicXmlExport("draft", "piano")}
-                    >
-                      {isExporting("draft", "musicxml", "piano")
-                        ? "Preparing Piano handoff... / 准备钢琴交接中..."
-                        : "Piano for MuseScore / 钢琴交给 MuseScore"}
-                    </button>
-                    <button
-                      className="button"
-                      type="button"
-                      disabled={!activeResult || isExporting("draft", "musicxml", "drums")}
-                      onClick={() => void handleMusicXmlExport("draft", "drums")}
-                    >
-                      {isExporting("draft", "musicxml", "drums")
-                        ? "Preparing Drums handoff... / 准备鼓谱交接中..."
-                        : "Drums for MuseScore / 鼓谱交给 MuseScore"}
-                    </button>
-                  </div>
-                  <div className="muted">
-                    This downloads separate MusicXML files only. Combined export is intentionally de-emphasized here because separate handoff is usually cleaner in MuseScore. / 此操作只下载分开的 MusicXML 文件；这里刻意弱化混合导出，因为分开交接通常更适合 MuseScore。
-                  </div>
-                </article>
-                <article className="note-card ornate-card">
-                  <strong>Project Package / 项目打包</strong>
-                  <div className="muted">
-                    Export the local-first project bundle as a ZIP package. / 将本地项目打包为 ZIP 压缩包。
-                  </div>
-                  <div className="actions">
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled={!projectDetail || isExportingProjectPackage}
-                      onClick={() => void handleExportProjectPackage()}
-                    >
-                      {isExportingProjectPackage
-                        ? "Exporting Project... / 导出项目中..."
-                        : "Export Project (.zip) / 导出项目（ZIP压缩包）"}
-                    </button>
-                  </div>
-                  {!projectDetail ? (
-                    <div className="muted">
-                      Reopen from a local project route to package the full project. / 请从本地项目路由重新打开后再导出完整项目包。
-                    </div>
-                  ) : null}
-                </article>
-              </div>
-            </div>
-          </section>
+          <ProjectWorkspaceExportPanel
+            activeResult={activeResult}
+            originalResult={job?.result}
+            projectDetail={projectDetail}
+            isExporting={isExporting}
+            onMidiExport={(modeName, scope) => void handleMidiExport(modeName, scope)}
+            onMusicXmlExport={(modeName, scope) => void handleMusicXmlExport(modeName, scope)}
+            isExportingProjectPackage={isExportingProjectPackage}
+            onExportProjectPackage={() => void handleExportProjectPackage()}
+          />
 
-          <details className="panel advanced-details">
-            <summary>Advanced Details / 高级详情</summary>
-            <div className="advanced-details-body">
-              <div className="content-grid">
-                <div className="panel inset-panel">
-                  <h3>Runtime / 运行状态</h3>
-                  {runtimeDiagnostics ? (
-                    <div className="note-list compact-list">
-                      <article className="note-card ornate-card">
-                        <strong className={getRuntimeSeverityClass(runtimeDiagnostics.severity)}>{runtimeDiagnostics.severity}</strong>
-                        <div className="muted">{runtimeDiagnostics.summary}</div>
-                      </article>
-                      {runtimeDiagnostics.providers.map((provider) => (
-                        <article className="note-card ornate-card" key={provider.key}>
-                          <strong>{provider.label}</strong>
-                          <div>{provider.status === "ready" ? "Ready / 就绪" : "Needs Attention / 需要关注"}</div>
-                          <div className="muted">{provider.message}</div>
-                          {provider.customProviders.length > 0 ? (
-                            <div className="muted">
-                              Custom registered: {provider.customProviders.length} / 已注册自定义 providers: {provider.customProviders.length}
-                            </div>
-                          ) : null}
-                        </article>
-                      ))}
-                    </div>
-                  ) : runtimeDiagnosticsError ? (
-                    <p className="error">{runtimeDiagnosticsError}</p>
-                  ) : (
-                    <p className="muted">Loading runtime diagnostics... / 正在加载运行时信息...</p>
-                  )}
-                </div>
-
-                {mode === "project" ? (
-                  <div className="panel inset-panel">
-                    <h3>{copy.project.projectSettings}</h3>
-                    {projectDetail ? (
-                      <div className="note-list compact-list">
-                        <article className="note-card ornate-card">
-                          <strong>Route / 路由</strong>
-                          <div className="muted">{renderBilingualText(copy.project.localRouteNotice)}</div>
-                        </article>
-                        <div className="actions">
-                          <button className="button secondary" type="button" onClick={() => void handleCopyProjectLink()}>
-                            {copy.project.copyLinkAction}
-                          </button>
-                          <button className="button secondary" type="button" disabled={isExportingProjectPackage} onClick={() => void handleExportProjectPackage()}>
-                            {isExportingProjectPackage ? "Exporting Package... / 导出中..." : "Export Package / 导出项目包"}
-                          </button>
-                          <button className="button tertiary" type="button" disabled={isRenamingProject} onClick={() => void handleRenameProject()}>
-                            {copy.project.renameAction}
-                          </button>
-                          <button className="button tertiary" type="button" disabled={isDuplicatingProject} onClick={() => void handleDuplicateProject()}>
-                            {copy.project.duplicateAction}
-                          </button>
-                          <button className="button tertiary danger-button" type="button" disabled={isDeletingProject} onClick={() => void handleDeleteProject()}>
-                            {copy.project.deleteAction}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="content-grid">
-                <div className="panel inset-panel">
-                  <h3>Track Summary / 轨道摘要</h3>
-                  {trackSummaries.length > 0 ? (
-                    <div className="track-list compact-list">
-                      {trackSummaries.map((track) => (
-                        <article className="track-card ornate-card" key={`${track.instrument}-${track.sourceStem}`}>
-                          <strong>{track.instrument} | {track.sourceStem}</strong>
-                          <div className="muted">Provider: {track.provider}</div>
-                          <div>{track.eventCount} events</div>
-                          <div className="muted">Average confidence: {track.avgConfidence}</div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">Track information appears after generation completes. / 生成完成后会显示轨道信息。</p>
-                  )}
-                </div>
-
-                <div className="panel inset-panel">
-                  <h3>Generated Stems / 已生成分轨</h3>
-                  {activeResult.stems.length > 0 ? (
-                    <div className="track-list compact-list">
-                      {activeResult.stems.map((stem) => (
-                        <article className="track-card ornate-card" key={stem.stemName}>
-                          <strong>{stem.instrumentHint} - {stem.stemName}</strong>
-                          <div>{stem.fileName}</div>
-                          <div className="muted">{stem.provider}</div>
-                          <div className="muted">{stem.storedPath}</div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">No stem assets were returned. / 当前结果没有返回分轨资产。</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="content-grid">
-                <div className="panel inset-panel">
-                  <h3>Piano Notes / 钢琴音符详情</h3>
-                  {pianoTrack ? (
-                    <div className="note-list compact-list">
-                      {pianoTrack.notes.slice(0, 8).map((note) => (
-                        <article
-                          className={`note-card ornate-card ${note.draftNoteId && selectedDraftNoteIds.includes(note.draftNoteId) ? "is-selected-card" : ""}`}
-                          key={note.draftNoteId ?? note.id}
-                          onClick={(event) =>
-                            note.draftNoteId &&
-                            handleSelectNote(getTrackKey(pianoTrack), note.draftNoteId, {
-                              additive: event.metaKey || event.ctrlKey || event.shiftKey
-                            })
-                          }
-                        >
-                          <strong>{formatNote(note)}</strong>
-                          <div>{formatEventTiming(note)}</div>
-                          <div className="muted">{pianoTrack.provider} | {note.sourceStem ?? "unknown"}</div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">No visible piano notes yet. / 当前还没有可见钢琴音符。</p>
-                  )}
-                </div>
-
-                <div className="panel inset-panel">
-                  <h3>Drum Notes / 鼓点详情</h3>
-                  {drumTrack ? (
-                    <div className="note-list compact-list">
-                      {drumTrack.notes.slice(0, 12).map((note) => (
-                        <article
-                          className={`note-card ornate-card ${note.draftNoteId && selectedDraftNoteIds.includes(note.draftNoteId) ? "is-selected-card" : ""}`}
-                          key={note.draftNoteId ?? note.id}
-                          onClick={(event) =>
-                            note.draftNoteId &&
-                            handleSelectNote(getTrackKey(drumTrack), note.draftNoteId, {
-                              additive: event.metaKey || event.ctrlKey || event.shiftKey
-                            })
-                          }
-                        >
-                          <strong>{formatNote(note)}</strong>
-                          <div>{formatEventTiming(note)}</div>
-                          <div className="muted">{drumTrack.provider} | {note.sourceStem ?? "unknown"}</div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">No visible drum notes yet. / 当前还没有可见鼓点。</p>
-                  )}
-                </div>
-              </div>
-
-              <section className="panel inset-panel panel-full">
-                <h3>Warnings / 提示与限制</h3>
-                <div className="note-list compact-list">
-                  {activeResult.warnings.length > 0 ? (
-                    activeResult.warnings.map((warning) => (
-                      <article className="note-card ornate-card" key={warning}>
-                        <div>{formatWarningMessage(warning)}</div>
-                      </article>
-                    ))
-                  ) : (
-                    <article className="note-card ornate-card">
-                      <div>No explicit warnings were returned. / 当前结果没有额外提示。</div>
-                    </article>
-                  )}
-                </div>
-              </section>
-            </div>
-          </details>
+          <ProjectWorkspaceAdvancedDetails
+            runtimeDiagnostics={runtimeDiagnostics}
+            runtimeDiagnosticsError={runtimeDiagnosticsError}
+            mode={mode}
+            projectCopy={copy.project}
+            projectDetail={projectDetail}
+            isExportingProjectPackage={isExportingProjectPackage}
+            onExportProjectPackage={() => void handleExportProjectPackage()}
+            onCopyProjectLink={() => void handleCopyProjectLink()}
+            onRenameProject={() => void handleRenameProject()}
+            onDuplicateProject={() => void handleDuplicateProject()}
+            onDeleteProject={() => void handleDeleteProject()}
+            isRenamingProject={isRenamingProject}
+            isDuplicatingProject={isDuplicatingProject}
+            isDeletingProject={isDeletingProject}
+            trackSummaries={trackSummaries}
+            activeResult={activeResult}
+            pianoTrack={pianoTrack ?? undefined}
+            drumTrack={drumTrack ?? undefined}
+            selectedDraftNoteIds={selectedDraftNoteIds}
+            onSelectNote={handleSelectNote}
+            formatWarningMessage={formatWarningMessage}
+            renderBilingualText={renderBilingualText}
+          />
         </>
       ) : mode === "project" ? (
         <section className="content-grid">
@@ -3064,3 +2605,6 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     </main>
   );
 }
+
+
+

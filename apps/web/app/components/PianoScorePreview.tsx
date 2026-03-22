@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   getPianoStaffPlacement,
@@ -17,13 +17,13 @@ const STAFF_LINE_SPACING = 12;
 
 export function PianoScorePreview({ track, bpm }: PianoScorePreviewProps) {
   if (!track) {
-    return <p className="muted">A visible piano track is required before the score preview can render. / 需要先显示钢琴轨道，才能渲染乐谱预览。</p>;
+    return <p className="muted">A visible piano track is required before the preview can render. / 需要先显示钢琴音轨，才能渲染预览。</p>;
   }
 
   const pitchedNotes = track.notes.filter((note) => note.pitch != null);
 
   if (pitchedNotes.length === 0) {
-    return <p className="muted">No pitched piano notes are available for score preview in the current visible track set. / 当前可见轨道中没有可用于乐谱预览的钢琴音符。</p>;
+    return <p className="muted">No pitched piano notes are available in the current visible tracks. / 当前可见音轨中没有可用于钢琴预览的音高音符。</p>;
   }
 
   const measures = groupNotesByBar(pitchedNotes, bpm, 8);
@@ -31,8 +31,8 @@ export function PianoScorePreview({ track, bpm }: PianoScorePreviewProps) {
   return (
     <div className="result-window result-window-score">
       <div className="result-window-toolbar muted">
-        <span>Score Reader / 乐谱阅览</span>
-        <span>Scroll inside the window to review the draft score bar by bar. / 可在窗口内滚动，按小节查看草稿乐谱。</span>
+        <span>Piano Preview / 钢琴预览</span>
+        <span>Scroll inside the window to review the draft bar by bar. / 可在窗口内滚动，按小节查看草稿。</span>
       </div>
       <div className="result-window-viewport result-window-viewport-score">
         <div className="measure-grid">
@@ -40,7 +40,9 @@ export function PianoScorePreview({ track, bpm }: PianoScorePreviewProps) {
             <article className="measure-card" key={`piano-measure-${measure.bar}`}>
               <div className="measure-meta">
                 <strong>Bar {measure.bar} / 第 {measure.bar} 小节</strong>
-                <span className="muted">{measure.notes.length} notes / 音符数</span>
+                <span className="muted">
+                  {measure.notes.length} notes / {measure.notes.length} 个音符
+                </span>
               </div>
 
               <svg aria-label={`Piano score bar ${measure.bar}`} className="score-measure-svg" role="img" viewBox="0 0 220 230">
@@ -93,4 +95,3 @@ function renderStaff(startY: number) {
     return <line className="preview-grid-line strong" key={`staff-line-${startY}-${index}`} x1="44" x2="202" y1={y} y2={y} />;
   });
 }
-

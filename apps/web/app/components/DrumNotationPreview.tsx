@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { getDrumLanes, groupNotesByBar, resolveBarBeat } from "@ai-sheet-music-generator/music-engine";
 import type { TrackResult } from "@ai-sheet-music-generator/shared-types";
@@ -10,11 +10,11 @@ interface DrumNotationPreviewProps {
 
 export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
   if (!track) {
-    return <p className="muted">A visible drum track is required before the drum notation preview can render. / 需要先显示鼓组轨道，才能渲染鼓谱预览。</p>;
+    return <p className="muted">A visible drum track is required before the preview can render. / 需要先显示鼓组音轨，才能渲染预览。</p>;
   }
 
   if (track.notes.length === 0) {
-    return <p className="muted">No drum hits are available for drum notation preview in the current visible track set. / 当前可见轨道中没有可用于鼓谱预览的鼓点。</p>;
+    return <p className="muted">No drum hits are available in the current visible tracks. / 当前可见音轨中没有可用于鼓组预览的打击事件。</p>;
   }
 
   const measures = groupNotesByBar(track.notes, bpm, 8);
@@ -28,7 +28,7 @@ export function DrumNotationPreview({ track, bpm }: DrumNotationPreviewProps) {
   return (
     <div className="result-window result-window-drum">
       <div className="result-window-toolbar muted">
-        <span>Drum Companion / 鼓谱辅助</span>
+        <span>Drum Preview / 鼓组预览</span>
         <span>Scroll inside the window to inspect drum lanes and bar details. / 可在窗口内滚动，查看鼓组轨道与小节细节。</span>
       </div>
       <div className="preview-scroll result-window-viewport result-window-viewport-drum">
