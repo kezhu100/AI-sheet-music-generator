@@ -16,7 +16,10 @@ from app.pipeline.development_pipeline import DevelopmentProcessingPipeline
 from app.pipeline.interfaces import SourceSeparationRunResult, SourceStem, TranscriptionResult
 from app.pipeline.post_processing import LightweightPostProcessor
 from app.services.audio_preprocessing import NormalizedAudioFile
-from app.services.piano_stem_filtering import PianoStemFilterService
+from app.services.piano_stem_filtering import (
+    PianoStemFilterService,
+    build_piano_filter_settings_from_preset,
+)
 
 
 class PianoStemFilteringTests(unittest.TestCase):
@@ -175,6 +178,36 @@ class PianoStemFilteringTests(unittest.TestCase):
         self.assertEqual(piano_provider.last_stem_name, "piano_stem")
         self.assertTrue(str(piano_provider.last_stem_path).endswith("piano_stem_filtered.wav"))
         self.assertEqual({stem.stem_name for stem in result.stems}, {"piano_stem", "piano_stem_raw", "drum_stem"})
+
+    def test_low_medium_and_high_pre_processing_presets_expose_distinct_backend_values(self) -> None:
+        low = build_piano_filter_settings_from_preset("low")
+        medium = build_piano_filter_settings_from_preset("medium")
+        high = build_piano_filter_settings_from_preset("high")
+
+        self.assertLess(low.low_cut_hz, medium.low_cut_hz)
+        self.assertLess(medium.low_cut_hz, high.low_cut_hz)
+        self.assertGreater(low.high_cut_hz, medium.high_cut_hz)
+        self.assertGreater(medium.high_cut_hz, high.high_cut_hz)
+        self.assertLess(low.cleanup_strength, medium.cleanup_strength)
+        self.assertLess(medium.cleanup_strength, high.cleanup_strength)
+
+    def test_legacy_raw_pre_processing_values_load_as_custom_settings(self) -> None:
+        preferences = ProcessingPreferences.model_validate(
+            {
+                "pianoFilter": {
+                    "enabled": True,
+                    "lowCutHz": 65,
+                    "highCutHz": 6400,
+                    "cleanupStrength": 0.55,
+                }
+            }
+        )
+
+        self.assertEqual(preferences.piano_filter.preset, "custom")
+        self.assertEqual(preferences.piano_filter.base_preset, "medium")
+        self.assertEqual(preferences.piano_filter.low_cut_hz, 65)
+        self.assertEqual(preferences.piano_filter.high_cut_hz, 6400)
+        self.assertEqual(preferences.piano_filter.cleanup_strength, 0.55)
 
     def _write_test_wav(self, path: Path) -> None:
         sample_rate = 44100

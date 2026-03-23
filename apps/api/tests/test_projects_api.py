@@ -245,6 +245,8 @@ class ProjectsApiTests(unittest.TestCase):
         payload = response.json()["project"]
         self.assertEqual(payload["status"], "queued")
         self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
+        self.assertEqual(payload["processingPreferences"]["pianoFilter"]["preset"], "custom")
+        self.assertEqual(payload["processingPreferences"]["pianoFilter"]["basePreset"], "medium")
         self.assertEqual(payload["processingPreferences"]["pianoFilter"]["lowCutHz"], 65)
         self.assertEqual(payload["processingPreferences"]["pianoFilter"]["cleanupStrength"], 0.55)
         self.assertEqual(payload["processingPreferences"]["pianoPostProcessing"]["preset"], "custom")

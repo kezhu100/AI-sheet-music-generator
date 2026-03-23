@@ -58,9 +58,11 @@ Presentation priorities:
 - drum MusicXML should use lightweight percussion semantics so MuseScore imports it as a readable drum staff without pretending to be a full notation engine
 - the workspace should let users hear a filtered piano stem and adjust a small number of plain-language cleanup controls before rerunning transcription
 - piano processing controls should clearly separate pre-processing before transcription from post-processing after transcription
-- post-processing should expose only on/off plus Low / Medium / High cleanup in the main visible layer
+- runtime/settings should use a clean single-column layout instead of an imbalanced left/right settings split
+- runtime/settings should separate Model Selection from Processing Pipeline as distinct top-level sections
+- both pre-processing and post-processing should expose only on/off plus Low / Medium / High cleanup in the main visible layer
 - Medium cleanup should be the recommended default
-- advanced post-processing thresholds should stay in a collapsed detail area and should move the profile into a clear custom state when edited
+- advanced controls for both stages should stay in stronger collapsed detail areas and should move the profile into a clear custom state when edited
 - the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
 - the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums
 - any future extra provider should come through a controlled custom-provider extension path rather than expanding the built-in official enhanced set
@@ -77,6 +79,7 @@ A successful current product:
 - preserves the original result while allowing saved and unsaved draft editing
 - exports valid piano-only and drums-only MIDI and MusicXML
 - keeps piano cleanup controls small, understandable, and project-local
+- keeps model selection separate from processing logic so the settings flow feels product-like rather than like a tuning dashboard
 - keeps piano cleanup more controllable without turning browser editing into a heavier note-editing workflow
 - makes MuseScore handoff obvious and honest
 - keeps local project workflows honest and understandable

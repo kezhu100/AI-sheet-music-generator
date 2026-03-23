@@ -86,6 +86,11 @@ Phase 11I piano cleanup control update:
 - processing preferences now split piano cleanup into two explicit stages:
   - pre-processing before transcription for piano stem filtering
   - post-processing after transcription for extracted piano note cleanup
+- piano pre-processing now also has a structured config with:
+  - `enabled`
+  - `preset` (`low`, `medium`, `high`, `custom`)
+  - `basePreset`
+  - advanced fields for low cutoff, high cutoff, and cleanup strength
 - piano post-processing now has a dedicated structured config with:
   - `enabled`
   - `preset` (`low`, `medium`, `high`, `custom`)
@@ -95,7 +100,9 @@ Phase 11I piano cleanup control update:
 - the backend now treats preset-backed and custom post-processing settings predictably:
   - selecting a preset restores that preset bundle
   - editing an advanced value switches the profile to `custom`
+- the same preset-backed and custom-switching behavior now also applies to piano pre-processing
 - if piano post-processing is disabled, the backend skips piano cleanup filtering, duplicate merging, and overlap trimming while keeping the broader normalization path intact
+- if piano pre-processing is disabled, the backend uses the raw separated piano stem for transcription and preview instead of the filtered one
 - region re-transcription now reuses the same persisted piano post-processing settings so cleanup behavior stays consistent across full runs and local piano-region reruns
 
 Phase 12 productization update:

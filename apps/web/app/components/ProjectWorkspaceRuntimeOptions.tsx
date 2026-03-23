@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import { type MouseEvent } from "react";
+import { type MouseEvent, type ReactNode } from "react";
 import type {
+  PianoPreProcessingBasePreset,
   PianoPostProcessingBasePreset,
   ProcessingPreferences,
   ProviderInstallState,
@@ -9,7 +10,7 @@ import type {
   RuntimeProviderOption,
   RuntimeProviderStatus
 } from "@ai-sheet-music-generator/shared-types";
-import { PianoProcessingControls } from "./PianoProcessingControls";
+import { ProcessingPipelineControls } from "./ProcessingPipelineControls";
 
 export interface RuntimeProviderInstallUiState {
   state: ProviderInstallState | "starting";
@@ -253,6 +254,8 @@ function RuntimeProviderPreferenceField({
 }
 
 interface ProjectWorkspaceRuntimeOptionsProps {
+  title?: string;
+  helperText?: ReactNode;
   isRefreshingRuntimeDiagnostics: boolean;
   onRefreshRuntimeDiagnostics: () => void;
   providerPreferences: ProviderPreferences;
@@ -270,6 +273,7 @@ interface ProjectWorkspaceRuntimeOptionsProps {
   drumRuntimeProvider?: RuntimeProviderStatus;
   processingPreferences: ProcessingPreferences;
   onTogglePianoFilterEnabled: (enabled: boolean) => void;
+  onSelectPianoFilterPreset: (preset: PianoPreProcessingBasePreset) => void;
   onChangePianoFilterNumber: (key: "lowCutHz" | "highCutHz" | "cleanupStrength", value: number) => void;
   onTogglePianoPostProcessingEnabled: (enabled: boolean) => void;
   onSelectPianoPostProcessingPreset: (preset: PianoPostProcessingBasePreset) => void;
@@ -290,9 +294,12 @@ interface ProjectWorkspaceRuntimeOptionsProps {
   onCancelCustomProviderForm: () => void;
   customProviderInstallState: RuntimeCustomProviderInstallUiState | null;
   runtimeDiagnosticsError: string | null;
+  actionSlot?: ReactNode;
 }
 
 export function ProjectWorkspaceRuntimeOptions({
+  title = "Runtime Settings / 运行设置",
+  helperText,
   isRefreshingRuntimeDiagnostics,
   onRefreshRuntimeDiagnostics,
   providerPreferences,
@@ -306,6 +313,7 @@ export function ProjectWorkspaceRuntimeOptions({
   drumRuntimeProvider,
   processingPreferences,
   onTogglePianoFilterEnabled,
+  onSelectPianoFilterPreset,
   onChangePianoFilterNumber,
   onTogglePianoPostProcessingEnabled,
   onSelectPianoPostProcessingPreset,
@@ -318,76 +326,112 @@ export function ProjectWorkspaceRuntimeOptions({
   onConfirmCustomProviderInstall,
   onCancelCustomProviderForm,
   customProviderInstallState,
-  runtimeDiagnosticsError
+  runtimeDiagnosticsError,
+  actionSlot
 }: ProjectWorkspaceRuntimeOptionsProps) {
   return (
-    <details className="runtime-options-panel ornate-card">
-      <summary>Runtime Options / 运行选项</summary>
+    <section className="runtime-options-panel">
       <div className="runtime-options-body">
-        <p className="muted">
-          Built-in providers stay ready by default. Official enhanced providers are optional, and custom providers only
-          register for diagnostics in this step.
-          <br />
-          内置提供方默认可直接使用。官方增强提供方可按需安装；自定义提供方在本阶段仅用于注册与诊断展示。
-        </p>
-        <div className="runtime-options-toolbar">
-          <button
-            className="button tertiary button-tiny"
-            type="button"
-            disabled={isRefreshingRuntimeDiagnostics}
-            onClick={onRefreshRuntimeDiagnostics}
-          >
-            {isRefreshingRuntimeDiagnostics ? "Refreshing... / 正在刷新..." : "Refresh Availability / 刷新可用性"}
-          </button>
+        <div className="runtime-options-heading">
+          <div>
+            <h3>{title}</h3>
+            <p className="muted">
+              {helperText ?? (
+                <>
+                  Choose which models run each stage, then decide how the signal and notes should be cleaned.
+                  <br />
+                  先选择每个阶段使用的模型，再决定如何清理音频信号与转写后的音符。
+                </>
+              )}
+            </p>
+          </div>
+          <div className="runtime-options-toolbar">
+            <button
+              className="button tertiary button-tiny"
+              type="button"
+              disabled={isRefreshingRuntimeDiagnostics}
+              onClick={onRefreshRuntimeDiagnostics}
+            >
+              {isRefreshingRuntimeDiagnostics ? "Refreshing... / 正在刷新..." : "Refresh Availability / 刷新可用性"}
+            </button>
+          </div>
         </div>
-        <div className="runtime-option-grid">
-          <RuntimeProviderPreferenceField
-            currentValue={providerPreferences.sourceSeparation}
-            fieldName="source-separation-provider"
-            preferenceKey="sourceSeparation"
-            onChange={(value) => onSourcePreferenceChange(value as "auto" | "development-copy" | "demucs")}
-            onInstall={onInstallProviderOption}
-            installStates={providerInstallStates}
-            options={sourceRuntimeProvider?.options}
-            selectedProviderLabel={sourceRuntimeProvider?.selectedProviderLabel}
-            title="Source Separation"
-            titleZh="源分离"
+        <section className="settings-section-card ornate-card">
+          <div className="settings-section-header">
+            <div>
+              <div className="eyebrow">Model Selection / 模型选择</div>
+              <h4>Model Selection</h4>
+              <p className="muted settings-section-help">
+                Pick who performs each stage. These choices affect the provider or model used for separation and
+                transcription.
+                <br />
+                这里决定由谁执行每个阶段，也就是源分离和转写实际使用的 provider 或模型。
+              </p>
+            </div>
+          </div>
+          <div className="runtime-option-grid">
+            <RuntimeProviderPreferenceField
+              currentValue={providerPreferences.sourceSeparation}
+              fieldName="source-separation-provider"
+              preferenceKey="sourceSeparation"
+              onChange={(value) => onSourcePreferenceChange(value as "auto" | "development-copy" | "demucs")}
+              onInstall={onInstallProviderOption}
+              installStates={providerInstallStates}
+              options={sourceRuntimeProvider?.options}
+              selectedProviderLabel={sourceRuntimeProvider?.selectedProviderLabel}
+              title="Source Separation"
+              titleZh="源分离"
+            />
+            <RuntimeProviderPreferenceField
+              currentValue={providerPreferences.pianoTranscription}
+              fieldName="piano-transcription-provider"
+              preferenceKey="pianoTranscription"
+              onChange={(value) => onPianoPreferenceChange(value as "auto" | "heuristic" | "basic-pitch")}
+              onInstall={onInstallProviderOption}
+              installStates={providerInstallStates}
+              options={pianoRuntimeProvider?.options}
+              selectedProviderLabel={pianoRuntimeProvider?.selectedProviderLabel}
+              title="Piano Transcription"
+              titleZh="钢琴转写"
+            />
+            <RuntimeProviderPreferenceField
+              currentValue={providerPreferences.drumTranscription}
+              fieldName="drum-transcription-provider"
+              preferenceKey="drumTranscription"
+              onChange={(value) => onDrumPreferenceChange(value as "auto" | "heuristic" | "demucs-drums")}
+              onInstall={onInstallProviderOption}
+              installStates={providerInstallStates}
+              options={drumRuntimeProvider?.options}
+              selectedProviderLabel={drumRuntimeProvider?.selectedProviderLabel}
+              title="Drum Transcription"
+              titleZh="鼓组转写"
+            />
+          </div>
+        </section>
+        <section className="settings-section-card ornate-card">
+          <div className="settings-section-header">
+            <div>
+              <div className="eyebrow">Processing Pipeline / 处理流程</div>
+              <h4>Processing Pipeline</h4>
+              <p className="muted settings-section-help">
+                Decide how the stem is cleaned before transcription and how notes are cleaned after transcription.
+                <br />
+                这里决定转写前如何清理 stem，以及转写后如何清理音符。
+              </p>
+            </div>
+          </div>
+          <ProcessingPipelineControls
+            processingPreferences={processingPreferences}
+            onTogglePianoFilterEnabled={onTogglePianoFilterEnabled}
+            onSelectPianoFilterPreset={onSelectPianoFilterPreset}
+            onChangePianoFilterNumber={onChangePianoFilterNumber}
+            onTogglePianoPostProcessingEnabled={onTogglePianoPostProcessingEnabled}
+            onSelectPianoPostProcessingPreset={onSelectPianoPostProcessingPreset}
+            onChangePianoPostProcessingNumber={onChangePianoPostProcessingNumber}
+            onToggleExtremeNoteFiltering={onToggleExtremeNoteFiltering}
           />
-          <RuntimeProviderPreferenceField
-            currentValue={providerPreferences.pianoTranscription}
-            fieldName="piano-transcription-provider"
-            preferenceKey="pianoTranscription"
-            onChange={(value) => onPianoPreferenceChange(value as "auto" | "heuristic" | "basic-pitch")}
-            onInstall={onInstallProviderOption}
-            installStates={providerInstallStates}
-            options={pianoRuntimeProvider?.options}
-            selectedProviderLabel={pianoRuntimeProvider?.selectedProviderLabel}
-            title="Piano Transcription"
-            titleZh="钢琴转写"
-          />
-          <RuntimeProviderPreferenceField
-            currentValue={providerPreferences.drumTranscription}
-            fieldName="drum-transcription-provider"
-            preferenceKey="drumTranscription"
-            onChange={(value) => onDrumPreferenceChange(value as "auto" | "heuristic" | "demucs-drums")}
-            onInstall={onInstallProviderOption}
-            installStates={providerInstallStates}
-            options={drumRuntimeProvider?.options}
-            selectedProviderLabel={drumRuntimeProvider?.selectedProviderLabel}
-            title="Drum Transcription"
-            titleZh="鼓组转写"
-          />
-        </div>
-        <PianoProcessingControls
-          processingPreferences={processingPreferences}
-          onTogglePianoFilterEnabled={onTogglePianoFilterEnabled}
-          onChangePianoFilterNumber={onChangePianoFilterNumber}
-          onTogglePianoPostProcessingEnabled={onTogglePianoPostProcessingEnabled}
-          onSelectPianoPostProcessingPreset={onSelectPianoPostProcessingPreset}
-          onChangePianoPostProcessingNumber={onChangePianoPostProcessingNumber}
-          onToggleExtremeNoteFiltering={onToggleExtremeNoteFiltering}
-        />
-        <section className="runtime-custom-section">
+        </section>
+        <section className="runtime-custom-section settings-section-card ornate-card">
           <div className="runtime-custom-header">
             <div>
               <strong>Register Custom Provider / 注册自定义提供方</strong>
@@ -465,8 +509,9 @@ export function ProjectWorkspaceRuntimeOptions({
             </div>
           </div>
         </section>
+        {actionSlot ? <div className="runtime-settings-actions">{actionSlot}</div> : null}
         {runtimeDiagnosticsError ? <p className="error">{runtimeDiagnosticsError}</p> : null}
       </div>
-    </details>
+    </section>
   );
 }

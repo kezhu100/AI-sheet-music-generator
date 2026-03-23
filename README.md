@@ -96,8 +96,11 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 - **Configurable piano stem pre-filter before transcription**  
   **钢琴转谱前增加可调的分轨预过滤**
 
-  The workspace now lets users tune a lightweight piano-stem pre-filter, hear the filtered stem directly, and rerun piano transcription from that saved filtered preview.  
-  现在工作区支持调节轻量钢琴分轨预过滤，直接试听过滤后的分轨，并基于该已保存的过滤结果重新运行钢琴转谱。  
+  The workspace now presents pre-processing and post-processing through the same product-style two-layer flow: on/off, Low / Medium / High presets, and stronger Advanced Settings that switch into a custom state when edited.  
+  现在工作区会用同一套产品化的双层方式呈现预处理和后处理：开关、Low / Medium / High 预设，以及更清晰的高级设置；编辑高级值后会进入自定义状态。  
+
+  The runtime/settings flow now uses a clean single-column structure with separate Model Selection and Processing Pipeline sections, so provider choice and cleanup logic no longer feel mixed together.  
+  运行时/设置流程现在采用干净的单列结构，并把 Model Selection 与 Processing Pipeline 分成两个顶层区域，让 provider 选择与清理逻辑不再混在一起。  
 
 - **MuseScore handoff for final polishing**  
   **支持交接到 MuseScore 进行最终排版润色**
@@ -110,6 +113,9 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 
 - **Advanced runtime options with Auto defaults**  
   **高级运行时选项（具有自动默认设置）**
+
+  Model Selection now covers Source Separation, Piano Transcription, and Drum Transcription only, while Processing Pipeline covers pre-processing before transcription and post-processing after transcription.  
+  现在 Model Selection 只负责 Source Separation、Piano Transcription 与 Drum Transcription；Processing Pipeline 则负责转写前预处理和转写后清理。  
 
 - **Optional enhanced providers install on demand from Runtime Options**  
   **可选的增强型提供程序可在运行时选项中按需安装**
@@ -195,6 +201,8 @@ audio
   **当钢琴分轨仍有残留时，可先调节过滤后的钢琴试听**
 - **Choose a simple piano cleanup preset, then open advanced post-processing only if needed**  
   **先选择简单的钢琴清理预设，只有在需要时才展开高级后处理参数**
+- **Use the same preset-first pattern for piano stem cleanup before transcription**  
+  **转写前的钢琴 stem 清理也采用同样的预设优先模式**
 - **Refine obvious issues in-browser**  
   **在浏览器内修正明显问题**
 - **Export clean separated output and finish in MuseScore**  

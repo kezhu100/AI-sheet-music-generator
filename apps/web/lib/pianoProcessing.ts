@@ -1,13 +1,34 @@
 import type {
+  PianoFilterSettings,
+  PianoPreProcessingBasePreset,
   PianoPostProcessingBasePreset,
   PianoPostProcessingSettings,
   ProcessingPreferences
 } from "@ai-sheet-music-generator/shared-types";
 
+type PianoFilterPresetValues = Omit<PianoFilterSettings, "enabled" | "preset" | "basePreset">;
 type PianoPostProcessingPresetValues = Omit<
   PianoPostProcessingSettings,
   "enabled" | "preset" | "basePreset"
 >;
+
+const PIANO_FILTER_PRESET_VALUES: Record<PianoPreProcessingBasePreset, PianoFilterPresetValues> = {
+  low: {
+    lowCutHz: 35,
+    highCutHz: 9000,
+    cleanupStrength: 0.24
+  },
+  medium: {
+    lowCutHz: 45,
+    highCutHz: 7200,
+    cleanupStrength: 0.42
+  },
+  high: {
+    lowCutHz: 60,
+    highCutHz: 6000,
+    cleanupStrength: 0.64
+  }
+};
 
 const PIANO_POST_PROCESSING_PRESET_VALUES: Record<
   PianoPostProcessingBasePreset,
@@ -39,9 +60,9 @@ const PIANO_POST_PROCESSING_PRESET_VALUES: Record<
 export const DEFAULT_PROCESSING_PREFERENCES: ProcessingPreferences = {
   pianoFilter: {
     enabled: true,
-    lowCutHz: 45,
-    highCutHz: 7200,
-    cleanupStrength: 0.42
+    preset: "medium",
+    basePreset: "medium",
+    ...PIANO_FILTER_PRESET_VALUES.medium
   },
   pianoPostProcessing: {
     enabled: true,
@@ -50,6 +71,18 @@ export const DEFAULT_PROCESSING_PREFERENCES: ProcessingPreferences = {
     ...PIANO_POST_PROCESSING_PRESET_VALUES.medium
   }
 };
+
+export function buildPianoFilterFromPreset(
+  preset: PianoPreProcessingBasePreset,
+  enabled = true
+): ProcessingPreferences["pianoFilter"] {
+  return {
+    enabled,
+    preset,
+    basePreset: preset,
+    ...PIANO_FILTER_PRESET_VALUES[preset]
+  };
+}
 
 export function buildPianoPostProcessingFromPreset(
   preset: PianoPostProcessingBasePreset,
@@ -63,6 +96,12 @@ export function buildPianoPostProcessingFromPreset(
   };
 }
 
+export function getVisiblePianoFilterPreset(
+  settings: ProcessingPreferences["pianoFilter"]
+): PianoPreProcessingBasePreset {
+  return settings.preset === "custom" ? settings.basePreset : settings.preset;
+}
+
 export function getVisiblePianoPostProcessingPreset(
   settings: ProcessingPreferences["pianoPostProcessing"]
 ): PianoPostProcessingBasePreset {
@@ -72,6 +111,30 @@ export function getVisiblePianoPostProcessingPreset(
 export function toEditableProcessingPreferences(
   processingPreferences?: ProcessingPreferences | null
 ): ProcessingPreferences {
+  const defaultFilter = DEFAULT_PROCESSING_PREFERENCES.pianoFilter;
+  const incomingFilter = processingPreferences?.pianoFilter;
+  const visibleFilterPreset = incomingFilter
+    ? getVisiblePianoFilterPreset({
+        ...defaultFilter,
+        ...incomingFilter
+      })
+    : defaultFilter.basePreset;
+  const presetInitializedFilter =
+    incomingFilter?.preset === "custom" ||
+    (incomingFilter?.preset == null &&
+      (incomingFilter?.lowCutHz !== undefined ||
+        incomingFilter?.highCutHz !== undefined ||
+        incomingFilter?.cleanupStrength !== undefined))
+      ? {
+          ...defaultFilter,
+          ...incomingFilter,
+          preset: "custom",
+          basePreset: incomingFilter?.basePreset ?? visibleFilterPreset
+        }
+      : buildPianoFilterFromPreset(
+          visibleFilterPreset,
+          incomingFilter?.enabled ?? defaultFilter.enabled
+        );
   const defaultPostProcessing = DEFAULT_PROCESSING_PREFERENCES.pianoPostProcessing;
   const incomingPostProcessing = processingPreferences?.pianoPostProcessing;
   const visiblePreset = incomingPostProcessing
@@ -93,20 +156,7 @@ export function toEditableProcessingPreferences(
         );
 
   return {
-    pianoFilter: {
-      enabled:
-        processingPreferences?.pianoFilter?.enabled ??
-        DEFAULT_PROCESSING_PREFERENCES.pianoFilter.enabled,
-      lowCutHz:
-        processingPreferences?.pianoFilter?.lowCutHz ??
-        DEFAULT_PROCESSING_PREFERENCES.pianoFilter.lowCutHz,
-      highCutHz:
-        processingPreferences?.pianoFilter?.highCutHz ??
-        DEFAULT_PROCESSING_PREFERENCES.pianoFilter.highCutHz,
-      cleanupStrength:
-        processingPreferences?.pianoFilter?.cleanupStrength ??
-        DEFAULT_PROCESSING_PREFERENCES.pianoFilter.cleanupStrength
-    },
+    pianoFilter: presetInitializedFilter as ProcessingPreferences["pianoFilter"],
     pianoPostProcessing: presetInitializedPostProcessing
   };
 }

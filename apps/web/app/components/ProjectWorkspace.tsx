@@ -20,6 +20,7 @@ import type {
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  PianoPreProcessingBasePreset,
   PianoPostProcessingBasePreset,
   ProcessingPreferences,
   ProviderInstallState,
@@ -53,8 +54,8 @@ import {
 } from "../../lib/api";
 import { getUiCopy } from "../../lib/uiCopy";
 import {
+  buildPianoFilterFromPreset,
   buildPianoPostProcessingFromPreset,
-  DEFAULT_PROCESSING_PREFERENCES,
   toEditableProcessingPreferences
 } from "../../lib/pianoProcessing";
 import { useEditableJobResult } from "../hooks/useEditableJobResult";
@@ -64,7 +65,6 @@ import { PianoRollPreview } from "./PianoRollPreview";
 import { PianoScorePreview } from "./PianoScorePreview";
 import { ProjectWorkspaceAdvancedDetails } from "./ProjectWorkspaceAdvancedDetails";
 import { ProjectWorkspaceExportPanel } from "./ProjectWorkspaceExportPanel";
-import { PianoProcessingControls } from "./PianoProcessingControls";
 import { ProjectWorkspaceRuntimeOptions } from "./ProjectWorkspaceRuntimeOptions";
 import { TrackVisibilityControls } from "./TrackVisibilityControls";
 
@@ -449,92 +449,6 @@ function RuntimeProviderPreferenceField({
   );
 }
 
-interface PianoFilterSettingsPanelProps {
-  value: ProcessingPreferences["pianoFilter"];
-  disabled?: boolean;
-  onToggleEnabled: (enabled: boolean) => void;
-  onChangeNumber: (key: "lowCutHz" | "highCutHz" | "cleanupStrength", value: number) => void;
-}
-
-function PianoFilterSettingsPanel({
-  value,
-  disabled = false,
-  onToggleEnabled,
-  onChangeNumber
-}: PianoFilterSettingsPanelProps) {
-  return (
-    <section className="runtime-custom-section">
-      <div className="runtime-custom-header">
-        <div>
-          <strong>Piano Stem Cleanup / 钢琴 Stem 清理</strong>
-          <div className="muted runtime-custom-help">
-            This lightweight pre-filter runs after source separation and before piano transcription. The filtered piano stem
-            is also the default piano preview.
-            <br />
-            这个轻量预过滤步骤位于源分离之后、钢琴转写之前。过滤后的钢琴 stem 也会作为默认钢琴预览。
-          </div>
-        </div>
-      </div>
-      <div className="runtime-custom-form ornate-card">
-        <label className="runtime-option-card">
-          <input
-            checked={value.enabled}
-            disabled={disabled}
-            type="checkbox"
-            onChange={(event) => onToggleEnabled(event.target.checked)}
-          />
-          <span className="runtime-option-label">Use filtered piano stem by default / 默认使用过滤后的钢琴 stem</span>
-          <span className="muted">Keeps the raw separated stem available, but makes preview and transcription favor the cleaned stem. / 保留原始分离 stem，同时让预览和转写优先使用清理后的版本。</span>
-        </label>
-
-        <div className="field">
-          <label htmlFor="piano-filter-low-cut">Low cleanup / 低频清理: {Math.round(value.lowCutHz)} Hz</label>
-          <input
-            id="piano-filter-low-cut"
-            type="range"
-            min="20"
-            max="180"
-            step="5"
-            disabled={disabled || !value.enabled}
-            value={value.lowCutHz}
-            onChange={(event) => onChangeNumber("lowCutHz", Number(event.target.value))}
-          />
-          <div className="muted">Reduces low bass-like residue in the piano stem. / 减少钢琴 stem 里偏低频、像贝斯一样的残留。</div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="piano-filter-high-cut">High cleanup / 高频清理: {Math.round(value.highCutHz)} Hz</label>
-          <input
-            id="piano-filter-high-cut"
-            type="range"
-            min="3000"
-            max="12000"
-            step="250"
-            disabled={disabled || !value.enabled}
-            value={value.highCutHz}
-            onChange={(event) => onChangeNumber("highCutHz", Number(event.target.value))}
-          />
-          <div className="muted">Softens sharp high-frequency bleed that may confuse transcription. / 柔化可能干扰转写的尖锐高频串音。</div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="piano-filter-strength">Cleanup strength / 清理强度: {value.cleanupStrength.toFixed(2)}</label>
-          <input
-            id="piano-filter-strength"
-            type="range"
-            min="0"
-            max="0.9"
-            step="0.05"
-            disabled={disabled || !value.enabled}
-            value={value.cleanupStrength}
-            onChange={(event) => onChangeNumber("cleanupStrength", Number(event.target.value))}
-          />
-          <div className="muted">Controls how strongly the piano stem is cleaned before transcription. / 控制钢琴 stem 在转写前被清理得多强。</div>
-        </div>
-      </div>
-    </section>
-  );
-}
 function buildJobFromProjectDetail(projectDetail?: ProjectDetail | null): JobRecord | null {
   if (!projectDetail) {
     return null;
@@ -1577,14 +1491,36 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }));
   }
 
-  function handlePianoFilterSettingChange(
-    key: keyof ProcessingPreferences["pianoFilter"],
-    value: boolean | number
+  function handlePianoFilterEnabledChange(enabled: boolean): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoFilter: {
+        ...currentPreferences.pianoFilter,
+        enabled
+      }
+    }));
+  }
+
+  function handlePianoFilterPresetChange(preset: PianoPreProcessingBasePreset): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoFilter: buildPianoFilterFromPreset(preset, currentPreferences.pianoFilter.enabled)
+    }));
+  }
+
+  function handlePianoFilterNumberChange(
+    key: "lowCutHz" | "highCutHz" | "cleanupStrength",
+    value: number
   ): void {
     setProcessingPreferences((currentPreferences) => ({
       ...currentPreferences,
       pianoFilter: {
         ...currentPreferences.pianoFilter,
+        preset: "custom",
+        basePreset:
+          currentPreferences.pianoFilter.preset === "custom"
+            ? currentPreferences.pianoFilter.basePreset
+            : currentPreferences.pianoFilter.preset,
         [key]: value
       }
     }));
@@ -2121,8 +2057,9 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 pianoRuntimeProvider={pianoRuntimeProvider ?? undefined}
                 drumRuntimeProvider={drumRuntimeProvider ?? undefined}
                 processingPreferences={processingPreferences}
-                onTogglePianoFilterEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
-                onChangePianoFilterNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                onTogglePianoFilterEnabled={handlePianoFilterEnabledChange}
+                onSelectPianoFilterPreset={handlePianoFilterPresetChange}
+                onChangePianoFilterNumber={handlePianoFilterNumberChange}
                 onTogglePianoPostProcessingEnabled={handlePianoPostProcessingEnabledChange}
                 onSelectPianoPostProcessingPreset={handlePianoPostProcessingPresetChange}
                 onChangePianoPostProcessingNumber={handlePianoPostProcessingNumberChange}
@@ -2268,6 +2205,64 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
           </div>
         </section>
       )}
+      {mode === "project" && projectDetail ? (
+        <section className="panel panel-full settings-flow-panel">
+          <ProjectWorkspaceRuntimeOptions
+            title="Project Settings / 项目设置"
+            helperText={
+              <>
+                Model Selection controls who performs each stage. Processing Pipeline controls how the audio is cleaned
+                before transcription and how notes are cleaned after transcription.
+                <br />
+                Model Selection 负责决定每个阶段由谁执行；Processing Pipeline 负责决定转写前怎样清理音频，以及转写后怎样清理音符。
+              </>
+            }
+            isRefreshingRuntimeDiagnostics={isRefreshingRuntimeDiagnostics}
+            onRefreshRuntimeDiagnostics={() => void refreshRuntimeDiagnostics()}
+            providerPreferences={providerPreferences}
+            onSourcePreferenceChange={(value) => handleProviderPreferenceChange("sourceSeparation", value)}
+            onPianoPreferenceChange={(value) => handleProviderPreferenceChange("pianoTranscription", value)}
+            onDrumPreferenceChange={(value) => handleProviderPreferenceChange("drumTranscription", value)}
+            providerInstallStates={providerInstallStates}
+            onInstallProviderOption={(preferenceKey, option, options) =>
+              void handleInstallProviderOption(preferenceKey, option, options)
+            }
+            sourceRuntimeProvider={sourceRuntimeProvider ?? undefined}
+            pianoRuntimeProvider={pianoRuntimeProvider ?? undefined}
+            drumRuntimeProvider={drumRuntimeProvider ?? undefined}
+            processingPreferences={processingPreferences}
+            onTogglePianoFilterEnabled={handlePianoFilterEnabledChange}
+            onSelectPianoFilterPreset={handlePianoFilterPresetChange}
+            onChangePianoFilterNumber={handlePianoFilterNumberChange}
+            onTogglePianoPostProcessingEnabled={handlePianoPostProcessingEnabledChange}
+            onSelectPianoPostProcessingPreset={handlePianoPostProcessingPresetChange}
+            onChangePianoPostProcessingNumber={handlePianoPostProcessingNumberChange}
+            onToggleExtremeNoteFiltering={handleExtremeNoteFilteringChange}
+            isCustomProviderFormOpen={isCustomProviderFormOpen}
+            onToggleCustomProviderForm={() => setIsCustomProviderFormOpen((currentOpen) => !currentOpen)}
+            customProviderManifestUrl={customProviderManifestUrl}
+            onChangeCustomProviderManifestUrl={setCustomProviderManifestUrl}
+            onConfirmCustomProviderInstall={() => void handleCustomProviderInstall()}
+            onCancelCustomProviderForm={handleCancelCustomProviderForm}
+            customProviderInstallState={customProviderInstallState}
+            runtimeDiagnosticsError={runtimeDiagnosticsError}
+            actionSlot={
+              <div className="actions">
+                <button
+                  className="button"
+                  type="button"
+                  disabled={!projectDetail || isRerunningProject}
+                  onClick={() => void handleRerunProject()}
+                >
+                  {isRerunningProject
+                    ? "Rebuilding Project... / 正在重建项目..."
+                    : "Rerun with Current Settings / 按当前设置重跑"}
+                </button>
+              </div>
+            }
+          />
+        </section>
+      ) : null}
       {error ? <p className="error">{error}</p> : null}
       {exportSuccessMessage ? (
         <section className="panel panel-full">
@@ -2383,29 +2378,6 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 {runtimeUsedFallbackDetected
                   ? "Fallback was detected in this result. / 本次结果检测到回退。"
                   : "No fallback warning was detected in this result. / 本次结果未检测到回退警告。"}
-              </div>
-            </article>
-            <article className="score-secondary-card ornate-card audition-card">
-              <h3>Piano Processing Controls / 钢琴处理控制</h3>
-              <p className="muted">
-                Adjust pre-processing and post-processing separately, then rerun this project to rebuild the piano draft with the saved settings.
-                <br />
-                将转写前预处理与转写后清理分开调节，然后重新运行当前项目，即可按已保存设置重建钢琴草稿。
-              </p>
-              <PianoProcessingControls
-                processingPreferences={processingPreferences}
-                disabled={isRerunningProject}
-                onTogglePianoFilterEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
-                onChangePianoFilterNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
-                onTogglePianoPostProcessingEnabled={handlePianoPostProcessingEnabledChange}
-                onSelectPianoPostProcessingPreset={handlePianoPostProcessingPresetChange}
-                onChangePianoPostProcessingNumber={handlePianoPostProcessingNumberChange}
-                onToggleExtremeNoteFiltering={handleExtremeNoteFilteringChange}
-              />
-              <div className="actions">
-                <button className="button" type="button" disabled={!projectDetail || isRerunningProject} onClick={() => void handleRerunProject()}>
-                  {isRerunningProject ? "Rebuilding Piano Draft... / 正在重建钢琴草稿..." : "Rerun with Current Piano Settings / 按当前钢琴设置重跑"}
-                </button>
               </div>
             </article>
             <article className="score-secondary-card ornate-card audition-card">

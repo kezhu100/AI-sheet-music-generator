@@ -22,8 +22,59 @@ class PianoStemFilterResult:
     warnings: list[str]
 
 
+PIANO_FILTER_PRESETS: dict[str, dict[str, float]] = {
+    "low": {
+        "low_cut_hz": 35.0,
+        "high_cut_hz": 9000.0,
+        "cleanup_strength": 0.24,
+    },
+    "medium": {
+        "low_cut_hz": 45.0,
+        "high_cut_hz": 7200.0,
+        "cleanup_strength": 0.42,
+    },
+    "high": {
+        "low_cut_hz": 60.0,
+        "high_cut_hz": 6000.0,
+        "cleanup_strength": 0.64,
+    },
+}
+
+
 def default_processing_preferences() -> ProcessingPreferences:
     return ProcessingPreferences()
+
+
+def build_piano_filter_settings_from_preset(
+    preset: str,
+    *,
+    enabled: bool = True,
+) -> PianoFilterSettings:
+    preset_values = PIANO_FILTER_PRESETS[preset]
+    return PianoFilterSettings(
+        enabled=enabled,
+        preset=preset,
+        basePreset=preset,
+        lowCutHz=preset_values["low_cut_hz"],
+        highCutHz=preset_values["high_cut_hz"],
+        cleanupStrength=preset_values["cleanup_strength"],
+    )
+
+
+def resolve_piano_filter_settings(
+    preferences: ProcessingPreferences | None = None,
+) -> PianoFilterSettings:
+    if preferences is None:
+        return PianoFilterSettings()
+
+    configured_settings = preferences.piano_filter
+    if configured_settings.preset == "custom":
+        return configured_settings
+
+    return build_piano_filter_settings_from_preset(
+        configured_settings.preset,
+        enabled=configured_settings.enabled,
+    )
 
 
 class PianoStemFilterService:
@@ -34,8 +85,7 @@ class PianoStemFilterService:
         job_id: str,
         preferences: ProcessingPreferences | None = None,
     ) -> PianoStemFilterResult:
-        processing_preferences = preferences or default_processing_preferences()
-        filter_settings = processing_preferences.piano_filter
+        filter_settings = resolve_piano_filter_settings(preferences or default_processing_preferences())
         filtered_path = self._write_filtered_wav(stem.file_path, job_id, filter_settings)
         settings = get_settings()
         filtered_asset = StemAsset(

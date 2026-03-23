@@ -134,9 +134,12 @@ Provider install behavior follows the same boundary:
 - runtime diagnostics surface custom providers distinctly from official enhanced options instead of folding them into the fixed official set
 
 Processing-control behavior follows the same boundary:
-- the frontend owns the simple two-layer control presentation
+- the frontend owns the single-column settings composition plus the simple two-layer control presentation
+- the frontend keeps Model Selection and Processing Pipeline as distinct top-level sections
 - the backend owns preset mapping, cleanup semantics, and post-processing execution
+- the backend now also resolves pre-processing presets and custom overrides before piano stem filtering runs
 - project/job persistence stores processing preferences additively so older saved projects without the new fields still load through defaults
+- `pianoFilter` remains the persisted pre-processing key for compatibility, but now carries `enabled`, `preset`, `basePreset`, and advanced parameter fields
 
 ## Future Direction
 - preserve the current local-first browser architecture

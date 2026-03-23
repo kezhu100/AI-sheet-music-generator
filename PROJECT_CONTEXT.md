@@ -75,13 +75,23 @@ A lightweight result-side provider summary now makes Auto selection and fallback
 The same compact runtime area can now also accept a local `file://...json` custom manifest URL for backend registration, while keeping custom providers diagnostic-only and not execution-ready in this phase.
 For the fixed official enhanced set, `demucs-drums` now provides the practical enhanced drum path by reusing Demucs stem isolation plus lightweight rule-based onset detection, while the built-in heuristic drum provider remains the stable fallback.
 
+The runtime/settings flow now uses a single-column structure with clearly separated top-level sections:
+- Model Selection
+- Processing Pipeline
+- optional custom provider registration
+
+This keeps provider choice separate from cleanup logic and avoids the older left-heavy / right-light settings imbalance.
+
 Piano processing controls are now split into two explicit stages:
 - pre-processing before transcription for piano stem cleanup/filtering
 - post-processing after transcription for piano note cleanup
 
-The post-processing stage now uses a two-layer control model:
-- layer 1: post-processing on/off plus Low / Medium / High cleanup presets, with Medium recommended by default
-- layer 2: advanced post-processing settings behind a details/disclosure area
+Both processing stages now use the same two-layer control model:
+- layer 1: on/off plus Low / Medium / High cleanup presets, with Medium recommended by default
+- layer 2: stronger Advanced Settings panels for stage-specific parameter overrides
+
+Pre-processing remains audio/stem cleanup before transcription.
+Post-processing remains note cleanup after transcription.
 
 Backend provider scope is now intentionally split:
 - built-in base providers remain the default runnable path

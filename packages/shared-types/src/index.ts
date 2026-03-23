@@ -34,11 +34,15 @@ export interface ProviderPreferences {
 
 export interface PianoFilterSettings {
   enabled: boolean;
+  preset: PianoPreProcessingPreset;
+  basePreset: PianoPreProcessingBasePreset;
   lowCutHz: number;
   highCutHz: number;
   cleanupStrength: number;
 }
 
+export type PianoPreProcessingPreset = "low" | "medium" | "high" | "custom";
+export type PianoPreProcessingBasePreset = "low" | "medium" | "high";
 export type PianoPostProcessingPreset = "low" | "medium" | "high" | "custom";
 export type PianoPostProcessingBasePreset = "low" | "medium" | "high";
 

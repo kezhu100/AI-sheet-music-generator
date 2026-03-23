@@ -55,6 +55,8 @@
 - [x] add conservative piano post-processing cleanup to reduce residual-driven false positives
 - [x] add configurable piano stem pre-filtering with filtered preview + same-project rerun flow
 - [x] split piano processing controls into explicit pre-processing and post-processing sections
+- [x] refactor runtime/settings into a single-column flow with separate Model Selection and Processing Pipeline sections
+- [x] give piano pre-processing the same preset-first two-layer UX model as post-processing
 - [x] add simple piano post-processing on/off plus Low / Medium / High cleanup presets with Medium as the recommended default
 - [x] add advanced piano post-processing controls behind a collapsed details section without widening browser-side editing scope
 

@@ -23,6 +23,8 @@ CustomProviderSourceTransport = Literal["file"]
 SourceSeparationProviderPreference = Literal["auto", "development-copy", "demucs"]
 PianoTranscriptionProviderPreference = Literal["auto", "heuristic", "basic-pitch"]
 DrumTranscriptionProviderPreference = Literal["auto", "heuristic", "demucs-drums"]
+PianoPreProcessingPreset = Literal["low", "medium", "high", "custom"]
+PianoPreProcessingBasePreset = Literal["low", "medium", "high"]
 PianoPostProcessingPreset = Literal["low", "medium", "high", "custom"]
 PianoPostProcessingBasePreset = Literal["low", "medium", "high"]
 MIN_NOTE_DURATION_SEC = 0.05
@@ -62,11 +64,35 @@ class ProviderPreferences(BaseModel):
 
 class PianoFilterSettings(BaseModel):
     enabled: bool = True
+    preset: PianoPreProcessingPreset = "medium"
+    base_preset: PianoPreProcessingBasePreset = Field(default="medium", alias="basePreset")
     low_cut_hz: float = Field(default=45.0, alias="lowCutHz")
     high_cut_hz: float = Field(default=7200.0, alias="highCutHz")
     cleanup_strength: float = Field(default=0.42, alias="cleanupStrength")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_custom_shape(cls, data: object) -> object:
+        if not isinstance(data, dict) or "preset" in data or "basePreset" in data or "base_preset" in data:
+            return data
+
+        raw_keys = {
+            "lowCutHz",
+            "highCutHz",
+            "cleanupStrength",
+            "low_cut_hz",
+            "high_cut_hz",
+            "cleanup_strength",
+        }
+        if not any(key in data for key in raw_keys):
+            return data
+
+        normalized = dict(data)
+        normalized.setdefault("preset", "custom")
+        normalized.setdefault("basePreset", "medium")
+        return normalized
 
     @field_validator("low_cut_hz")
     @classmethod
@@ -93,6 +119,8 @@ class PianoFilterSettings(BaseModel):
     def validate_cutoff_order(self) -> "PianoFilterSettings":
         if self.high_cut_hz <= self.low_cut_hz:
             raise ValueError("highCutHz must be greater than lowCutHz.")
+        if self.preset != "custom":
+            self.base_preset = self.preset
         return self
 
 

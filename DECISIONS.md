@@ -4,6 +4,25 @@
 
 ### 2026-03-23
 Decision:
+- Refactor runtime/settings into a single-column product-style flow, separate Model Selection from Processing Pipeline, and give piano pre-processing the same preset-plus-advanced interaction model as post-processing.
+
+Context:
+- Provider/model choice and cleanup logic had become visually mixed together, while the previous layout also made the settings area feel left-heavy and more like a tuning dashboard than a product workflow.
+- Product direction still requires local-first processing, lightweight verification before export, and MuseScore as the deep-edit destination, so the refactor needed to improve control clarity without expanding browser-side editing complexity.
+
+Chosen option:
+- Use a single-column settings composition.
+- Make Model Selection a provider-only section for Source Separation, Piano Transcription, and Drum Transcription.
+- Make Processing Pipeline a cleanup-only section for pre-processing before transcription and post-processing after transcription.
+- Add the same two-layer behavior to pre-processing: on/off, Low / Medium / High presets, and stronger Advanced Settings that switch into `custom` when edited.
+- Keep `pianoFilter` as the persisted compatibility key, but extend it additively with `preset` and `basePreset`.
+
+Tradeoffs:
+- This adds a small amount of preset-mapping and compatibility logic, but it removes UI inconsistency and makes the settings flow easier to understand quickly.
+- The app keeps advanced controls discoverable without pushing more editing complexity into the browser workspace itself.
+
+### 2026-03-23
+Decision:
 - Split piano cleanup controls into explicit pre-processing and post-processing sections, and make piano post-processing a two-layer control model with simple presets plus advanced overrides.
 
 Context:
