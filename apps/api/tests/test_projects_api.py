@@ -226,6 +226,16 @@ class ProjectsApiTests(unittest.TestCase):
                             "lowCutHz": 65,
                             "highCutHz": 6400,
                             "cleanupStrength": 0.55,
+                        },
+                        "pianoPostProcessing": {
+                            "enabled": True,
+                            "preset": "custom",
+                            "basePreset": "medium",
+                            "isolatedWeakNoteThreshold": 0.52,
+                            "duplicateMergeToleranceMs": 70,
+                            "overlapTrimAggressiveness": 0.6,
+                            "extremeNoteFiltering": False,
+                            "confidenceThreshold": 0.31,
                         }
                     },
                 },
@@ -237,6 +247,9 @@ class ProjectsApiTests(unittest.TestCase):
         self.assertEqual(payload["providerPreferences"]["sourceSeparation"], "demucs")
         self.assertEqual(payload["processingPreferences"]["pianoFilter"]["lowCutHz"], 65)
         self.assertEqual(payload["processingPreferences"]["pianoFilter"]["cleanupStrength"], 0.55)
+        self.assertEqual(payload["processingPreferences"]["pianoPostProcessing"]["preset"], "custom")
+        self.assertEqual(payload["processingPreferences"]["pianoPostProcessing"]["basePreset"], "medium")
+        self.assertFalse(payload["processingPreferences"]["pianoPostProcessing"]["extremeNoteFiltering"])
         start_job_mock.assert_called_once()
         self.assertEqual(start_job_mock.call_args.args[0], project_id)
         self.assertEqual(start_job_mock.call_args.args[1].upload_id, upload.upload_id)

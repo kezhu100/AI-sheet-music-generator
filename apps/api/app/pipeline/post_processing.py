@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.models.schemas import TrackResult
+from app.models.schemas import ProcessingPreferences, TrackResult
 from app.pipeline.post_processing_helpers import (
     choose_quantization_plan,
     clean_track_notes,
@@ -10,6 +10,7 @@ from app.pipeline.post_processing_helpers import (
     estimate_tempo,
     merge_tracks,
     quantize_track_notes,
+    resolve_piano_post_processing_settings,
     sort_tracks,
     summarize_cleanup_warnings,
 )
@@ -23,13 +24,19 @@ class PostProcessingResult:
 
 
 class LightweightPostProcessor:
-    def process(self, tracks: list[TrackResult], warnings: list[str]) -> PostProcessingResult:
+    def process(
+        self,
+        tracks: list[TrackResult],
+        warnings: list[str],
+        processing_preferences: ProcessingPreferences | None = None,
+    ) -> PostProcessingResult:
         merged_tracks = merge_tracks(tracks)
         cleaned_tracks: list[TrackResult] = []
         cleanup_stats = []
+        piano_settings = resolve_piano_post_processing_settings(processing_preferences)
 
         for track in merged_tracks:
-            cleaned_notes, track_stats = clean_track_notes(track)
+            cleaned_notes, track_stats = clean_track_notes(track, piano_settings)
             cleanup_stats.append(track_stats)
             cleaned_tracks.append(
                 TrackResult(
@@ -46,7 +53,7 @@ class LightweightPostProcessor:
         processed_tracks: list[TrackResult] = []
 
         for track in cleaned_tracks:
-            quantized_notes, track_stats = quantize_track_notes(track, quantization_plan)
+            quantized_notes, track_stats = quantize_track_notes(track, quantization_plan, piano_settings)
             cleanup_stats.append(track_stats)
             processed_tracks.append(
                 TrackResult(
@@ -59,6 +66,12 @@ class LightweightPostProcessor:
             )
 
         output_warnings = list(warnings)
+        if not piano_settings.enabled:
+            disabled_warning = (
+                "Piano post-processing cleanup was turned off, so extracted piano notes were kept without cleanup filtering, duplicate merging, or overlap trimming."
+            )
+            if disabled_warning not in output_warnings:
+                output_warnings.append(disabled_warning)
         if tempo_estimate.warning is not None and tempo_estimate.warning not in output_warnings:
             output_warnings.append(tempo_estimate.warning)
 

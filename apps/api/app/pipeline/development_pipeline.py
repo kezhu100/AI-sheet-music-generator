@@ -89,7 +89,11 @@ class DevelopmentProcessingPipeline:
             )
             for transcription in transcriptions
         ]
-        post_processing_result = self._post_processor.process(raw_tracks, warnings)
+        post_processing_result = self._post_processor.process(
+            raw_tracks,
+            warnings,
+            processing_preferences,
+        )
 
         return JobResult(
             projectName=Path(original_file_name).stem,

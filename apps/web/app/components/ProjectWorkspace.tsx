@@ -20,6 +20,7 @@ import type {
   JobDraftRecord,
   JobRecord,
   NoteEvent,
+  PianoPostProcessingBasePreset,
   ProcessingPreferences,
   ProviderInstallState,
   ProviderPreferences,
@@ -51,6 +52,11 @@ import {
   uploadAudio
 } from "../../lib/api";
 import { getUiCopy } from "../../lib/uiCopy";
+import {
+  buildPianoPostProcessingFromPreset,
+  DEFAULT_PROCESSING_PREFERENCES,
+  toEditableProcessingPreferences
+} from "../../lib/pianoProcessing";
 import { useEditableJobResult } from "../hooks/useEditableJobResult";
 import { DrumNotationPreview } from "./DrumNotationPreview";
 import { NoteEditorPanel } from "./NoteEditorPanel";
@@ -58,6 +64,7 @@ import { PianoRollPreview } from "./PianoRollPreview";
 import { PianoScorePreview } from "./PianoScorePreview";
 import { ProjectWorkspaceAdvancedDetails } from "./ProjectWorkspaceAdvancedDetails";
 import { ProjectWorkspaceExportPanel } from "./ProjectWorkspaceExportPanel";
+import { PianoProcessingControls } from "./PianoProcessingControls";
 import { ProjectWorkspaceRuntimeOptions } from "./ProjectWorkspaceRuntimeOptions";
 import { TrackVisibilityControls } from "./TrackVisibilityControls";
 
@@ -75,15 +82,6 @@ const DEFAULT_PROVIDER_PREFERENCES: ProviderPreferences = {
   sourceSeparation: "auto",
   pianoTranscription: "auto",
   drumTranscription: "auto"
-};
-
-const DEFAULT_PROCESSING_PREFERENCES: ProcessingPreferences = {
-  pianoFilter: {
-    enabled: true,
-    lowCutHz: 45,
-    highCutHz: 7200,
-    cleanupStrength: 0.42
-  }
 };
 
 function renderBilingualText(text: string): ReactNode {
@@ -571,20 +569,6 @@ function toEditableProviderPreferences(
     sourceSeparation: providerPreferences?.sourceSeparation ?? "auto",
     pianoTranscription: providerPreferences?.pianoTranscription ?? "auto",
     drumTranscription: providerPreferences?.drumTranscription ?? "auto"
-  };
-}
-
-function toEditableProcessingPreferences(
-  processingPreferences?: ProcessingPreferences | null
-): ProcessingPreferences {
-  return {
-    pianoFilter: {
-      enabled: processingPreferences?.pianoFilter?.enabled ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.enabled,
-      lowCutHz: processingPreferences?.pianoFilter?.lowCutHz ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.lowCutHz,
-      highCutHz: processingPreferences?.pianoFilter?.highCutHz ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.highCutHz,
-      cleanupStrength:
-        processingPreferences?.pianoFilter?.cleanupStrength ?? DEFAULT_PROCESSING_PREFERENCES.pianoFilter.cleanupStrength
-    }
   };
 }
 
@@ -1606,6 +1590,65 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
     }));
   }
 
+  function handlePianoPostProcessingEnabledChange(enabled: boolean): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoPostProcessing: {
+        ...currentPreferences.pianoPostProcessing,
+        enabled
+      }
+    }));
+  }
+
+  function handlePianoPostProcessingPresetChange(
+    preset: PianoPostProcessingBasePreset
+  ): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoPostProcessing: buildPianoPostProcessingFromPreset(
+        preset,
+        currentPreferences.pianoPostProcessing.enabled
+      )
+    }));
+  }
+
+  function handlePianoPostProcessingNumberChange(
+    key:
+      | "isolatedWeakNoteThreshold"
+      | "duplicateMergeToleranceMs"
+      | "overlapTrimAggressiveness"
+      | "confidenceThreshold",
+    value: number
+  ): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoPostProcessing: {
+        ...currentPreferences.pianoPostProcessing,
+        preset: "custom",
+        basePreset:
+          currentPreferences.pianoPostProcessing.preset === "custom"
+            ? currentPreferences.pianoPostProcessing.basePreset
+            : currentPreferences.pianoPostProcessing.preset,
+        [key]: value
+      }
+    }));
+  }
+
+  function handleExtremeNoteFilteringChange(enabled: boolean): void {
+    setProcessingPreferences((currentPreferences) => ({
+      ...currentPreferences,
+      pianoPostProcessing: {
+        ...currentPreferences.pianoPostProcessing,
+        preset: "custom",
+        basePreset:
+          currentPreferences.pianoPostProcessing.preset === "custom"
+            ? currentPreferences.pianoPostProcessing.basePreset
+            : currentPreferences.pianoPostProcessing.preset,
+        extremeNoteFiltering: enabled
+      }
+    }));
+  }
+
   async function handleInstallProviderOption(
     preferenceKey: keyof ProviderPreferences,
     option: RuntimeProviderOption,
@@ -2080,6 +2123,10 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
                 processingPreferences={processingPreferences}
                 onTogglePianoFilterEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
                 onChangePianoFilterNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                onTogglePianoPostProcessingEnabled={handlePianoPostProcessingEnabledChange}
+                onSelectPianoPostProcessingPreset={handlePianoPostProcessingPresetChange}
+                onChangePianoPostProcessingNumber={handlePianoPostProcessingNumberChange}
+                onToggleExtremeNoteFiltering={handleExtremeNoteFilteringChange}
                 isCustomProviderFormOpen={isCustomProviderFormOpen}
                 onToggleCustomProviderForm={() => setIsCustomProviderFormOpen((currentOpen) => !currentOpen)}
                 customProviderManifestUrl={customProviderManifestUrl}
@@ -2339,21 +2386,25 @@ export function ProjectWorkspace({ mode, initialProjectDetail = null }: ProjectW
               </div>
             </article>
             <article className="score-secondary-card ornate-card audition-card">
-              <h3>Piano Filter Controls / 钢琴过滤控制</h3>
+              <h3>Piano Processing Controls / 钢琴处理控制</h3>
               <p className="muted">
-                Tune the filtered piano stem, then rerun this project to rebuild the preview and piano transcription from the saved settings.
+                Adjust pre-processing and post-processing separately, then rerun this project to rebuild the piano draft with the saved settings.
                 <br />
-                调整过滤后的钢琴 stem 参数后，重新运行当前项目，即可按已保存设置重建预览和钢琴转写。
+                将转写前预处理与转写后清理分开调节，然后重新运行当前项目，即可按已保存设置重建钢琴草稿。
               </p>
-              <PianoFilterSettingsPanel
-                value={processingPreferences.pianoFilter}
+              <PianoProcessingControls
+                processingPreferences={processingPreferences}
                 disabled={isRerunningProject}
-                onToggleEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
-                onChangeNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                onTogglePianoFilterEnabled={(enabled) => handlePianoFilterSettingChange("enabled", enabled)}
+                onChangePianoFilterNumber={(key, value) => handlePianoFilterSettingChange(key, value)}
+                onTogglePianoPostProcessingEnabled={handlePianoPostProcessingEnabledChange}
+                onSelectPianoPostProcessingPreset={handlePianoPostProcessingPresetChange}
+                onChangePianoPostProcessingNumber={handlePianoPostProcessingNumberChange}
+                onToggleExtremeNoteFiltering={handleExtremeNoteFilteringChange}
               />
               <div className="actions">
                 <button className="button" type="button" disabled={!projectDetail || isRerunningProject} onClick={() => void handleRerunProject()}>
-                  {isRerunningProject ? "Rebuilding Filtered Stem... / 正在重建过滤后的 Stem..." : "Rerun with Current Filter / 按当前过滤设置重跑"}
+                  {isRerunningProject ? "Rebuilding Piano Draft... / 正在重建钢琴草稿..." : "Rerun with Current Piano Settings / 按当前钢琴设置重跑"}
                 </button>
               </div>
             </article>

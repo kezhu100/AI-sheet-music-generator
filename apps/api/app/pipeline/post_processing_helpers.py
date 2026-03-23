@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from statistics import median
 
-from app.models.schemas import MIN_NOTE_DURATION_SEC, NoteEvent, TrackResult
+from app.models.schemas import (
+    MIN_NOTE_DURATION_SEC,
+    NoteEvent,
+    PianoPostProcessingSettings,
+    ProcessingPreferences,
+    TrackResult,
+)
 from app.pipeline.timing import (
     absolute_beat_to_bar_beat,
     beats_to_seconds,
@@ -40,6 +46,32 @@ PIANO_LONG_NOTE_CONFIDENCE_THRESHOLD = 0.78
 PIANO_DUPLICATE_WINDOW_SEC = 0.08
 DRUM_DUPLICATE_WINDOW_SEC = 0.05
 
+# Presets intentionally stay conservative because this product favors
+# quick verification and export handoff over destructive browser cleanup.
+PIANO_POST_PROCESSING_PRESETS: dict[str, dict[str, float | bool]] = {
+    "low": {
+        "isolated_weak_note_threshold": 0.48,
+        "duplicate_merge_tolerance_ms": 55,
+        "overlap_trim_aggressiveness": 0.35,
+        "extreme_note_filtering": False,
+        "confidence_threshold": 0.24,
+    },
+    "medium": {
+        "isolated_weak_note_threshold": 0.58,
+        "duplicate_merge_tolerance_ms": 80,
+        "overlap_trim_aggressiveness": 0.75,
+        "extreme_note_filtering": True,
+        "confidence_threshold": 0.35,
+    },
+    "high": {
+        "isolated_weak_note_threshold": 0.68,
+        "duplicate_merge_tolerance_ms": 110,
+        "overlap_trim_aggressiveness": 1.0,
+        "extreme_note_filtering": True,
+        "confidence_threshold": 0.45,
+    },
+}
+
 
 @dataclass(frozen=True)
 class CleanupStats:
@@ -60,6 +92,40 @@ class TempoEstimate:
 class QuantizationPlan:
     bpm: int
     subdivision: int
+
+
+def build_piano_post_processing_settings_from_preset(
+    preset: str,
+    *,
+    enabled: bool = True,
+) -> PianoPostProcessingSettings:
+    preset_values = PIANO_POST_PROCESSING_PRESETS[preset]
+    return PianoPostProcessingSettings(
+        enabled=enabled,
+        preset=preset,
+        basePreset=preset,
+        isolatedWeakNoteThreshold=preset_values["isolated_weak_note_threshold"],
+        duplicateMergeToleranceMs=preset_values["duplicate_merge_tolerance_ms"],
+        overlapTrimAggressiveness=preset_values["overlap_trim_aggressiveness"],
+        extremeNoteFiltering=preset_values["extreme_note_filtering"],
+        confidenceThreshold=preset_values["confidence_threshold"],
+    )
+
+
+def resolve_piano_post_processing_settings(
+    preferences: ProcessingPreferences | None = None,
+) -> PianoPostProcessingSettings:
+    if preferences is None:
+        return PianoPostProcessingSettings()
+
+    configured_settings = preferences.piano_post_processing
+    if configured_settings.preset == "custom":
+        return configured_settings
+
+    return build_piano_post_processing_settings_from_preset(
+        configured_settings.preset,
+        enabled=configured_settings.enabled,
+    )
 
 
 def merge_tracks(tracks: list[TrackResult]) -> list[TrackResult]:
@@ -89,9 +155,13 @@ def merge_tracks(tracks: list[TrackResult]) -> list[TrackResult]:
     return sort_tracks(list(merged.values()))
 
 
-def clean_track_notes(track: TrackResult) -> tuple[list[NoteEvent], CleanupStats]:
+def clean_track_notes(
+    track: TrackResult,
+    piano_settings: PianoPostProcessingSettings | None = None,
+) -> tuple[list[NoteEvent], CleanupStats]:
     if track.instrument == "piano":
-        return _clean_piano_track_notes(track)
+        resolved_piano_settings = piano_settings or PianoPostProcessingSettings()
+        return _clean_piano_track_notes(track, resolved_piano_settings)
 
     cleaned: list[NoteEvent] = []
     low_confidence_filtered = 0
@@ -186,13 +256,26 @@ def choose_quantization_plan(tracks: list[TrackResult], bpm: int) -> Quantizatio
     return QuantizationPlan(bpm=bpm, subdivision=subdivision)
 
 
-def quantize_track_notes(track: TrackResult, plan: QuantizationPlan) -> tuple[list[NoteEvent], CleanupStats]:
+def quantize_track_notes(
+    track: TrackResult,
+    plan: QuantizationPlan,
+    piano_settings: PianoPostProcessingSettings | None = None,
+) -> tuple[list[NoteEvent], CleanupStats]:
     quantized_notes: list[NoteEvent] = []
     for note in sort_notes(track.notes):
         quantized_notes.append(_quantize_note(note, plan))
 
+    resolved_piano_settings = piano_settings or PianoPostProcessingSettings()
+    if track.instrument == "piano" and not resolved_piano_settings.enabled:
+        return sort_notes(quantized_notes), CleanupStats()
+
     deduped_notes, duplicates_removed = _dedupe_notes(track.instrument, quantized_notes, quantized=True)
-    overlap_cleaned_notes, overlaps_trimmed = _trim_overlaps(track.instrument, deduped_notes, plan)
+    overlap_cleaned_notes, overlaps_trimmed = _trim_overlaps(
+        track.instrument,
+        deduped_notes,
+        plan,
+        resolved_piano_settings,
+    )
     return sort_notes(overlap_cleaned_notes), CleanupStats(
         duplicates_removed=duplicates_removed,
         overlaps_trimmed=overlaps_trimmed,
@@ -251,36 +334,63 @@ def sort_tracks(tracks: list[TrackResult]) -> list[TrackResult]:
     return sorted(tracks, key=lambda track: (track.instrument, track.source_stem, track.provider))
 
 
-def _should_filter_note(note: NoteEvent) -> bool:
+def _should_filter_note(
+    note: NoteEvent,
+    piano_settings: PianoPostProcessingSettings | None = None,
+) -> bool:
     confidence = 1.0 if note.confidence is None else note.confidence
     if confidence < VERY_LOW_CONFIDENCE_THRESHOLD:
         return True
 
-    threshold = DRUM_CONFIDENCE_THRESHOLD if note.instrument == "drums" else PIANO_CONFIDENCE_THRESHOLD
+    threshold = DRUM_CONFIDENCE_THRESHOLD
+    if note.instrument == "piano":
+        resolved_piano_settings = piano_settings or PianoPostProcessingSettings()
+        threshold = resolved_piano_settings.confidence_threshold
     if confidence < threshold:
         return True
 
     if note.instrument == "piano" and note.offset_sec is not None:
         duration = note.offset_sec - note.onset_sec
-        if duration < SHORT_PIANO_DURATION_SEC and confidence < SHORT_PIANO_CONFIDENCE_THRESHOLD:
+        short_note_threshold = max(
+            SHORT_PIANO_CONFIDENCE_THRESHOLD,
+            threshold,
+        )
+        if duration < SHORT_PIANO_DURATION_SEC and confidence < short_note_threshold:
             return True
 
     return False
 
 
-def _clean_piano_track_notes(track: TrackResult) -> tuple[list[NoteEvent], CleanupStats]:
+def _clean_piano_track_notes(
+    track: TrackResult,
+    settings: PianoPostProcessingSettings,
+) -> tuple[list[NoteEvent], CleanupStats]:
     sorted_notes = sort_notes(track.notes)
+    if not settings.enabled:
+        normalized_notes: list[NoteEvent] = []
+        invalid_timing_fixed = 0
+        for note in sorted_notes:
+            normalized_note = note
+            if note.offset_sec is not None and note.offset_sec <= note.onset_sec:
+                normalized_note = note.model_copy(
+                    update={"offset_sec": round(note.onset_sec + MIN_NOTE_DURATION_SEC, 3)}
+                )
+                invalid_timing_fixed += 1
+            normalized_notes.append(normalized_note)
+
+        return normalized_notes, CleanupStats(invalid_timing_fixed=invalid_timing_fixed)
+
     cleaned: list[NoteEvent] = []
     low_confidence_filtered = 0
     piano_residual_filtered = 0
     invalid_timing_fixed = 0
 
     for index, note in enumerate(sorted_notes):
-        if _should_filter_note(note):
+        if _should_filter_note(note, settings):
             low_confidence_filtered += 1
             continue
 
-        if _should_filter_piano_residual(note, sorted_notes, index):
+        if _should_filter_piano_residual(note, sorted_notes, index, settings):
             piano_residual_filtered += 1
             continue
 
@@ -293,7 +403,11 @@ def _clean_piano_track_notes(track: TrackResult) -> tuple[list[NoteEvent], Clean
 
         cleaned.append(normalized_note)
 
-    deduped_notes, duplicates_removed = _dedupe_notes(track.instrument, cleaned)
+    deduped_notes, duplicates_removed = _dedupe_notes(
+        track.instrument,
+        cleaned,
+        duplicate_window_sec=settings.duplicate_merge_tolerance_ms / 1000.0,
+    )
     return deduped_notes, CleanupStats(
         low_confidence_filtered=low_confidence_filtered,
         piano_residual_filtered=piano_residual_filtered,
@@ -302,7 +416,12 @@ def _clean_piano_track_notes(track: TrackResult) -> tuple[list[NoteEvent], Clean
     )
 
 
-def _should_filter_piano_residual(note: NoteEvent, notes: list[NoteEvent], index: int) -> bool:
+def _should_filter_piano_residual(
+    note: NoteEvent,
+    notes: list[NoteEvent],
+    index: int,
+    settings: PianoPostProcessingSettings,
+) -> bool:
     pitch = note.pitch
     if pitch is None:
         return False
@@ -312,7 +431,11 @@ def _should_filter_piano_residual(note: NoteEvent, notes: list[NoteEvent], index
     has_local_support = _has_piano_local_support(notes, index)
     is_extreme_register = pitch < PIANO_STRICT_REGISTER_LOW_PITCH or pitch > PIANO_STRICT_REGISTER_HIGH_PITCH
 
-    if (pitch < PIANO_CONSERVATIVE_MIN_PITCH or pitch > PIANO_CONSERVATIVE_MAX_PITCH) and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD:
+    if (
+        settings.extreme_note_filtering
+        and (pitch < PIANO_CONSERVATIVE_MIN_PITCH or pitch > PIANO_CONSERVATIVE_MAX_PITCH)
+        and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD
+    ):
         return True
 
     if duration >= PIANO_MAX_DURATION_SEC:
@@ -322,11 +445,11 @@ def _should_filter_piano_residual(note: NoteEvent, notes: list[NoteEvent], index
         return True
 
     if not has_local_support:
-        if confidence < PIANO_ISOLATED_CONFIDENCE_THRESHOLD and (
+        if confidence < settings.isolated_weak_note_threshold and (
             duration <= PIANO_ISOLATED_SHORT_DURATION_SEC or duration >= PIANO_ISOLATED_LONG_DURATION_SEC
         ):
             return True
-        if is_extreme_register and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD:
+        if settings.extreme_note_filtering and is_extreme_register and confidence < PIANO_REGISTER_CONFIDENCE_THRESHOLD:
             return True
 
     return False
@@ -417,13 +540,20 @@ def _minimum_note_duration(instrument: str, bpm: int, subdivision: int) -> float
     return max(MIN_NOTE_DURATION_SEC, beats_to_seconds(1 / subdivision, bpm))
 
 
-def _dedupe_notes(instrument: str, notes: list[NoteEvent], quantized: bool = False) -> tuple[list[NoteEvent], int]:
+def _dedupe_notes(
+    instrument: str,
+    notes: list[NoteEvent],
+    quantized: bool = False,
+    duplicate_window_sec: float | None = None,
+) -> tuple[list[NoteEvent], int]:
     if not notes:
         return [], 0
 
     duplicates_removed = 0
     output: list[NoteEvent] = []
-    duplicate_window = DRUM_DUPLICATE_WINDOW_SEC if instrument == "drums" else PIANO_DUPLICATE_WINDOW_SEC
+    duplicate_window = duplicate_window_sec
+    if duplicate_window is None:
+        duplicate_window = DRUM_DUPLICATE_WINDOW_SEC if instrument == "drums" else PIANO_DUPLICATE_WINDOW_SEC
     if quantized:
         duplicate_window = 0.001
 
@@ -487,8 +617,14 @@ def _trim_overlaps(
     instrument: str,
     notes: list[NoteEvent],
     plan: QuantizationPlan,
+    piano_settings: PianoPostProcessingSettings | None = None,
 ) -> tuple[list[NoteEvent], int]:
     if instrument != "piano":
+        return notes, 0
+
+    resolved_piano_settings = piano_settings or PianoPostProcessingSettings()
+    aggressiveness = max(0.0, min(1.0, resolved_piano_settings.overlap_trim_aggressiveness))
+    if aggressiveness <= 0:
         return notes, 0
 
     trimmed_count = 0
@@ -506,6 +642,13 @@ def _trim_overlaps(
             previous_note = output[previous_index]
             if previous_note.offset_sec is not None and previous_note.offset_sec > note.onset_sec:
                 minimum_duration = _minimum_note_duration("piano", plan.bpm, plan.subdivision)
+                overlap_sec = previous_note.offset_sec - note.onset_sec
+                minimum_overlap_to_trim = minimum_duration * (1.0 - aggressiveness)
+                if overlap_sec <= minimum_overlap_to_trim:
+                    last_by_pitch[pitch] = len(output)
+                    output.append(note)
+                    continue
+
                 trimmed_offset = round(max(previous_note.onset_sec + minimum_duration, note.onset_sec), 3)
                 if trimmed_offset < previous_note.offset_sec:
                     output[previous_index] = previous_note.model_copy(update={"offset_sec": trimmed_offset})

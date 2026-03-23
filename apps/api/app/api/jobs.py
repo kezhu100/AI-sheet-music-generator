@@ -107,6 +107,7 @@ async def retranscribe_job_region(job_id: str, payload: RegionRetranscriptionReq
         result_stems=job.result.stems,
         request=payload,
         provider_preferences=job.provider_preferences,
+        processing_preferences=job.processing_preferences,
     )
     return RegionRetranscriptionResponse(
         instrument=payload.instrument,

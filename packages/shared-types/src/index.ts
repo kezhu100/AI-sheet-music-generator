@@ -39,8 +39,23 @@ export interface PianoFilterSettings {
   cleanupStrength: number;
 }
 
+export type PianoPostProcessingPreset = "low" | "medium" | "high" | "custom";
+export type PianoPostProcessingBasePreset = "low" | "medium" | "high";
+
+export interface PianoPostProcessingSettings {
+  enabled: boolean;
+  preset: PianoPostProcessingPreset;
+  basePreset: PianoPostProcessingBasePreset;
+  isolatedWeakNoteThreshold: number;
+  duplicateMergeToleranceMs: number;
+  overlapTrimAggressiveness: number;
+  extremeNoteFiltering: boolean;
+  confidenceThreshold: number;
+}
+
 export interface ProcessingPreferences {
   pianoFilter: PianoFilterSettings;
+  pianoPostProcessing: PianoPostProcessingSettings;
 }
 
 export interface NoteEvent {

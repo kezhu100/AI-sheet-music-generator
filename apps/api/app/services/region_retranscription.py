@@ -10,7 +10,14 @@ from tempfile import TemporaryDirectory
 from fastapi import HTTPException, status
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import NoteEvent, ProviderPreferences, RegionRetranscriptionRequest, StemAsset, TrackResult
+from app.models.schemas import (
+    NoteEvent,
+    ProcessingPreferences,
+    ProviderPreferences,
+    RegionRetranscriptionRequest,
+    StemAsset,
+    TrackResult,
+)
 from app.pipeline.drum_transcription import build_drum_transcription_provider
 from app.pipeline.interfaces import SourceStem, TranscriptionResult
 from app.pipeline.piano_transcription import build_piano_transcription_provider
@@ -37,6 +44,7 @@ class RegionRetranscriptionService:
         result_stems: list[StemAsset],
         request: RegionRetranscriptionRequest,
         provider_preferences: ProviderPreferences | None = None,
+        processing_preferences: ProcessingPreferences | None = None,
     ) -> RegionRetranscriptionRunResult:
         stem_asset = self._resolve_stem_asset(result_stems, request.instrument)
         stem_path = resolve_project_path(stem_asset.stored_path)
@@ -75,6 +83,7 @@ class RegionRetranscriptionService:
                 )
             ],
             warnings=transcription_result.warnings,
+            processing_preferences=processing_preferences,
         )
 
         if not processed.tracks:

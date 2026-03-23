@@ -82,6 +82,22 @@ Phase 11H upload streaming reliability update:
 - the backend now streams upload chunks directly into the existing local uploads directory
 - a configurable server-side max upload size is enforced during streaming, and oversized uploads fail with a clear 413-style API error after partial-file cleanup
 
+Phase 11I piano cleanup control update:
+- processing preferences now split piano cleanup into two explicit stages:
+  - pre-processing before transcription for piano stem filtering
+  - post-processing after transcription for extracted piano note cleanup
+- piano post-processing now has a dedicated structured config with:
+  - `enabled`
+  - `preset` (`low`, `medium`, `high`, `custom`)
+  - `basePreset`
+  - advanced fields for isolated weak note threshold, duplicate merge tolerance, overlap trim aggressiveness, extreme note filtering, and confidence threshold
+- `medium` is the recommended default preset
+- the backend now treats preset-backed and custom post-processing settings predictably:
+  - selecting a preset restores that preset bundle
+  - editing an advanced value switches the profile to `custom`
+- if piano post-processing is disabled, the backend skips piano cleanup filtering, duplicate merging, and overlap trimming while keeping the broader normalization path intact
+- region re-transcription now reuses the same persisted piano post-processing settings so cleanup behavior stays consistent across full runs and local piano-region reruns
+
 Phase 12 productization update:
 - job creation now also creates a filesystem-backed project manifest so the local project library can outlive API process memory
 - job progress, completion, failure, and draft-save events now update that project manifest rather than depending on the in-memory `job_store` for persisted project listing/detail

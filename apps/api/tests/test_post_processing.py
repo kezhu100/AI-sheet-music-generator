@@ -6,8 +6,9 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.models.schemas import NoteEvent, TrackResult
+from app.models.schemas import NoteEvent, ProcessingPreferences, TrackResult
 from app.pipeline.post_processing import LightweightPostProcessor
+from app.pipeline.post_processing_helpers import build_piano_post_processing_settings_from_preset
 
 
 class PostProcessingTests(unittest.TestCase):
@@ -62,6 +63,38 @@ class PostProcessingTests(unittest.TestCase):
             "Phase 11D post-processing removed 1 near-duplicate note events while cleaning overlapping provider output.",
             result.warnings,
         )
+
+    def test_post_processing_off_bypasses_piano_cleanup_filters(self) -> None:
+        processor = LightweightPostProcessor()
+        track = TrackResult(
+            instrument="piano",
+            sourceStem="piano_stem",
+            provider="provider-a",
+            eventCount=4,
+            notes=[
+                self._piano_note("duplicate-low", 0.50, 0.88, 60, 0.44),
+                self._piano_note("duplicate-strong", 0.53, 0.96, 60, 0.92),
+                self._piano_note("short-weak", 1.02, 1.09, 67, 0.41),
+                self._piano_note("isolated-high-noise", 2.20, 2.32, 106, 0.46),
+            ],
+        )
+
+        result = processor.process(
+            [track],
+            warnings=[],
+            processing_preferences=ProcessingPreferences.model_validate(
+                {"pianoPostProcessing": {"enabled": False}}
+            ),
+        )
+        note_ids = [note.id for note in result.tracks[0].notes]
+
+        self.assertEqual(
+            note_ids,
+            ["duplicate-low", "duplicate-strong", "short-weak", "isolated-high-noise"],
+        )
+        self.assertFalse(any("filtered 1 low-confidence" in warning for warning in result.warnings))
+        self.assertFalse(any("removed 1 near-duplicate" in warning for warning in result.warnings))
+        self.assertTrue(any("turned off" in warning for warning in result.warnings))
 
     def test_trims_overlapping_piano_notes_after_quantization(self) -> None:
         processor = LightweightPostProcessor()
@@ -153,6 +186,59 @@ class PostProcessingTests(unittest.TestCase):
 
         self.assertEqual(note_ids, ["left", "middle", "right"])
         self.assertFalse(any("suspicious piano note events" in warning for warning in result.warnings))
+
+    def test_low_medium_and_high_presets_expose_distinct_backend_values(self) -> None:
+        low = build_piano_post_processing_settings_from_preset("low")
+        medium = build_piano_post_processing_settings_from_preset("medium")
+        high = build_piano_post_processing_settings_from_preset("high")
+
+        self.assertLess(low.confidence_threshold, medium.confidence_threshold)
+        self.assertLess(medium.confidence_threshold, high.confidence_threshold)
+        self.assertLess(low.duplicate_merge_tolerance_ms, medium.duplicate_merge_tolerance_ms)
+        self.assertLess(medium.duplicate_merge_tolerance_ms, high.duplicate_merge_tolerance_ms)
+        self.assertLess(low.overlap_trim_aggressiveness, medium.overlap_trim_aggressiveness)
+        self.assertLess(medium.overlap_trim_aggressiveness, high.overlap_trim_aggressiveness)
+        self.assertFalse(low.extreme_note_filtering)
+        self.assertTrue(medium.extreme_note_filtering)
+        self.assertTrue(high.extreme_note_filtering)
+
+    def test_custom_advanced_settings_can_keep_extreme_note_when_filtering_is_disabled(self) -> None:
+        processor = LightweightPostProcessor()
+        track = TrackResult(
+            instrument="piano",
+            sourceStem="piano_stem",
+            provider="provider-a",
+            eventCount=4,
+            notes=[
+                self._piano_note("keep-left", 0.00, 0.42, 60, 0.86),
+                self._piano_note("keep-right", 0.50, 0.92, 64, 0.84),
+                self._piano_note("keep-third", 1.02, 1.38, 67, 0.82),
+                self._piano_note("isolated-high-noise", 2.20, 2.32, 106, 0.46),
+            ],
+        )
+
+        result = processor.process(
+            [track],
+            warnings=[],
+            processing_preferences=ProcessingPreferences.model_validate(
+                {
+                    "pianoPostProcessing": {
+                        "preset": "custom",
+                        "basePreset": "medium",
+                        "isolatedWeakNoteThreshold": 0.40,
+                        "duplicateMergeToleranceMs": 80,
+                        "overlapTrimAggressiveness": 0.75,
+                        "extremeNoteFiltering": False,
+                        "confidenceThreshold": 0.35,
+                    }
+                }
+            ),
+        )
+
+        self.assertEqual(
+            [note.id for note in result.tracks[0].notes],
+            ["keep-left", "keep-right", "keep-third", "isolated-high-noise"],
+        )
 
     def test_merges_same_instrument_and_source_stem_tracks_with_stable_provider_name(self) -> None:
         processor = LightweightPostProcessor()

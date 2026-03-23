@@ -54,6 +54,9 @@
 - [x] clarify export guidance so MuseScore, MIDI/DAW, and compatibility-oriented paths are easy to distinguish
 - [x] add conservative piano post-processing cleanup to reduce residual-driven false positives
 - [x] add configurable piano stem pre-filtering with filtered preview + same-project rerun flow
+- [x] split piano processing controls into explicit pre-processing and post-processing sections
+- [x] add simple piano post-processing on/off plus Low / Medium / High cleanup presets with Medium as the recommended default
+- [x] add advanced piano post-processing controls behind a collapsed details section without widening browser-side editing scope
 
 ## Phase 15L - Desktop Packaging (Optional / Future)
 - [ ] evaluate optional packaging direction (Electron, Tauri, or equivalent)

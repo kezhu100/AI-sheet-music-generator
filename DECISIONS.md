@@ -2,6 +2,26 @@
 
 ## Decision Log
 
+### 2026-03-23
+Decision:
+- Split piano cleanup controls into explicit pre-processing and post-processing sections, and make piano post-processing a two-layer control model with simple presets plus advanced overrides.
+
+Context:
+- The existing piano post-processing heuristics could remove too many notes, while the UI already had a separate piano stem pre-filter before transcription.
+- Product direction still requires local-first processing, lightweight browser verification, and MuseScore as the deep-edit path, so the fix needed to improve control without expanding browser-side editing complexity.
+
+Chosen option:
+- Keep piano stem filtering as a pre-transcription stage and label it clearly as such in the UI.
+- Add a dedicated piano post-processing settings block under `ProcessingPreferences`.
+- Expose only post-processing on/off and Low / Medium / High cleanup presets in the main visible layer.
+- Put advanced post-processing thresholds behind an advanced details area.
+- Let preset selection restore a known backend parameter bundle, and let advanced edits switch the profile to `custom`.
+- Keep the normalized `JobResult` contract unchanged and preserve backward compatibility by defaulting missing persisted fields.
+
+Tradeoffs:
+- This adds a modest amount of settings and persistence complexity, but it keeps the user-facing path understandable and makes piano cleanup less destructive.
+- The browser still stops at verification and quick fixes; deeper score cleanup remains a MuseScore handoff task.
+
 ### 2026-03-21
 Decision:
 - Add a lightweight, configurable piano stem pre-filter stage before piano transcription, and make the filtered stem the default piano preview in the workspace.

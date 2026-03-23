@@ -44,6 +44,9 @@ It does not add:
 
 Small additive contract refinements are allowed when they stay architecture-safe, such as exposing runtime provider availability options and accepting per-job provider preferences without changing the normalized `JobResult` boundary.
 
+Another additive contract refinement now extends `ProcessingPreferences` with a dedicated piano post-processing settings block.
+This keeps the normalized `JobResult` unchanged while letting the frontend, API, persisted project manifests, reruns, and region re-transcription share the same project-local cleanup settings.
+
 ## Additive Provider Capability Layer (Backend Foundation)
 An additive backend foundation now exists for optional enhanced providers.
 
@@ -99,7 +102,7 @@ The processing pipeline remains:
 6. optional backend-owned piano stem pre-filtering before piano transcription
 7. piano transcription via the configured provider
 8. drum transcription via the configured provider
-9. backend-owned post-processing and normalization, including conservative piano cleanup for residual-heavy stems
+9. backend-owned post-processing and normalization, including controllable piano cleanup after transcription
 10. deliver normalized `JobResult`
 11. clone to frontend draft for editing
 12. save/load latest draft separately when requested
@@ -129,6 +132,11 @@ Provider install behavior follows the same boundary:
 - heavy optional downloads are never forced during normal app startup
 - custom-provider registration status is queryable through the same backend-owned install-status layer
 - runtime diagnostics surface custom providers distinctly from official enhanced options instead of folding them into the fixed official set
+
+Processing-control behavior follows the same boundary:
+- the frontend owns the simple two-layer control presentation
+- the backend owns preset mapping, cleanup semantics, and post-processing execution
+- project/job persistence stores processing preferences additively so older saved projects without the new fields still load through defaults
 
 ## Future Direction
 - preserve the current local-first browser architecture

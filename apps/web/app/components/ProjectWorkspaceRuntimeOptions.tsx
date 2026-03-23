@@ -2,12 +2,14 @@
 
 import { type MouseEvent } from "react";
 import type {
+  PianoPostProcessingBasePreset,
   ProcessingPreferences,
   ProviderInstallState,
   ProviderPreferences,
   RuntimeProviderOption,
   RuntimeProviderStatus
 } from "@ai-sheet-music-generator/shared-types";
+import { PianoProcessingControls } from "./PianoProcessingControls";
 
 export interface RuntimeProviderInstallUiState {
   state: ProviderInstallState | "starting";
@@ -250,93 +252,6 @@ function RuntimeProviderPreferenceField({
   );
 }
 
-interface PianoFilterSettingsPanelProps {
-  value: ProcessingPreferences["pianoFilter"];
-  disabled?: boolean;
-  onToggleEnabled: (enabled: boolean) => void;
-  onChangeNumber: (key: "lowCutHz" | "highCutHz" | "cleanupStrength", value: number) => void;
-}
-
-function PianoFilterSettingsPanel({
-  value,
-  disabled = false,
-  onToggleEnabled,
-  onChangeNumber
-}: PianoFilterSettingsPanelProps) {
-  return (
-    <section className="runtime-custom-section">
-      <div className="runtime-custom-header">
-        <div>
-          <strong>Piano Stem Cleanup / 钢琴 Stem 清理</strong>
-          <div className="muted runtime-custom-help">
-            This lightweight pre-filter runs after source separation and before piano transcription. The filtered piano stem
-            is also the default piano preview.
-            <br />
-            这个轻量预过滤步骤位于源分离之后、钢琴转写之前。过滤后的钢琴 stem 也会作为默认钢琴预览。
-          </div>
-        </div>
-      </div>
-      <div className="runtime-custom-form ornate-card">
-        <label className="runtime-option-card">
-          <input
-            checked={value.enabled}
-            disabled={disabled}
-            type="checkbox"
-            onChange={(event) => onToggleEnabled(event.target.checked)}
-          />
-          <span className="runtime-option-label">Use filtered piano stem by default / 默认使用过滤后的钢琴 stem</span>
-          <span className="muted">Keeps the raw separated stem available, but makes preview and transcription favor the cleaned stem. / 保留原始分离 stem，同时让预览和转写优先使用清理后的版本。</span>
-        </label>
-
-        <div className="field">
-          <label htmlFor="piano-filter-low-cut">Low cleanup / 低频清理: {Math.round(value.lowCutHz)} Hz</label>
-          <input
-            id="piano-filter-low-cut"
-            type="range"
-            min="20"
-            max="180"
-            step="5"
-            disabled={disabled || !value.enabled}
-            value={value.lowCutHz}
-            onChange={(event) => onChangeNumber("lowCutHz", Number(event.target.value))}
-          />
-          <div className="muted">Reduces low bass-like residue in the piano stem. / 减少钢琴 stem 里偏低频、像贝斯一样的残留。</div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="piano-filter-high-cut">High cleanup / 高频清理: {Math.round(value.highCutHz)} Hz</label>
-          <input
-            id="piano-filter-high-cut"
-            type="range"
-            min="3000"
-            max="12000"
-            step="250"
-            disabled={disabled || !value.enabled}
-            value={value.highCutHz}
-            onChange={(event) => onChangeNumber("highCutHz", Number(event.target.value))}
-          />
-          <div className="muted">Softens sharp high-frequency bleed that may confuse transcription. / 柔化可能干扰转写的尖锐高频串音。</div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="piano-filter-strength">Cleanup strength / 清理强度: {value.cleanupStrength.toFixed(2)}</label>
-          <input
-            id="piano-filter-strength"
-            type="range"
-            min="0"
-            max="0.9"
-            step="0.05"
-            disabled={disabled || !value.enabled}
-            value={value.cleanupStrength}
-            onChange={(event) => onChangeNumber("cleanupStrength", Number(event.target.value))}
-          />
-          <div className="muted">Controls how strongly the piano stem is cleaned before transcription. / 控制钢琴 stem 在转写前被清理得多强。</div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 interface ProjectWorkspaceRuntimeOptionsProps {
   isRefreshingRuntimeDiagnostics: boolean;
   onRefreshRuntimeDiagnostics: () => void;
@@ -356,6 +271,17 @@ interface ProjectWorkspaceRuntimeOptionsProps {
   processingPreferences: ProcessingPreferences;
   onTogglePianoFilterEnabled: (enabled: boolean) => void;
   onChangePianoFilterNumber: (key: "lowCutHz" | "highCutHz" | "cleanupStrength", value: number) => void;
+  onTogglePianoPostProcessingEnabled: (enabled: boolean) => void;
+  onSelectPianoPostProcessingPreset: (preset: PianoPostProcessingBasePreset) => void;
+  onChangePianoPostProcessingNumber: (
+    key:
+      | "isolatedWeakNoteThreshold"
+      | "duplicateMergeToleranceMs"
+      | "overlapTrimAggressiveness"
+      | "confidenceThreshold",
+    value: number
+  ) => void;
+  onToggleExtremeNoteFiltering: (enabled: boolean) => void;
   isCustomProviderFormOpen: boolean;
   onToggleCustomProviderForm: () => void;
   customProviderManifestUrl: string;
@@ -381,6 +307,10 @@ export function ProjectWorkspaceRuntimeOptions({
   processingPreferences,
   onTogglePianoFilterEnabled,
   onChangePianoFilterNumber,
+  onTogglePianoPostProcessingEnabled,
+  onSelectPianoPostProcessingPreset,
+  onChangePianoPostProcessingNumber,
+  onToggleExtremeNoteFiltering,
   isCustomProviderFormOpen,
   onToggleCustomProviderForm,
   customProviderManifestUrl,
@@ -448,10 +378,14 @@ export function ProjectWorkspaceRuntimeOptions({
             titleZh="鼓组转写"
           />
         </div>
-        <PianoFilterSettingsPanel
-          value={processingPreferences.pianoFilter}
-          onToggleEnabled={onTogglePianoFilterEnabled}
-          onChangeNumber={onChangePianoFilterNumber}
+        <PianoProcessingControls
+          processingPreferences={processingPreferences}
+          onTogglePianoFilterEnabled={onTogglePianoFilterEnabled}
+          onChangePianoFilterNumber={onChangePianoFilterNumber}
+          onTogglePianoPostProcessingEnabled={onTogglePianoPostProcessingEnabled}
+          onSelectPianoPostProcessingPreset={onSelectPianoPostProcessingPreset}
+          onChangePianoPostProcessingNumber={onChangePianoPostProcessingNumber}
+          onToggleExtremeNoteFiltering={onToggleExtremeNoteFiltering}
         />
         <section className="runtime-custom-section">
           <div className="runtime-custom-header">

@@ -11,7 +11,7 @@ The current product includes:
 - local audio normalization to a stable PCM WAV intermediate for common music formats
 - provider-based source separation and transcription
 - configurable piano stem pre-filtering before piano transcription
-- conservative piano post-processing cleanup to reduce residual-driven false positives
+- controllable piano post-processing cleanup with on/off, Low/Medium/High presets, and advanced overrides to reduce residual-driven false positives without over-deleting notes
 - lightweight result review in the browser
 - draft editing and saved-draft persistence for cleanup before export
 - region re-transcription and draft analysis
@@ -75,6 +75,14 @@ A lightweight result-side provider summary now makes Auto selection and fallback
 The same compact runtime area can now also accept a local `file://...json` custom manifest URL for backend registration, while keeping custom providers diagnostic-only and not execution-ready in this phase.
 For the fixed official enhanced set, `demucs-drums` now provides the practical enhanced drum path by reusing Demucs stem isolation plus lightweight rule-based onset detection, while the built-in heuristic drum provider remains the stable fallback.
 
+Piano processing controls are now split into two explicit stages:
+- pre-processing before transcription for piano stem cleanup/filtering
+- post-processing after transcription for piano note cleanup
+
+The post-processing stage now uses a two-layer control model:
+- layer 1: post-processing on/off plus Low / Medium / High cleanup presets, with Medium recommended by default
+- layer 2: advanced post-processing settings behind a details/disclosure area
+
 Backend provider scope is now intentionally split:
 - built-in base providers remain the default runnable path
 - the fixed official enhanced-provider set is only demucs, basic-pitch, and demucs-drums
@@ -105,6 +113,7 @@ This roadmap direction clarifies the product center of gravity:
 - the browser UI is a verification surface, not a final notation editor
 - draft editing remains for quick fixes before export, not deep engraving work
 - piano stem cleanup can now be tuned in the workspace and heard before rerunning transcription
+- piano note cleanup can now be disabled, preset-driven, or refined with advanced post-processing thresholds without expanding browser-side editing complexity
 - separate piano/drum MusicXML handoff to MuseScore is the intended final notation-editing path
 - export quality and usability now matter more than richer in-browser notation rendering
 

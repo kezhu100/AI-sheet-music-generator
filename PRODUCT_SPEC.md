@@ -19,7 +19,7 @@ Implemented product scope includes:
 - backend-local normalization of common audio inputs into a stable PCM WAV intermediate
 - source separation, piano transcription, and drum transcription
 - configurable piano stem pre-filtering before piano transcription
-- conservative piano post-processing cleanup to suppress obvious residual-driven false positives
+- controllable piano post-processing cleanup to suppress obvious residual-driven false positives with less destructive defaults
 - lightweight score preview, drum notation preview, stem audition, and piano-roll editing
 - draft editing with undo / redo and saved latest-draft persistence
 - region re-transcription
@@ -57,6 +57,10 @@ Presentation priorities:
 - export guidance should clearly distinguish MuseScore-oriented MusicXML handoff, DAW-oriented MIDI export, and combined export as an optional compatibility path
 - drum MusicXML should use lightweight percussion semantics so MuseScore imports it as a readable drum staff without pretending to be a full notation engine
 - the workspace should let users hear a filtered piano stem and adjust a small number of plain-language cleanup controls before rerunning transcription
+- piano processing controls should clearly separate pre-processing before transcription from post-processing after transcription
+- post-processing should expose only on/off plus Low / Medium / High cleanup in the main visible layer
+- Medium cleanup should be the recommended default
+- advanced post-processing thresholds should stay in a collapsed detail area and should move the profile into a clear custom state when edited
 - the homepage may carry the strongest fantasy/music atmosphere, but imagery must stay controlled and all workflow panels must remain readable and product-like
 - the fixed official enhanced-provider set remains limited to demucs, basic-pitch, and demucs-drums
 - any future extra provider should come through a controlled custom-provider extension path rather than expanding the built-in official enhanced set
@@ -73,6 +77,7 @@ A successful current product:
 - preserves the original result while allowing saved and unsaved draft editing
 - exports valid piano-only and drums-only MIDI and MusicXML
 - keeps piano cleanup controls small, understandable, and project-local
+- keeps piano cleanup more controllable without turning browser editing into a heavier note-editing workflow
 - makes MuseScore handoff obvious and honest
 - keeps local project workflows honest and understandable
 - presents advanced technical detail without cluttering the main path

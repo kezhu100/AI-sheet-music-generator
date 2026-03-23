@@ -87,8 +87,11 @@ Local-first AI transcription and draft-cleanup with a browser UI, local backend,
 - **Conservative piano draft cleanup after transcription**  
   **钢琴转谱后增加保守型草稿清理**
 
-  Piano post-processing now applies lightweight conservative filtering to reduce false positives caused by non-piano residuals left in the separated piano stem.  
-  钢琴后处理现在会做轻量保守过滤，用于减少分离后钢琴 stem 中残留的非钢琴成分带来的误检。  
+  Piano post-processing can now be turned on or off, uses Low / Medium / High cleanup presets with Medium as the recommended default, and exposes advanced thresholds only inside an advanced section.  
+  钢琴后处理现在可以开启或关闭，提供 Low / Medium / High 三档清理预设，并以 Medium 作为推荐默认值；高级阈值仅放在高级设置里。  
+
+  This keeps pre-transcription piano stem cleanup clearly separate from post-transcription piano note cleanup, making the cleanup path more controllable and less destructive.  
+  这样可以把“转写前的钢琴 stem 清理”和“转写后的钢琴音符清理”明确分开，让清理过程更可控，也更不容易误删音符。  
 
 - **Configurable piano stem pre-filter before transcription**  
   **钢琴转谱前增加可调的分轨预过滤**
@@ -174,9 +177,9 @@ Not required for normal app usage
 audio
   -> local ffmpeg normalization / PCM WAV handoff
   -> source separation
-  -> optional configurable piano stem pre-filter
+  -> optional configurable piano stem pre-filter before transcription
   -> piano / drum transcription
-  -> post-processing
+  -> optional configurable piano note post-processing after transcription
   -> lightweight preview + stem audition
   -> editable draft cleanup
   -> separate piano / drums MIDI / MusicXML export
@@ -190,6 +193,8 @@ audio
   **通过轻量预览与分轨试听确认草稿可用性**
 - **Tune the filtered piano stem when separation leaves residue**  
   **当钢琴分轨仍有残留时，可先调节过滤后的钢琴试听**
+- **Choose a simple piano cleanup preset, then open advanced post-processing only if needed**  
+  **先选择简单的钢琴清理预设，只有在需要时才展开高级后处理参数**
 - **Refine obvious issues in-browser**  
   **在浏览器内修正明显问题**
 - **Export clean separated output and finish in MuseScore**  

@@ -23,6 +23,8 @@ CustomProviderSourceTransport = Literal["file"]
 SourceSeparationProviderPreference = Literal["auto", "development-copy", "demucs"]
 PianoTranscriptionProviderPreference = Literal["auto", "heuristic", "basic-pitch"]
 DrumTranscriptionProviderPreference = Literal["auto", "heuristic", "demucs-drums"]
+PianoPostProcessingPreset = Literal["low", "medium", "high", "custom"]
+PianoPostProcessingBasePreset = Literal["low", "medium", "high"]
 MIN_NOTE_DURATION_SEC = 0.05
 MIN_MIDI_NOTE = 0
 MAX_MIDI_NOTE = 127
@@ -94,8 +96,52 @@ class PianoFilterSettings(BaseModel):
         return self
 
 
+class PianoPostProcessingSettings(BaseModel):
+    enabled: bool = True
+    preset: PianoPostProcessingPreset = "medium"
+    base_preset: PianoPostProcessingBasePreset = Field(default="medium", alias="basePreset")
+    isolated_weak_note_threshold: float = Field(default=0.58, alias="isolatedWeakNoteThreshold")
+    duplicate_merge_tolerance_ms: int = Field(default=80, alias="duplicateMergeToleranceMs")
+    overlap_trim_aggressiveness: float = Field(default=0.75, alias="overlapTrimAggressiveness")
+    extreme_note_filtering: bool = Field(default=True, alias="extremeNoteFiltering")
+    confidence_threshold: float = Field(default=0.35, alias="confidenceThreshold")
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    @field_validator("isolated_weak_note_threshold", "confidence_threshold")
+    @classmethod
+    def validate_thresholds(cls, value: float) -> float:
+        if value < 0 or value > 1:
+            raise ValueError("Post-processing thresholds must stay between 0 and 1.")
+        return value
+
+    @field_validator("duplicate_merge_tolerance_ms")
+    @classmethod
+    def validate_duplicate_merge_tolerance_ms(cls, value: int) -> int:
+        if value < 10 or value > 200:
+            raise ValueError("duplicateMergeToleranceMs must stay between 10 and 200.")
+        return value
+
+    @field_validator("overlap_trim_aggressiveness")
+    @classmethod
+    def validate_overlap_trim_aggressiveness(cls, value: float) -> float:
+        if value < 0 or value > 1:
+            raise ValueError("overlapTrimAggressiveness must stay between 0 and 1.")
+        return value
+
+    @model_validator(mode="after")
+    def normalize_base_preset(self) -> "PianoPostProcessingSettings":
+        if self.preset != "custom":
+            self.base_preset = self.preset
+        return self
+
+
 class ProcessingPreferences(BaseModel):
     piano_filter: PianoFilterSettings = Field(default_factory=PianoFilterSettings, alias="pianoFilter")
+    piano_post_processing: PianoPostProcessingSettings = Field(
+        default_factory=PianoPostProcessingSettings,
+        alias="pianoPostProcessing",
+    )
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

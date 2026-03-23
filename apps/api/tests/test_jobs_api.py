@@ -44,6 +44,16 @@ class JobsApiTests(unittest.TestCase):
                             "lowCutHz": 60,
                             "highCutHz": 6800,
                             "cleanupStrength": 0.5,
+                        },
+                        "pianoPostProcessing": {
+                            "enabled": True,
+                            "preset": "high",
+                            "basePreset": "high",
+                            "isolatedWeakNoteThreshold": 0.68,
+                            "duplicateMergeToleranceMs": 110,
+                            "overlapTrimAggressiveness": 1.0,
+                            "extremeNoteFiltering": True,
+                            "confidenceThreshold": 0.45,
                         }
                     },
                 },
@@ -55,6 +65,7 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(payload["providerPreferences"]["pianoTranscription"], "basic-pitch")
         self.assertEqual(payload["providerPreferences"]["drumTranscription"], "demucs-drums")
         self.assertEqual(payload["processingPreferences"]["pianoFilter"]["lowCutHz"], 60)
+        self.assertEqual(payload["processingPreferences"]["pianoPostProcessing"]["preset"], "high")
         start_job_mock.assert_called_once()
         _, _, provider_preferences, processing_preferences = start_job_mock.call_args.args
         self.assertEqual(provider_preferences.source_separation, "demucs")
@@ -62,6 +73,8 @@ class JobsApiTests(unittest.TestCase):
         self.assertEqual(provider_preferences.drum_transcription, "demucs-drums")
         self.assertEqual(processing_preferences.piano_filter.low_cut_hz, 60)
         self.assertEqual(processing_preferences.piano_filter.high_cut_hz, 6800)
+        self.assertEqual(processing_preferences.piano_post_processing.preset, "high")
+        self.assertEqual(processing_preferences.piano_post_processing.duplicate_merge_tolerance_ms, 110)
 
     def test_get_job_stem_asset_streams_local_stem_file(self) -> None:
         settings = get_settings()
